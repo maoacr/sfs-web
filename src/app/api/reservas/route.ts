@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 import { notificarCambioReserva } from "@/lib/event-listeners";
+import { liberarReservasExpiradas } from "@/lib/ttl";
 
 /**
  * POST /api/reservas
@@ -16,6 +17,10 @@ import { notificarCambioReserva } from "@/lib/event-listeners";
 export async function POST(request: Request) {
   try {
     const user = await getAuthUser(request);
+
+    // Limpiar reservas expiradas
+    liberarReservasExpiradas().catch(() => {});
+
     const body = await request.json();
 
     const { canchaId, slotInicio, slotFin, playerId, playerNombre } = body;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { liberarReservasExpiradas } from "@/lib/ttl";
 
 /**
  * GET /api/disponibilidad
@@ -13,6 +14,10 @@ import { getAuthUser, AuthError } from "@/lib/auth-api";
 export async function GET(request: Request) {
   try {
     const user = await getAuthUser(request);
+
+    // Limpiar reservas expiradas antes de mostrar disponibilidad
+    liberarReservasExpiradas().catch(() => {});
+
     const { searchParams } = new URL(request.url);
     const fecha = searchParams.get("fecha");
     const tipo = searchParams.get("tipo");
