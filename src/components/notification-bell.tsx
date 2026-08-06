@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 
 interface Notif {
   id: string;
@@ -8,6 +9,7 @@ interface Notif {
   titulo: string;
   mensaje: string;
   leida: boolean;
+  reservaId?: string | null;
   createdAt: string;
 }
 
@@ -20,6 +22,8 @@ const ICONOS: Record<string, string> = {
 };
 
 export function NotificationBell() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [count, setCount] = useState(0);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [open, setOpen] = useState(false);
@@ -46,13 +50,18 @@ export function NotificationBell() {
     } catch {}
   }
 
-  async function marcarLeida(id: string) {
+  async function marcarLeida(notif: Notif) {
     await fetch("/api/notificaciones", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id: notif.id }),
     });
     setCount(c => Math.max(0, c - 1));
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, leida: true } : n));
+    setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, leida: true } : n));
+
+    // Navegar a la página de reservas según el rol
+    const role = pathname.startsWith("/owner") ? "owner" : "player";
+    router.push(`/${role}/reservas`);
+    setOpen(false);
   }
 
   async function marcarTodas() {
@@ -124,7 +133,7 @@ export function NotificationBell() {
               ) : (
                 <div className="divide-y divide-border/50">
                   {notifs.map(n => (
-                    <button key={n.id} onClick={() => marcarLeida(n.id)}
+                    <button key={n.id} onClick={() => marcarLeida(n)}
                       className={`w-full text-left px-5 py-4 transition-colors hover:bg-surface-hover ${
                         !n.leida ? "bg-field/5" : ""
                       }`}>

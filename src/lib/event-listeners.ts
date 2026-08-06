@@ -5,6 +5,8 @@ import { onReservaEvent } from "./events";
 import { crearNotificacion } from "./notifications";
 import { notificarPorEmail } from "./email";
 
+let initialized = false;
+
 // ─── Mensajes ──────────────────────────────────────────────────────────────
 
 const mensajes: Record<string, { player: { titulo: string; mensaje: string }; owner: { titulo: string; mensaje: string } }> = {
@@ -33,6 +35,9 @@ const mensajes: Record<string, { player: { titulo: string; mensaje: string }; ow
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 export function initNotificaciones() {
+  if (initialized) return;
+  initialized = true;
+
   onReservaEvent(async (event) => {
     const msgs = mensajes[event.tipo];
     if (!msgs) return;
