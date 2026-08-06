@@ -1,5 +1,18 @@
 import { Resend } from "resend";
-import type { ReservaEvent } from "./events";
+
+interface ReservaEvent {
+  tipo: string;
+  reservaId: string;
+  canchaNombre: string;
+  complejoNombre: string;
+  slotInicio: Date;
+  slotFin: Date;
+  playerId: string;
+  playerNombre: string;
+  playerEmail: string;
+  tenantId: string;
+  tenantEmail: string;
+}
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)

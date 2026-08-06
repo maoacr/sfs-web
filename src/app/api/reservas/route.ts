@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
-import { emitReservaEvent } from "@/lib/events";
-import { initNotificaciones } from "@/lib/event-listeners";
-
-// Registrar listeners una vez
-initNotificaciones();
+import { notificarCambioReserva } from "@/lib/event-listeners";
 
 /**
  * POST /api/reservas
@@ -91,9 +87,9 @@ export async function POST(request: Request) {
       },
     });
 
-    // Emitir evento
+    // Notificar a ambos
     const eventTipo = user.role === "OWNER" ? "RESERVA_CONFIRMADA" : "RESERVA_CREADA";
-    emitReservaEvent({
+    notificarCambioReserva({
       tipo: eventTipo as any,
       reservaId: reserva.id,
       canchaNombre: reserva.cancha.nombre,

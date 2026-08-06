@@ -1,11 +1,5 @@
-// Wire up: cuando se emite un evento de reserva,
-// se crea notificación in-app Y se envía email.
-
-import { onReservaEvent } from "./events";
 import { crearNotificacion } from "./notifications";
 import { notificarPorEmail } from "./email";
-
-let initialized = false;
 
 // ─── Mensajes ──────────────────────────────────────────────────────────────
 
@@ -32,37 +26,44 @@ const mensajes: Record<string, { player: { titulo: string; mensaje: string }; ow
   },
 };
 
-// ─── Init ───────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
-export function initNotificaciones() {
-  if (initialized) return;
-  initialized = true;
+export async function notificarCambioReserva(event: {
+  tipo: string;
+  reservaId: string;
+  canchaNombre: string;
+  complejoNombre: string;
+  slotInicio: Date;
+  slotFin: Date;
+  playerId: string;
+  playerNombre: string;
+  playerEmail: string;
+  tenantId: string;
+  tenantEmail: string;
+}) {
+  const msgs = mensajes[event.tipo];
+  if (!msgs) return;
 
-  onReservaEvent(async (event) => {
-    const msgs = mensajes[event.tipo];
-    if (!msgs) return;
+  // In-app: jugador
+  await crearNotificacion({
+    userId: event.playerId,
+    tipo: event.tipo,
+    titulo: `${msgs.player.titulo} — ${event.canchaNombre}`,
+    mensaje: msgs.player.mensaje,
+    reservaId: event.reservaId,
+  });
 
-    // In-app: jugador
+  // In-app: dueño
+  if (msgs.owner.titulo) {
     await crearNotificacion({
-      userId: event.playerId,
+      userId: event.tenantId,
       tipo: event.tipo,
-      titulo: `${msgs.player.titulo} — ${event.canchaNombre}`,
-      mensaje: `${msgs.player.mensaje}`,
+      titulo: `${msgs.owner.titulo} — ${event.canchaNombre}`,
+      mensaje: `${event.playerNombre} ${msgs.owner.mensaje}`,
       reservaId: event.reservaId,
     });
+  }
 
-    // In-app: dueño
-    if (msgs.owner.titulo) {
-      await crearNotificacion({
-        userId: event.tenantId,
-        tipo: event.tipo,
-        titulo: `${msgs.owner.titulo} — ${event.canchaNombre}`,
-        mensaje: `${event.playerNombre} ${msgs.owner.mensaje}`,
-        reservaId: event.reservaId,
-      });
-    }
-
-    // Email
-    await notificarPorEmail(event);
-  });
+  // Email
+  await notificarPorEmail(event as any);
 }

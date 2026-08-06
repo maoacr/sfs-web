@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
-import { emitReservaEvent } from "@/lib/events";
-import { initNotificaciones } from "@/lib/event-listeners";
-
-initNotificaciones();
+import { notificarCambioReserva } from "@/lib/event-listeners";
 
 /**
  * PUT /api/reservas/[id]
@@ -43,9 +40,9 @@ export async function PUT(
       },
     });
 
-    // Emitir evento según el nuevo estado
+    // Notificar
     const eventTipo = body.estado === "COMPLETADA" ? "RESERVA_COMPLETADA" : "RESERVA_CANCELADA";
-    emitReservaEvent({
+    notificarCambioReserva({
       tipo: eventTipo,
       reservaId: updated.id,
       canchaNombre: updated.cancha.nombre,

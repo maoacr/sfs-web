@@ -26,7 +26,7 @@ export default function OwnerDashboard() {
     };
     load();
     // Auto-refresh cada 30 segundos
-    const interval = setInterval(load, 30000);
+    const interval = setInterval(load, 10000);
     return () => clearInterval(interval);
   }, []);
 

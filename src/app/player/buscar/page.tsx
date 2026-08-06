@@ -18,25 +18,33 @@ export default function PlayerBuscar() {
   const [selectedCancha, setSelectedCancha] = useState<CanchaSlot & { complejoNombre: string; complejoDireccion: string } | null>(null);
 
   useEffect(() => {
+    let active = true;
+    const load = () => {
+      if (!active) return;
+      const params = new URLSearchParams({ fecha });
+      if (tipo) params.set("tipo", tipo);
+      fetch(`/api/disponibilidad?${params}`)
+        .then(r => r.json()).then(canchas => {
+          if (!active) return;
+          const byComplejo: Record<string, ComplejoSlot> = {};
+          canchas.forEach((c: any) => {
+            if (!byComplejo[c.complejo.id]) {
+              byComplejo[c.complejo.id] = {
+                id: c.complejo.id, nombre: c.complejo.nombre,
+                direccion: c.complejo.direccion, telefono: c.complejo.telefono, canchas: [],
+              };
+            }
+            byComplejo[c.complejo.id].canchas.push(c);
+          });
+          setComplejos(Object.values(byComplejo));
+        })
+        .catch(() => {})
+        .finally(() => { if (active) setLoading(false); });
+    };
     setLoading(true);
-    const params = new URLSearchParams({ fecha });
-    if (tipo) params.set("tipo", tipo);
-    fetch(`/api/disponibilidad?${params}`)
-      .then(r => r.json()).then(canchas => {
-        const byComplejo: Record<string, ComplejoSlot> = {};
-        canchas.forEach((c: any) => {
-          if (!byComplejo[c.complejo.id]) {
-            byComplejo[c.complejo.id] = {
-              id: c.complejo.id, nombre: c.complejo.nombre,
-              direccion: c.complejo.direccion, telefono: c.complejo.telefono, canchas: [],
-            };
-          }
-          byComplejo[c.complejo.id].canchas.push(c);
-        });
-        setComplejos(Object.values(byComplejo));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    load();
+    const interval = setInterval(load, 10000);
+    return () => { active = false; clearInterval(interval); };
   }, [fecha, tipo]);
 
   async function reservar(canchaId: string, slot: Slot) {
