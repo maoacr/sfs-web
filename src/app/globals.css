@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* ─── SFS Design Tokens ──────────────────────────────────────────────────────
+   Dark mode by default. Football-field-inspired green palette.
+   Two green tones: field (deep) + grass (vibrant)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  /* Greens — dos tonos como el campo de fútbol */
+  --color-field: #0a5c2a;       /* verde oscuro — fondo de campo */
+  --color-field-light: #0d7234; /* hover states */
+  --color-grass: #16a34a;       /* verde vibrante — CTAs, acentos */
+  --color-grass-light: #22c55e; /* hover CTA */
+
+  /* Backgrounds */
+  --color-bg: #0a0a0a;          /* fondo principal */
+  --color-surface: #141414;     /* tarjetas, inputs */
+  --color-surface-hover: #1c1c1c; /* hover de tarjetas */
+
+  /* Text */
+  --color-text: #ededed;        /* texto principal */
+  --color-text-muted: #a1a1aa;  /* texto secundario */
+  --color-text-dim: #71717a;    /* texto terciario */
+
+  /* Borders */
+  --color-border: #262626;      /* bordes sutiles */
+  --color-border-hover: #404040; /* borde en hover */
+
+  /* States */
+  --color-error: #ef4444;
+  --color-error-bg: #1f0f0f;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #1f1806;
+  --color-success: #22c55e;
+  --color-success-bg: #061a0e;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ─── Base ─────────────────────────────────────────────────────────────────── */
+
+html {
+  font-size: 16px;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smoother cards and surfaces */
+.rounded-2xl, .rounded-xl {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* ─── Selection ────────────────────────────────────────────────────────────── */
+
+::selection {
+  background: var(--color-grass);
+  color: white;
+}
+
+/* ─── Animations ───────────────────────────────────────────────────────────── */
+
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
+/* ─── Safe Area (iPhone notch / home indicator) ────────────────────────────── */
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* ─── Focus ring ───────────────────────────────────────────────────────────── */
+
+*:focus-visible {
+  outline: 2px solid var(--color-grass);
+  outline-offset: 2px;
+}
