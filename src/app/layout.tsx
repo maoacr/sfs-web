@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sileo";
 import { OfflineBanner } from "@/components/offline-banner";
 import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PwaRegister />
       </head>
       <body className="min-h-screen flex flex-col bg-bg text-text">
+        <Toaster position="top-right" />
         <OfflineBanner />
         {children}
       </body>

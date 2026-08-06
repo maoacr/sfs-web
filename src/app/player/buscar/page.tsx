@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sileo } from "sileo";
 
 interface Slot { inicio: string; fin: string; disponible: boolean }
 interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; slots: Slot[] }
@@ -14,12 +15,10 @@ export default function PlayerBuscar() {
   const [complejos, setComplejos] = useState<ComplejoSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [selectedCancha, setSelectedCancha] = useState<CanchaSlot & { complejoNombre: string; complejoDireccion: string } | null>(null);
 
   useEffect(() => {
-    setLoading(true); setError("");
+    setLoading(true);
     const params = new URLSearchParams({ fecha });
     if (tipo) params.set("tipo", tipo);
     fetch(`/api/disponibilidad?${params}`)
@@ -36,12 +35,12 @@ export default function PlayerBuscar() {
         });
         setComplejos(Object.values(byComplejo));
       })
-      .catch(() => setError("Error al cargar"))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [fecha, tipo]);
 
   async function reservar(canchaId: string, slot: Slot) {
-    setBooking(slot.inicio); setError(""); setSuccess("");
+    setBooking(slot.inicio);
     try {
       const res = await fetch("/api/reservas", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -52,7 +51,7 @@ export default function PlayerBuscar() {
         if (res.status === 409) throw new Error("Este slot ya fue reservado.");
         throw new Error(d.error || "Error");
       }
-      setSuccess("¡Reserva confirmada! Podés verla en Mis reservas.");
+      sileo.success({ title: "¡Reserva creada!", description: "Podés verla en Mis reservas." });
       setSelectedCancha(null);
       // Refrescar disponibilidad
       const params = new URLSearchParams({ fecha });
@@ -71,7 +70,7 @@ export default function PlayerBuscar() {
         setComplejos(Object.values(byComplejo));
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error");
+      sileo.error({ title: "Error al reservar", description: err instanceof Error ? err.message : "Error" });
     } finally { setBooking(null); }
   }
 
@@ -101,15 +100,6 @@ export default function PlayerBuscar() {
           </select>
         </div>
       </div>
-
-      {success && (
-        <div className="mb-4 rounded-xl bg-success-bg border border-success/20 px-4 py-3 text-sm text-success flex items-center gap-2">
-          <span>✅</span> {success}
-        </div>
-      )}
-      {error && (
-        <div className="mb-4 rounded-xl bg-error-bg border border-error/20 px-4 py-3 text-sm text-error">{error}</div>
-      )}
 
       {/* Complejos y canchas */}
       {loading ? (

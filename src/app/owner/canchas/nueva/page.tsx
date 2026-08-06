@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { sileo } from "sileo";
 
 const TIPOS = [
   { value: "F5", label: "Fútbol 5", jugadores: 10 },
@@ -57,8 +58,9 @@ function NuevaCanchaForm() {
         body: JSON.stringify({ complejoId, nombre, tipo, capacidad, descripcion: descripcion || undefined, servicios, duracionSlotMinutos: duracionSlot }),
       });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Error al crear"); }
+      sileo.success({ title: "Cancha creada", description: `${nombre} fue agregada exitosamente.` });
       router.push("/owner/dashboard"); router.refresh();
-    } catch (err) { setError(err instanceof Error ? err.message : "Error"); }
+    } catch (err) { sileo.error({ title: "Error", description: err instanceof Error ? err.message : "Error" }); }
     finally { setLoading(false); }
   }
 
