@@ -1,0 +1,205 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+
+interface CanchaInfo { id: string; nombre: string; tipo: string; capacidad: number; _count: { reservas: number } }
+
+export default function EditarComplejo() {
+  const router = useRouter();
+  const params = useParams();
+  const id = params.id as string;
+
+  const [nombre, setNombre] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [email, setEmail] = useState("");
+  const [canchas, setCanchas] = useState<CanchaInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"datos" | "canchas">("datos");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/complejos").then(r => r.json()).then(data => {
+      const c = data.find((x: any) => x.id === id);
+      if (c) {
+        setNombre(c.nombre); setDireccion(c.direccion);
+        setDescripcion(c.descripcion || ""); setTelefono(c.telefono || "");
+        setEmail(c.email || "");
+        setCanchas(c.canchas || []);
+      }
+    }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
+  }, [id]);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true); setError("");
+    try {
+      const res = await fetch(`/api/complejos/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, direccion, descripcion: descripcion || null, telefono: telefono || null, email: email || null }),
+      });
+      if (!res.ok) throw new Error("Error al guardar");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error");
+    } finally { setSaving(false); }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await fetch(`/api/complejos/${id}`, { method: "DELETE" });
+      router.push("/owner/complejos"); router.refresh();
+    } catch {
+      setError("Error al eliminar");
+      setDeleting(false);
+    }
+  }
+
+  const i = "mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass";
+  const l = "block text-sm font-medium text-text";
+
+  if (loading) return (
+    <div className="p-6 lg:p-8">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="h-8 w-20 animate-pulse rounded-lg bg-surface" />
+        <div className="h-8 w-48 animate-pulse rounded bg-surface" />
+      </div>
+      <div className="h-80 animate-pulse rounded-2xl bg-surface" />
+    </div>
+  );
+
+  return (
+    <div className="p-6 lg:p-8">
+      {/* Back + title */}
+      <div className="flex items-center gap-3 mb-2">
+        <Link href="/owner/complejos"
+          className="flex items-center justify-center h-9 w-9 rounded-xl border border-border text-text-muted hover:text-text hover:border-border-hover transition-colors text-sm">
+          ←
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-text">{nombre}</h1>
+          <p className="text-sm text-text-muted">Complejo deportivo · {canchas.length} cancha{canchas.length !== 1 ? "s" : ""}</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="mt-6 flex gap-1 rounded-xl bg-surface p-1 border border-border">
+        {(["datos", "canchas"] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              tab === t ? "bg-field text-grass-light shadow-sm" : "text-text-muted hover:text-text"
+            }`}>
+            {t === "datos" ? "Información" : `Canchas (${canchas.length})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: Datos del complejo */}
+      {tab === "datos" && (
+        <div className="mt-6 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          {saved && <div className="mb-4 rounded-xl bg-success-bg border border-success/20 px-4 py-3 text-sm text-success">✅ Cambios guardados</div>}
+          {error && <div className="mb-4 rounded-xl bg-error-bg px-4 py-3 text-sm text-error">{error}</div>}
+
+          <form onSubmit={handleSave} className="space-y-5">
+            <div>
+              <label className={l}>Nombre del complejo</label>
+              <input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} className={i} />
+            </div>
+            <div>
+              <label className={l}>Dirección</label>
+              <input type="text" required value={direccion} onChange={e => setDireccion(e.target.value)} className={i} />
+            </div>
+            <div>
+              <label className={l}>Descripción</label>
+              <textarea rows={3} value={descripcion} onChange={e => setDescripcion(e.target.value)} className={i} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={l}>Teléfono</label>
+                <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} className={i} />
+              </div>
+              <div>
+                <label className={l}>Email</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={i} />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button type="submit" disabled={saving}
+                className="rounded-xl bg-grass px-6 py-2.5 text-sm font-semibold text-white hover:bg-grass-light disabled:opacity-50 transition-colors">
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </button>
+              <button type="button" onClick={() => setShowDelete(true)}
+                className="rounded-xl border border-error/30 px-4 py-2.5 text-sm font-medium text-error hover:bg-error-bg transition-colors">
+                Eliminar complejo
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Tab: Canchas del complejo */}
+      {tab === "canchas" && (
+        <div className="mt-6 space-y-3">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-text-muted">{canchas.length} cancha{canchas.length !== 1 ? "s" : ""} en este complejo</p>
+            <Link href={`/owner/canchas/nueva?complejo=${id}`}
+              className="rounded-lg bg-grass px-4 py-2 text-sm font-semibold text-white hover:bg-grass-light transition-colors">
+              + Agregar cancha
+            </Link>
+          </div>
+
+          {canchas.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
+              <p className="text-text-muted text-sm">Este complejo no tiene canchas.</p>
+            </div>
+          ) : (
+            canchas.map(c => (
+              <Link key={c.id} href={`/owner/canchas/${c.id}`}
+                className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 hover:border-border-hover hover:shadow-sm transition-all duration-150">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-field/30 text-base">⚽</div>
+                  <div>
+                    <p className="text-sm font-semibold text-text">{c.nombre}</p>
+                    <p className="text-xs text-text-dim">{c.tipo} · {c.capacidad} jugadores</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {c._count && <span className="text-xs text-text-dim">{c._count.reservas} reservas</span>}
+                  <span className="text-text-dim text-sm">Gestionar →</span>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Delete modal */}
+      {showDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowDelete(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-text">¿Eliminar este complejo?</h3>
+            <p className="text-sm text-text-muted mt-2">Esta acción no se puede deshacer. Las canchas asociadas quedarán sin complejo.</p>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowDelete(false)}
+                className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm text-text-muted hover:bg-surface-hover">Cancelar</button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 rounded-xl bg-error px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50">
+                {deleting ? "Eliminando..." : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
