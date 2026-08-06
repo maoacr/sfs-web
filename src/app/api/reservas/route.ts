@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { emitReservaEvent } from "@/lib/events";
+import { initNotificaciones } from "@/lib/event-listeners";
+
+// Registrar listeners una vez
+initNotificaciones();
 
 /**
  * POST /api/reservas
@@ -80,9 +85,26 @@ export async function POST(request: Request) {
         estado: user.role === "OWNER" ? "CONFIRMADA" : "PENDIENTE_PAGO",
       },
       include: {
-        cancha: { select: { nombre: true, tipo: true } },
-        player: { select: { primerNombre: true, apellidos: true, apodo: true } },
+        cancha: { include: { complejo: true } },
+        player: { select: { id: true, primerNombre: true, apellidos: true, email: true } },
+        tenant: { select: { id: true, email: true } },
       },
+    });
+
+    // Emitir evento
+    const eventTipo = user.role === "OWNER" ? "RESERVA_CONFIRMADA" : "RESERVA_CREADA";
+    emitReservaEvent({
+      tipo: eventTipo as any,
+      reservaId: reserva.id,
+      canchaNombre: reserva.cancha.nombre,
+      complejoNombre: reserva.cancha.complejo.nombre,
+      slotInicio: reserva.slotInicio,
+      slotFin: reserva.slotFin,
+      playerId: reserva.playerId,
+      playerNombre: `${reserva.player.primerNombre} ${reserva.player.apellidos || ""}`.trim(),
+      playerEmail: reserva.player.email,
+      tenantId: reserva.tenantId,
+      tenantEmail: reserva.tenant.email,
     });
 
     return NextResponse.json(reserva, { status: 201 });

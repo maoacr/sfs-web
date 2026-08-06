@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { emitReservaEvent } from "@/lib/events";
+import { initNotificaciones } from "@/lib/event-listeners";
+
+initNotificaciones();
 
 /**
  * PUT /api/reservas/[id]
@@ -32,6 +36,27 @@ export async function PUT(
     const updated = await prisma.reserva.update({
       where: { id },
       data: { estado: body.estado },
+      include: {
+        cancha: { include: { complejo: true } },
+        player: { select: { id: true, primerNombre: true, apellidos: true, email: true } },
+        tenant: { select: { id: true, email: true } },
+      },
+    });
+
+    // Emitir evento según el nuevo estado
+    const eventTipo = body.estado === "COMPLETADA" ? "RESERVA_COMPLETADA" : "RESERVA_CANCELADA";
+    emitReservaEvent({
+      tipo: eventTipo,
+      reservaId: updated.id,
+      canchaNombre: updated.cancha.nombre,
+      complejoNombre: updated.cancha.complejo.nombre,
+      slotInicio: updated.slotInicio,
+      slotFin: updated.slotFin,
+      playerId: updated.playerId,
+      playerNombre: `${updated.player.primerNombre} ${updated.player.apellidos || ""}`.trim(),
+      playerEmail: updated.player.email,
+      tenantId: updated.tenantId,
+      tenantEmail: updated.tenant.email,
     });
 
     return NextResponse.json(updated);

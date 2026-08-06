@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NotificationBell } from "@/components/notification-bell";
 
 interface NavItem { label: string; href: string; icon: string }
 
@@ -43,22 +44,25 @@ export function AppSidebar({ role, nav }: { role: "OWNER" | "PLAYER"; nav: NavIt
                 {isActive(item.href) && (
                   <span className="ml-auto h-1.5 w-1.5 rounded-full bg-grass-light" />
                 )}
-              </Link>
+            </Link>
             ))}
           </nav>
 
           {/* Footer */}
           <div className="border-t border-border/50 px-5 py-4">
-            <Link href={role === "OWNER" ? "/owner/perfil" : "/player/perfil"}
-              className="flex items-center gap-3 mb-3 px-1 py-1.5 rounded-lg hover:bg-surface-hover transition-colors">
-              <div className="h-8 w-8 rounded-full bg-field flex items-center justify-center text-xs font-bold text-grass-light">
-                {role === "OWNER" ? "D" : "J"}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text truncate">Mi cuenta</p>
-                <p className="text-[11px] text-text-dim">{role === "OWNER" ? "Dueño" : "Jugador"}</p>
-              </div>
-            </Link>
+            <div className="flex items-center justify-between mb-3">
+              <Link href={role === "OWNER" ? "/owner/perfil" : "/player/perfil"}
+                className="flex items-center gap-3 px-1 py-1.5 rounded-lg hover:bg-surface-hover transition-colors">
+                <div className="h-8 w-8 rounded-full bg-field flex items-center justify-center text-xs font-bold text-grass-light">
+                  {role === "OWNER" ? "D" : "J"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text truncate">Mi cuenta</p>
+                  <p className="text-[11px] text-text-dim">{role === "OWNER" ? "Dueño" : "Jugador"}</p>
+                </div>
+              </Link>
+              <NotificationBell />
+            </div>
             <form action="/api/auth/logout" method="POST">
               <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-text-dim hover:text-error hover:bg-error-bg/50 transition-colors">
                 <span className="text-sm">🚪</span> Cerrar sesión

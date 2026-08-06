@@ -42,6 +42,14 @@ enum TipoDescuento {
   MONTO_FIJO
 }
 
+enum TipoNotificacion {
+  RESERVA_CREADA
+  RESERVA_CONFIRMADA
+  RESERVA_CANCELADA
+  RESERVA_COMPLETADA
+  RESERVA_EXPIRADA
+}
+
 // ─── Models ─────────────────────────────────────────────────────────────────
 
 model User {
@@ -223,4 +231,19 @@ model Promocion {
 
   @@index([codigo])
   @@map("promociones")
+}
+
+model Notificacion {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @map("user_id") @db.Uuid
+  tipo         TipoNotificacion
+  titulo       String           @db.VarChar(200)
+  mensaje      String           @db.Text
+  reservaId    String?          @map("reserva_id") @db.Uuid
+  leida        Boolean          @default(false)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([userId, leida])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notificaciones")
 }
