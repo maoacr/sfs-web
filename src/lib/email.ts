@@ -96,18 +96,7 @@ const ownerTemplates: Record<
   string,
   (e: ReservaEvent) => { subject: string; html: string } | null
 > = {
-  RESERVA_CREADA: (e) => ({
-    subject: `📅 Nueva reserva — ${e.canchaNombre} ${fD(e.slotInicio)}`,
-    html: `
-      <h2>Nueva reserva</h2>
-      <p><strong>${e.playerNombre}</strong> reservó en ${e.canchaNombre}.</p>
-      <table style="margin:16px 0;border-collapse:collapse">
-        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Fecha</td><td>${fD(e.slotInicio)}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Horario</td><td>${fH(e.slotInicio)} – ${fH(e.slotFin)}</td></tr>
-      </table>
-      <p style="color:#71717a;font-size:14px">Estado: pendiente de pago.</p>
-    `,
-  }),
+  RESERVA_CREADA: () => null, // Owner solo recibe email cuando el pago se confirma
 
   RESERVA_CONFIRMADA: (e) => ({
     subject: `✅ Pago recibido — ${e.canchaNombre} ${fD(e.slotInicio)}`,

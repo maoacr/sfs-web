@@ -6,7 +6,7 @@ import { notificarPorEmail } from "./email";
 const mensajes: Record<string, { player: { titulo: string; mensaje: string }; owner: { titulo: string; mensaje: string } }> = {
   RESERVA_CREADA: {
     player: { titulo: "Reserva pendiente de pago", mensaje: "Tu reserva está pendiente. Completá el pago en los próximos 15 minutos." },
-    owner:  { titulo: "Nueva reserva", mensaje: "recibiste una nueva reserva pendiente de pago." },
+    owner:  { titulo: "", mensaje: "" }, // Owner solo se notifica cuando el pago se confirma
   },
   RESERVA_CONFIRMADA: {
     player: { titulo: "¡Reserva confirmada!", mensaje: "Tu reserva fue confirmada. ¡Buen partido!" },
