@@ -31,6 +31,7 @@ JWT_SECRET=                 # Clave de firma JWT
 JWT_REFRESH_SECRET=
 MERCADOPAGO_ACCESS_TOKEN=   # (próximamente)
 NEXT_PUBLIC_APP_URL=
+RESEND_API_KEY=             # API key de Resend (emails de reservas)
 ```
 
 ## Navegación
