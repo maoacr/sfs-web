@@ -18,9 +18,5 @@ export default async function LoginPage() {
     }
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <AuthForm mode="login" />
-    </div>
-  );
+  return <AuthForm mode="login" />;
 }
