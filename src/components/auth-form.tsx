@@ -54,7 +54,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   // ─── Hero panel (left side, desktop) ─────────────────────────────────
 
   const HeroPanel = () => (
-    <div className="hidden lg:flex flex-col justify-center w-1/2 bg-gradient-to-br from-field to-field-light p-16 relative overflow-hidden">
+    <div className="hidden lg:flex flex-col justify-center w-5/12 bg-gradient-to-br from-field to-field-light p-16 relative overflow-hidden">
       {/* Decorative elements */}
       <div className="absolute top-12 left-12 text-8xl opacity-15">⚽</div>
       <div className="absolute bottom-20 right-16 text-9xl opacity-10 rotate-12">🥅</div>
@@ -107,8 +107,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   // ─── Form panel (right side, desktop) ─────────────────────────────────
 
   const FormPanel = () => (
-    <div className="w-full lg:w-1/2 flex flex-col justify-center p-4 sm:p-6 lg:p-16">
-      <div className="w-full lg:max-w-md mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full lg:w-7/12 flex flex-col justify-center p-4 sm:p-6 lg:p-12">
+      <div className="w-full lg:max-w-lg mx-auto space-y-5 sm:space-y-6">
         {/* Mobile branding (hidden on desktop) */}
         <div className="lg:hidden text-center">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-field">
