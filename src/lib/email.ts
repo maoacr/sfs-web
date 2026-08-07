@@ -18,8 +18,7 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-// Para producción: verificá tu dominio en Resend y cambialo acá
-const FROM = "SFS <onboarding@resend.dev>";
+const FROM = "SFS <notificaciones@maoacr.com>";
 
 function fH(iso: Date) {
   return new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
