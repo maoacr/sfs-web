@@ -13,7 +13,7 @@ Frontend y API del proyecto **SFS** — SaaS multi-tenant para gestión y reserv
 | Pagos | MercadoPago (Checkout Pro) |
 | PWA | Serwist (Service Worker) |
 | Monorepo | [maoacr/sfs](https://github.com/maoacr/sfs) (pnpm workspaces) |
-| Docs | [maoacr/sfs-docs](https://github.com/maoacr/sfs-docs) |
+| Docs | [sfsdocs.maoacr.com](https://sfsdocs.maoacr.com) |
 
 ## Arranque rápido
 
