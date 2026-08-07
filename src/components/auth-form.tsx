@@ -54,51 +54,70 @@ export function AuthForm({ mode }: AuthFormProps) {
   // ─── Hero panel (left side, desktop) ─────────────────────────────────
 
   const HeroPanel = () => (
-    <div className="hidden lg:flex flex-col justify-center w-5/12 bg-gradient-to-br from-field to-field-light p-16 relative overflow-hidden">
-      {/* Decorative elements */}
-      <div className="absolute top-12 left-12 text-8xl opacity-15">⚽</div>
-      <div className="absolute bottom-20 right-16 text-9xl opacity-10 rotate-12">🥅</div>
-      <div className="absolute top-1/3 right-24 text-6xl opacity-10">🏟️</div>
+    <div className="hidden lg:flex flex-col justify-center w-1/2 bg-gradient-to-br from-field via-field to-emerald-950 p-12 xl:p-16 relative overflow-hidden">
+      {/* Field lines pattern */}
+      <div className="absolute inset-0 opacity-[0.04]">
+        <div className="absolute top-1/2 left-0 right-0 h-px bg-white" />
+        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white" />
+        <div className="absolute top-0 bottom-0 left-1/4 w-px bg-white" />
+        <div className="absolute top-0 bottom-0 left-3/4 w-px bg-white" />
+        <div className="absolute top-1/4 left-0 right-0 h-px bg-white" />
+        <div className="absolute top-3/4 left-0 right-0 h-px bg-white" />
+        {/* Center circle */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border border-white" />
+      </div>
 
-      {/* Gradient circles */}
-      <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-grass/20 blur-3xl" />
-      <div className="absolute -bottom-32 -left-32 w-80 h-80 rounded-full bg-grass/10 blur-3xl" />
+      {/* Gradient glows */}
+      <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-grass/15 blur-3xl" />
+      <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl" />
+
+      {/* Decorative balls */}
+      <div className="absolute top-16 right-20 text-7xl opacity-[0.06] animate-pulse">⚽</div>
+      <div className="absolute bottom-24 left-16 text-8xl opacity-[0.04]">🥅</div>
 
       {/* Content */}
-      <div className="relative z-10 max-w-md">
-        <div className="flex items-center gap-3 mb-10">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-grass shadow-lg shadow-grass/25">
-            <span className="text-xl">⚽</span>
+      <div className="relative z-10 max-w-sm xl:max-w-md">
+        <div className="flex items-center gap-3 mb-12">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-grass shadow-xl shadow-grass/30">
+            <span className="text-2xl">⚽</span>
           </div>
           <div>
-            <span className="text-2xl font-bold text-white tracking-tight">SFS</span>
-            <span className="block text-sm text-white/60">Sistema de Fútbol</span>
+            <span className="text-3xl font-bold text-white tracking-tight">SFS</span>
+            <span className="block text-sm text-white/50">Sistema de Fútbol</span>
           </div>
         </div>
 
-        <h2 className="text-3xl font-bold text-white leading-tight mb-4">
-          {isLogin ? "Bienvenido de vuelta" : "Empezá a jugar"}
+        <h2 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-5">
+          {isLogin ? "Bienvenido\nde vuelta" : "Tu próxima\ncancha te espera"}
         </h2>
-        <p className="text-lg text-white/70 leading-relaxed">
+        <p className="text-lg text-white/60 leading-relaxed mb-10">
           {isLogin
-            ? "Gestioná tus canchas, revisá tus reservas y mantené todo bajo control desde un solo lugar."
-            : "Encontrá canchas cerca tuyo, reservá tu horario y jugá sin vueltas. La cancha te espera."}
+            ? "Gestioná tus complejos, revisá reservas y controlá todo desde un solo lugar."
+            : "Encontrá, reservá y jugá. La plataforma que conecta jugadores con las mejores canchas."}
         </p>
 
-        {/* Stats */}
-        <div className="flex gap-8 mt-10">
+        {/* Stats row */}
+        <div className="flex gap-10">
           <div>
-            <p className="text-2xl font-bold text-white">+100</p>
-            <p className="text-sm text-white/50">Canchas</p>
+            <p className="text-3xl font-bold text-white">+100</p>
+            <p className="text-sm text-white/40 mt-0.5">Canchas activas</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-white">+500</p>
-            <p className="text-sm text-white/50">Reservas</p>
+            <p className="text-3xl font-bold text-white">+1K</p>
+            <p className="text-sm text-white/40 mt-0.5">Reservas/mes</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-white">+1000</p>
-            <p className="text-sm text-white/50">Jugadores</p>
+            <p className="text-3xl font-bold text-white">+500</p>
+            <p className="text-sm text-white/40 mt-0.5">Jugadores</p>
           </div>
+        </div>
+
+        {/* Bottom quote */}
+        <div className="mt-12 pt-8 border-t border-white/10">
+          <p className="text-sm text-white/30 italic">
+            &ldquo;La mejor plataforma para gestionar mis canchas. Mis clientes reservan sin llamarme.&rdquo;
+          </p>
+          <p className="text-xs text-white/20 mt-2">— Carlos, dueño de Fútbol Center</p>
         </div>
       </div>
     </div>
@@ -107,8 +126,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   // ─── Form panel (right side, desktop) ─────────────────────────────────
 
   const FormPanel = () => (
-    <div className="w-full lg:w-7/12 flex flex-col justify-center p-4 sm:p-6 lg:p-12">
-      <div className="w-full lg:max-w-lg mx-auto space-y-5 sm:space-y-6">
+    <div className="w-full lg:w-1/2 flex flex-col justify-center p-4 sm:p-6 lg:p-12 xl:p-16">
+      <div className="w-full lg:max-w-md xl:max-w-lg mx-auto space-y-5 sm:space-y-6">
         {/* Mobile branding (hidden on desktop) */}
         <div className="lg:hidden text-center">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-field">
