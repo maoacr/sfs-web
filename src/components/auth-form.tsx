@@ -107,8 +107,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   // ─── Form panel (right side, desktop) ─────────────────────────────────
 
   const FormPanel = () => (
-    <div className="w-full lg:w-1/2 flex flex-col justify-center p-8 lg:p-16">
-      <div className="w-full max-w-md mx-auto space-y-6">
+    <div className="w-full lg:w-1/2 flex flex-col justify-center p-4 sm:p-6 lg:p-16">
+      <div className="w-full lg:max-w-md mx-auto space-y-5 sm:space-y-6">
         {/* Mobile branding (hidden on desktop) */}
         <div className="lg:hidden text-center">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-field">
@@ -130,7 +130,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         {/* Google OAuth button */}
         <button type="button"
           onClick={() => alert("Google OAuth — próximamente")}
-          className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-text hover:bg-surface-hover transition-colors">
+          className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 text-base sm:text-sm font-medium text-text hover:bg-surface-hover transition-colors">
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -164,7 +164,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                   <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-surface px-3 text-sm text-text-muted">@</span>
                   <input id="apodo" type="text" maxLength={30} value={apodo}
                     onChange={(e) => setApodo(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
-                    className="block w-full rounded-r-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
+                    className="block w-full rounded-r-lg border border-border bg-surface px-3 py-3 text-base sm:text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
                     placeholder="carlitosgomez" />
                 </div>
               </div>
@@ -174,7 +174,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 <label className="block text-sm font-medium text-text mb-1.5">Teléfono</label>
                 <div className="flex gap-2">
                   <select value={codigoPais} onChange={(e) => setCodigoPais(e.target.value)}
-                    className="rounded-lg border border-border bg-surface px-2 py-2 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
+                      className="rounded-lg border border-border bg-surface px-2 py-3 text-base sm:text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
                     <option value="+57">🇨🇴 +57</option>
                     <option value="+54">🇦🇷 +54</option>
                     <option value="+56">🇨🇱 +56</option>
@@ -185,7 +185,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                     <option value="+34">🇪🇸 +34</option>
                   </select>
                   <input id="telefono" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)}
-                    className="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
+                    className="block w-full rounded-lg border border-border bg-surface px-3 py-3 text-base sm:text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
                     placeholder="300 123 4567" />
                 </div>
               </div>
@@ -207,7 +207,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           {error && <div className="rounded-lg bg-error-bg px-4 py-3 text-sm text-error">{error}</div>}
 
           <button type="submit" disabled={loading}
-            className="w-full rounded-xl bg-grass px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-grass-light disabled:opacity-50 transition-colors">
+            className="w-full rounded-xl bg-grass px-4 py-3.5 text-base sm:text-sm font-semibold text-white shadow-sm hover:bg-grass-light disabled:opacity-50 transition-colors">
             {loading ? "Cargando..." : isLogin ? "Iniciar sesión" : "Crear cuenta"}
           </button>
         </form>
@@ -239,10 +239,10 @@ function Input({ id, label, type = "text", required, minLength, value, onChange,
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-text">{label}</label>
+      <label htmlFor={id} className="block text-sm sm:text-sm font-medium text-text">{label}</label>
       <input id={id} type={type} required={required} minLength={minLength} value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
+        className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-3 text-base sm:text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
         placeholder={placeholder} />
     </div>
   );
