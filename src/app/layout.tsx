@@ -42,7 +42,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <PwaRegister />
       </head>
       <body className="min-h-screen flex flex-col bg-bg text-text">
-        <Toaster position="top-right" />
+        <Toaster
+          position="top-right"
+          options={{
+            fill: "#141414",
+            roundness: 16,
+            styles: {
+              title: "text-text! text-sm!",
+              description: "text-text-muted! text-xs!",
+              badge: "bg-grass/20!",
+              button: "bg-grass/15! hover:bg-grass/25! text-grass-light! text-xs!",
+            },
+          }}
+        />
         <OfflineBanner />
         {children}
       </body>

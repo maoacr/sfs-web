@@ -101,6 +101,15 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
 
+/* ─── Sileo Toast Colors ───────────────────────────────────────────────────── */
+
+:root {
+  --sileo-state-success: #16a34a;
+  --sileo-state-error: #ef4444;
+  --sileo-state-warning: #f59e0b;
+  --sileo-state-info: #3b82f6;
+}
+
 /* ─── Focus ring ───────────────────────────────────────────────────────────── */
 
 *:focus-visible {
