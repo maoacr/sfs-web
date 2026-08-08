@@ -72,7 +72,8 @@ export default function PlayerBuscar() {
           if (!byComplejo[c.complejo.id]) {
             byComplejo[c.complejo.id] = {
               id: c.complejo.id, nombre: c.complejo.nombre,
-              direccion: c.complejo.direccion, telefono: c.complejo.telefono, canchas: [],
+              direccion: formatAddress(c.complejo), telefono: c.complejo.telefono,
+              lat: c.complejo.lat ?? null, lng: c.complejo.lng ?? null, canchas: [],
             };
           }
           byComplejo[c.complejo.id].canchas.push(c);
