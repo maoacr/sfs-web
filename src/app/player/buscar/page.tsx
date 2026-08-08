@@ -179,7 +179,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   const isCompact = count >= 4; // vertical layout for 4+
 
   return (
-    <div className={`flex flex-col min-h-0 ${isMobile ? "flex-1 pb-4" : ""}`}>
+    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "h-[26rem] rounded-2xl border border-border bg-surface overflow-hidden"}`}>
       {/* Header */}
       <div className="px-4 pb-3 flex-shrink-0">
         <h2 className="text-base font-bold text-text">{complejo.nombre}</h2>
@@ -198,8 +198,8 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
         slidesPerView={isCompact ? "auto" : count <= 2 ? count : count}
         spaceBetween={12}
         centeredSlides={isCompact}
-        className={`w-full px-4 min-h-0 ${!isMobile && !isCompact ? "h-48 sm:h-56" : ""} ${isCompact ? "!pb-8" : ""}`}
-        style={isMobile && isCompact ? { flex: 1 } : {}}
+        className={`w-full px-4 min-h-0 ${isCompact ? "!pb-8" : ""}`}
+        style={isMobile && isCompact ? { flex: 1 } : isCompact ? { flex: 1 } : { flex: 1 }}
         pagination={isCompact ? { clickable: true } : false}
         modules={[Pagination]}
         resistanceRatio={0.5}
@@ -208,7 +208,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
           const libres = cancha.slots.filter(s => s.disponible).length;
           return (
             <SwiperSlide key={cancha.id}
-              style={isCompact && isMobile ? { width: "85vw", maxWidth: "24rem" } : !isCompact ? { height: "100%" } : undefined}
+              style={isCompact && isMobile ? { width: "85vw", maxWidth: "24rem" } : undefined}
               className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact ? "!flex !flex-col" : "!flex !flex-row"}`}
               onClick={() => onSelect(cancha)}>
 
@@ -241,7 +241,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
                 /* ─── 1-3 canchas: horizontal split layout ─── */
                 <>
                   {/* Image — left side */}
-                  <div className="w-[45%] sm:w-1/2 flex-shrink-0 bg-surface-hover relative" style={{ minHeight: "10rem" }}>
+                  <div className="w-[45%] sm:w-1/2 flex-shrink-0 bg-surface-hover relative">
                     {cancha.imagen ? (
                       <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
