@@ -22,6 +22,10 @@ export async function PUT(
         ...(body.descripcion !== undefined && { descripcion: body.descripcion }),
         ...(body.telefono !== undefined && { telefono: body.telefono }),
         ...(body.email !== undefined && { email: body.email }),
+        ...(body.instagram !== undefined && { instagram: body.instagram }),
+        ...(body.tiktok !== undefined && { tiktok: body.tiktok }),
+        ...(body.twitter !== undefined && { twitter: body.twitter }),
+        ...(body.facebook !== undefined && { facebook: body.facebook }),
       },
     });
 

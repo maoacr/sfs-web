@@ -39,6 +39,10 @@ export async function POST(request: Request) {
         descripcion: body.descripcion || null,
         telefono: body.telefono || null,
         email: body.email || null,
+        instagram: body.instagram || null,
+        tiktok: body.tiktok || null,
+        twitter: body.twitter || null,
+        facebook: body.facebook || null,
       },
       include: { _count: { select: { canchas: true } } },
     });

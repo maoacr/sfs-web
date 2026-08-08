@@ -89,6 +89,10 @@ model Complejo {
   descripcion String?   @db.Text
   telefono    String?   @db.VarChar(20)
   email       String?   @db.VarChar(255)
+  instagram   String?   @db.VarChar(30)
+  tiktok      String?   @db.VarChar(30)
+  twitter     String?   @db.VarChar(30)
+  facebook    String?   @db.VarChar(50)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz()

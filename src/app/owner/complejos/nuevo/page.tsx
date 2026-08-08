@@ -13,6 +13,10 @@ export default function NuevoComplejo() {
   const [descripcion, setDescripcion] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [tiktok, setTiktok] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [facebook, setFacebook] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -20,7 +24,7 @@ export default function NuevoComplejo() {
     try {
       const res = await fetch("/api/complejos", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, direccion, descripcion: descripcion || undefined, telefono: telefono || undefined, email: email || undefined }),
+        body: JSON.stringify({ nombre, direccion, descripcion: descripcion || undefined, telefono: telefono || undefined, email: email || undefined, instagram: instagram || undefined, tiktok: tiktok || undefined, twitter: twitter || undefined, facebook: facebook || undefined }),
       });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Error al crear"); }
       router.push("/owner/dashboard"); router.refresh();
@@ -68,6 +72,30 @@ export default function NuevoComplejo() {
           </div>
 
           {error && <div className="rounded-lg bg-error-bg px-4 py-3 text-sm text-error">{error}</div>}
+
+          {/* Redes sociales */}
+          <div className="pt-2 border-t border-border">
+            <p className="text-sm font-medium text-text mb-3">Redes sociales <span className="font-normal text-text-dim">(opcional)</span></p>
+            <div className="space-y-3">
+              {[
+                { id: "instagram", label: "Instagram", value: instagram, set: setInstagram, prefix: "instagram.com/", icon: "📷" },
+                { id: "tiktok", label: "TikTok", value: tiktok, set: setTiktok, prefix: "tiktok.com/@", icon: "🎵" },
+                { id: "twitter", label: "Twitter / X", value: twitter, set: setTwitter, prefix: "x.com/", icon: "𝕏" },
+                { id: "facebook", label: "Facebook", value: facebook, set: setFacebook, prefix: "facebook.com/", icon: "📘" },
+              ].map(({ id, label, value, set, prefix, icon }) => (
+                <div key={id}>
+                  <label htmlFor={`social-${id}`} className="text-xs font-medium text-text-muted mb-1 block">{icon} {label}</label>
+                  <div className="flex rounded-lg">
+                    <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-surface px-3 text-xs text-text-dim">{prefix}</span>
+                    <input id={`social-${id}`} type="text" value={value}
+                      onChange={e => set(e.target.value)}
+                      className="block w-full rounded-r-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
+                      placeholder="tuusuario" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={() => router.back()}
