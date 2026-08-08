@@ -3,57 +3,38 @@
 import { useState } from "react";
 import Link from "next/link";
 
-type AuthFormProps = { mode: "login" | "register" };
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sub-components defined at module level to avoid focus loss on re-render.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-export function AuthForm({ mode }: AuthFormProps) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [primerNombre, setPrimerNombre] = useState("");
-  const [segundoNombre, setSegundoNombre] = useState("");
-  const [apellidos, setApellidos] = useState("");
-  const [apodo, setApodo] = useState("");
-  const [codigoPais, setCodigoPais] = useState("+57");
-  const [telefono, setTelefono] = useState("");
-  const [role, setRole] = useState<"PLAYER" | "OWNER">("PLAYER");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+function Input({ id, label, type = "text", required, minLength, value, onChange, placeholder }: {
+  id: string; label: string; type?: string; required?: boolean; minLength?: number;
+  value: string; onChange: (v: string) => void; placeholder?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-text">{label}</label>
+      <input id={id} type={type} required={required} minLength={minLength} value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-3 text-base sm:text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
+        placeholder={placeholder} />
+    </div>
+  );
+}
 
-  const isLogin = mode === "login";
+function RoleBtn({ active, onClick, label, icon }: { active: boolean; onClick: () => void; label: string; icon: string }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
+        active ? "border-grass bg-field text-grass-light" : "border-border text-text-muted hover:border-border-hover"
+      }`}>
+      {icon} {label}
+    </button>
+  );
+}
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-      const body: Record<string, string> = { email, password };
-      if (!isLogin) {
-        body.primerNombre = primerNombre;
-        body.segundoNombre = segundoNombre;
-        body.apellidos = apellidos;
-        body.apodo = apodo;
-        body.codigoPais = codigoPais;
-        body.telefono = telefono;
-        body.role = role;
-      }
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Error inesperado"); return; }
-      window.location.href = data.user?.role === "OWNER" ? "/owner/dashboard" : "/player/buscar";
-    } catch {
-      setError("Error de conexión. Intentá de nuevo.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ─── Hero panel (left side, desktop) ─────────────────────────────────
-
-  const HeroPanel = () => (
+function HeroPanel({ isLogin }: { isLogin: boolean }) {
+  return (
     <div className="hidden lg:flex flex-col justify-center w-1/2 bg-gradient-to-br from-field via-field to-emerald-950 p-12 xl:p-16 relative overflow-hidden">
       {/* Field lines pattern */}
       <div className="absolute inset-0 opacity-[0.04]">
@@ -63,7 +44,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         <div className="absolute top-0 bottom-0 left-3/4 w-px bg-white" />
         <div className="absolute top-1/4 left-0 right-0 h-px bg-white" />
         <div className="absolute top-3/4 left-0 right-0 h-px bg-white" />
-        {/* Center circle */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border border-white" />
       </div>
 
@@ -122,13 +102,35 @@ export function AuthForm({ mode }: AuthFormProps) {
       </div>
     </div>
   );
+}
 
-  // ─── Form panel (right side, desktop) ─────────────────────────────────
+type FormPanelProps = {
+  isLogin: boolean;
+  error: string;
+  loading: boolean;
+  email: string; setEmail: (v: string) => void;
+  password: string; setPassword: (v: string) => void;
+  primerNombre: string; setPrimerNombre: (v: string) => void;
+  segundoNombre: string; setSegundoNombre: (v: string) => void;
+  apellidos: string; setApellidos: (v: string) => void;
+  apodo: string; setApodo: (v: string) => void;
+  codigoPais: string; setCodigoPais: (v: string) => void;
+  telefono: string; setTelefono: (v: string) => void;
+  role: "PLAYER" | "OWNER"; setRole: (v: "PLAYER" | "OWNER") => void;
+  onSubmit: (e: React.FormEvent) => void;
+};
 
-  const FormPanel = () => (
+function FormPanel(props: FormPanelProps) {
+  const { isLogin, error, loading, email, setEmail, password, setPassword,
+    primerNombre, setPrimerNombre, segundoNombre, setSegundoNombre,
+    apellidos, setApellidos, apodo, setApodo,
+    codigoPais, setCodigoPais, telefono, setTelefono,
+    role, setRole, onSubmit } = props;
+
+  return (
     <div className="w-full lg:w-1/2 flex flex-col justify-center p-4 sm:p-6 lg:p-12 xl:p-16">
       <div className="w-full lg:max-w-md xl:max-w-lg mx-auto space-y-5 sm:space-y-6">
-        {/* Mobile branding (hidden on desktop) */}
+        {/* Mobile branding */}
         <div className="lg:hidden text-center">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-field">
             <span className="text-lg">⚽</span>
@@ -167,7 +169,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           {!isLogin && (
             <>
               <div className="grid grid-cols-2 gap-3">
@@ -176,7 +178,6 @@ export function AuthForm({ mode }: AuthFormProps) {
               </div>
               <Input id="apellidos" label="Apellidos" required value={apellidos} onChange={setApellidos} placeholder="Gómez Pérez" />
 
-              {/* Apodo */}
               <div>
                 <label htmlFor="apodo" className="block text-sm font-medium text-text">Usuario <span className="font-normal text-text-dim">(opcional)</span></label>
                 <div className="mt-1 flex rounded-lg">
@@ -188,7 +189,6 @@ export function AuthForm({ mode }: AuthFormProps) {
                 </div>
               </div>
 
-              {/* Teléfono */}
               <div>
                 <label className="block text-sm font-medium text-text mb-1.5">Teléfono</label>
                 <div className="flex gap-2">
@@ -209,7 +209,6 @@ export function AuthForm({ mode }: AuthFormProps) {
                 </div>
               </div>
 
-              {/* Tipo de cuenta */}
               <div>
                 <label className="block text-sm font-medium text-text mb-2">Tipo de cuenta</label>
                 <div className="grid grid-cols-2 gap-3">
@@ -241,39 +240,76 @@ export function AuthForm({ mode }: AuthFormProps) {
       </div>
     </div>
   );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AuthForm — main component (thin, delegates to sub-components)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+type AuthFormProps = { mode: "login" | "register" };
+
+export function AuthForm({ mode }: AuthFormProps) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [primerNombre, setPrimerNombre] = useState("");
+  const [segundoNombre, setSegundoNombre] = useState("");
+  const [apellidos, setApellidos] = useState("");
+  const [apodo, setApodo] = useState("");
+  const [codigoPais, setCodigoPais] = useState("+57");
+  const [telefono, setTelefono] = useState("");
+  const [role, setRole] = useState<"PLAYER" | "OWNER">("PLAYER");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const isLogin = mode === "login";
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
+      const body: Record<string, string> = { email, password };
+      if (!isLogin) {
+        body.primerNombre = primerNombre;
+        body.segundoNombre = segundoNombre;
+        body.apellidos = apellidos;
+        body.apodo = apodo;
+        body.codigoPais = codigoPais;
+        body.telefono = telefono;
+        body.role = role;
+      }
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Error inesperado"); return; }
+      window.location.href = data.user?.role === "OWNER" ? "/owner/dashboard" : "/player/buscar";
+    } catch {
+      setError("Error de conexión. Intentá de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="flex min-h-screen bg-bg">
-      <HeroPanel />
-      <FormPanel />
+      <HeroPanel isLogin={isLogin} />
+      <FormPanel
+        isLogin={isLogin} error={error} loading={loading}
+        email={email} setEmail={setEmail}
+        password={password} setPassword={setPassword}
+        primerNombre={primerNombre} setPrimerNombre={setPrimerNombre}
+        segundoNombre={segundoNombre} setSegundoNombre={setSegundoNombre}
+        apellidos={apellidos} setApellidos={setApellidos}
+        apodo={apodo} setApodo={setApodo}
+        codigoPais={codigoPais} setCodigoPais={setCodigoPais}
+        telefono={telefono} setTelefono={setTelefono}
+        role={role} setRole={setRole}
+        onSubmit={handleSubmit}
+      />
     </div>
-  );
-}
-
-/* ─── Reusable Input ─────────────────────────────────────────────────── */
-
-function Input({ id, label, type = "text", required, minLength, value, onChange, placeholder }: {
-  id: string; label: string; type?: string; required?: boolean; minLength?: number;
-  value: string; onChange: (v: string) => void; placeholder?: string;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="block text-sm sm:text-sm font-medium text-text">{label}</label>
-      <input id={id} type={type} required={required} minLength={minLength} value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-3 text-base sm:text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
-        placeholder={placeholder} />
-    </div>
-  );
-}
-
-function RoleBtn({ active, onClick, label, icon }: { active: boolean; onClick: () => void; label: string; icon: string }) {
-  return (
-    <button type="button" onClick={onClick}
-      className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
-        active ? "border-grass bg-field text-grass-light" : "border-border text-text-muted hover:border-border-hover"
-      }`}>
-      {icon} {label}
-    </button>
   );
 }
