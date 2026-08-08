@@ -131,7 +131,7 @@ export default function PlayerBuscar() {
         {/* Tablet+: vertical scroll, one complejo per row */}
         <div className="hidden md:block flex-1 overflow-y-auto p-4 space-y-6">
           {complejos.map(comp => (
-            <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden">
+              <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden h-[32rem] md:h-[36rem]">
               <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
             </div>
           ))}
@@ -164,7 +164,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   isMobile?: boolean;
 }) {
   const count = complejo.canchas.length;
-  const isCompact = count >= 4; // vertical layout for 4+
+  const isCompact = !isMobile || count >= 4; // tablet always compact, mobile only 4+
 
   return (
     <div className={`flex flex-col ${isMobile ? "flex-1 pb-2 min-h-0" : "p-4"}`}>
@@ -183,13 +183,13 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
       {/* Cancha cards */}
       <Swiper
-        slidesPerView={isMobile ? 1 : isCompact ? "auto" : count}
+        slidesPerView={isMobile ? 1 : 1}
         spaceBetween={isMobile ? 16 : 12}
         centeredSlides
         centeredSlidesBounds
         loop={count >= 2}
-        className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"} ${isCompact ? "!pb-8" : ""}`}
-        style={isMobile ? { flex: 1 } : !isMobile ? { height: isCompact ? "24rem" : "12rem" } : {}}
+        className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"}`}
+        style={isMobile ? { flex: 1 } : { flex: 1 }}
         pagination={isCompact ? { clickable: true } : false}
         modules={[Pagination]}
         resistanceRatio={0.3}
