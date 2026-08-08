@@ -211,6 +211,7 @@ export default function PlayerBuscar() {
         <CanchaDetailSheet
           cancha={selectedCancha}
           complejoNombre={selectedCancha.complejoNombre}
+          complejoDireccion={selectedCancha.complejoDireccion}
           complejoLat={selectedCancha.complejoLat}
           complejoLng={selectedCancha.complejoLng}
           fH={fH}
