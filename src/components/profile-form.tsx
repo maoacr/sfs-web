@@ -233,10 +233,19 @@ export function ProfileForm() {
         </div>
       </div>
 
-      {/* Save button — below both cards, spans full width */}
-      <div className="hidden md:block mt-8">
+      {/* Tablet save button — full width (single column layout) */}
+      <div className="hidden md:block lg:hidden mt-8">
         <button type="submit" form="profile-form" disabled={saving}
           className="w-full rounded-xl bg-gradient-to-r from-grass to-grass-light py-3.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-md shadow-grass/20">
+          {saving ? "Guardando..." : "Guardar cambios"}
+        </button>
+      </div>
+
+      {/* Desktop save button — aligned with form column */}
+      <div className="hidden lg:grid grid-cols-[340px_1fr] gap-8 mt-8">
+        <div /> {/* spacer for profile card column */}
+        <button type="submit" form="profile-form" disabled={saving}
+          className="rounded-xl bg-gradient-to-r from-grass to-grass-light py-3.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-md shadow-grass/20">
           {saving ? "Guardando..." : "Guardar cambios"}
         </button>
       </div>
