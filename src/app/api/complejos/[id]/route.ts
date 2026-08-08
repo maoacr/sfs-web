@@ -45,6 +45,8 @@ export async function PUT(
         ...(body.tiktok !== undefined && { tiktok: body.tiktok }),
         ...(body.twitter !== undefined && { twitter: body.twitter }),
         ...(body.facebook !== undefined && { facebook: body.facebook }),
+        ...(body.lat !== undefined && { lat: body.lat }),
+        ...(body.lng !== undefined && { lng: body.lng }),
       },
     });
 

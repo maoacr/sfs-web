@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ImageUploadZone } from "@/components/image-upload-zone";
+import { MapPicker } from "@/components/map-picker";
 
 interface CanchaInfo { id: string; nombre: string; tipo: string; capacidad: number; _count: { reservas: number } }
 interface ImagenInfo { id: string; url: string; orden: number; principal: boolean }
@@ -22,6 +23,8 @@ export default function EditarComplejo() {
   const [tiktok, setTiktok] = useState("");
   const [twitter, setTwitter] = useState("");
   const [facebook, setFacebook] = useState("");
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [canchas, setCanchas] = useState<CanchaInfo[]>([]);
   const [imagenes, setImagenes] = useState<ImagenInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +42,7 @@ export default function EditarComplejo() {
       setEmail(c.email || "");
       setInstagram(c.instagram || ""); setTiktok(c.tiktok || "");
       setTwitter(c.twitter || ""); setFacebook(c.facebook || "");
+      setLat(c.lat || null); setLng(c.lng || null);
       setCanchas(c.canchas || []);
       setImagenes(c.imagenes || []);
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
@@ -50,7 +54,7 @@ export default function EditarComplejo() {
     try {
       const res = await fetch(`/api/complejos/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, direccion, descripcion: descripcion || null, telefono: telefono || null, email: email || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null }),
+        body: JSON.stringify({ nombre, direccion, descripcion: descripcion || null, telefono: telefono || null, email: email || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null, lat, lng }),
       });
       if (!res.ok) throw new Error("Error al guardar");
       setSaved(true);
@@ -138,6 +142,25 @@ export default function EditarComplejo() {
                 <label className={l}>Email</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={i} />
               </div>
+            </div>
+
+            {/* Ubicación en mapa */}
+            <div className="pt-2 border-t border-border">
+              <p className="text-sm font-medium text-text mb-3">Ubicación</p>
+              <MapPicker lat={lat} lng={lng} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
+              {lat && lng && (
+                <div className="flex gap-2 mt-2">
+                  <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-text-muted hover:text-text hover:border-border-hover transition-colors">
+                    🗺️ Google Maps
+                  </a>
+                  <a href={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-text-muted hover:text-text hover:border-border-hover transition-colors">
+                    🚗 Waze
+                  </a>
+                </div>
+              )}
+              <p className="mt-2 text-xs text-text-dim">Hacé clic en el mapa o arrastrá el marcador para ajustar la ubicación.</p>
             </div>
 
             {/* Redes sociales */}

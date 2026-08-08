@@ -43,6 +43,8 @@ export async function POST(request: Request) {
         tiktok: body.tiktok || null,
         twitter: body.twitter || null,
         facebook: body.facebook || null,
+        lat: body.lat || null,
+        lng: body.lng || null,
       },
       include: { _count: { select: { canchas: true } } },
     });

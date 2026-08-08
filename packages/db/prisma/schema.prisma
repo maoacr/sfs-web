@@ -87,6 +87,8 @@ model Complejo {
   direccion   String    @db.Text
   ubicacion   Unsupported("geometry(Point, 4326)")?
   descripcion String?   @db.Text
+  lat          Float?
+  lng          Float?
   telefono    String?   @db.VarChar(20)
   email       String?   @db.VarChar(255)
   instagram   String?   @db.VarChar(30)
