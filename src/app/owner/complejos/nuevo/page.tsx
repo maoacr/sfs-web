@@ -10,6 +10,8 @@ export default function NuevoComplejo() {
 
   const [nombre, setNombre] = useState("");
   const [direccion, setDireccion] = useState("");
+  const [ciudad, setCiudad] = useState("");
+  const [departamento, setDepartamento] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
@@ -24,7 +26,7 @@ export default function NuevoComplejo() {
     try {
       const res = await fetch("/api/complejos", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, direccion, descripcion: descripcion || undefined, telefono: telefono || undefined, email: email || undefined, instagram: instagram || undefined, tiktok: tiktok || undefined, twitter: twitter || undefined, facebook: facebook || undefined }),
+        body: JSON.stringify({ nombre, direccion, ciudad: ciudad || undefined, departamento: departamento || undefined, descripcion: descripcion || undefined, telefono: telefono || undefined, email: email || undefined, instagram: instagram || undefined, tiktok: tiktok || undefined, twitter: twitter || undefined, facebook: facebook || undefined }),
       });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Error al crear"); }
       router.push("/owner/dashboard"); router.refresh();
@@ -54,7 +56,17 @@ export default function NuevoComplejo() {
           </div>
           <div>
             <label className={l}>Dirección</label>
-            <input type="text" required value={direccion} onChange={e => setDireccion(e.target.value)} className={i} placeholder="Calle, carrera, ciudad" />
+            <input type="text" required value={direccion} onChange={e => setDireccion(e.target.value)} className={i} placeholder="Calle, carrera, número" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={l}>Ciudad</label>
+              <input type="text" value={ciudad} onChange={e => setCiudad(e.target.value)} className={i} placeholder="Ej: Bogotá" />
+            </div>
+            <div>
+              <label className={l}>Departamento</label>
+              <input type="text" value={departamento} onChange={e => setDepartamento(e.target.value)} className={i} placeholder="Ej: Cundinamarca" />
+            </div>
           </div>
           <div>
             <label className={l}>Descripción <span className="font-normal text-text-dim">(opcional)</span></label>

@@ -16,6 +16,8 @@ export default function EditarComplejo() {
 
   const [nombre, setNombre] = useState("");
   const [direccion, setDireccion] = useState("");
+  const [ciudad, setCiudad] = useState("");
+  const [departamento, setDepartamento] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
@@ -38,6 +40,7 @@ export default function EditarComplejo() {
   useEffect(() => {
     fetch(`/api/complejos/${id}`).then(r => r.json()).then(c => {
       setNombre(c.nombre); setDireccion(c.direccion);
+      setCiudad(c.ciudad || ""); setDepartamento(c.departamento || "");
       setDescripcion(c.descripcion || ""); setTelefono(c.telefono || "");
       setEmail(c.email || "");
       setInstagram(c.instagram || ""); setTiktok(c.tiktok || "");
@@ -54,7 +57,7 @@ export default function EditarComplejo() {
     try {
       const res = await fetch(`/api/complejos/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, direccion, descripcion: descripcion || null, telefono: telefono || null, email: email || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null, lat, lng }),
+        body: JSON.stringify({ nombre, direccion, ciudad: ciudad || null, departamento: departamento || null, descripcion: descripcion || null, telefono: telefono || null, email: email || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null, lat, lng }),
       });
       if (!res.ok) throw new Error("Error al guardar");
       setSaved(true);
@@ -127,7 +130,17 @@ export default function EditarComplejo() {
             </div>
             <div>
               <label className={l}>Dirección</label>
-              <input type="text" required value={direccion} onChange={e => setDireccion(e.target.value)} className={i} />
+              <input type="text" required value={direccion} onChange={e => setDireccion(e.target.value)} className={i} placeholder="Calle, carrera, número" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={l}>Ciudad</label>
+                <input type="text" value={ciudad} onChange={e => setCiudad(e.target.value)} className={i} placeholder="Ej: Bogotá" />
+              </div>
+              <div>
+                <label className={l}>Departamento</label>
+                <input type="text" value={departamento} onChange={e => setDepartamento(e.target.value)} className={i} placeholder="Ej: Cundinamarca" />
+              </div>
             </div>
             <div>
               <label className={l}>Descripción</label>
@@ -147,7 +160,7 @@ export default function EditarComplejo() {
             {/* Ubicación en mapa */}
             <div className="pt-2 border-t border-border">
               <p className="text-sm font-medium text-text mb-3">Ubicación</p>
-              <MapPicker lat={lat} lng={lng} address={direccion} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
+              <MapPicker lat={lat} lng={lng} direccion={direccion} ciudad={ciudad} departamento={departamento} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
             </div>
 
             {/* Redes sociales */}

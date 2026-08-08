@@ -6,7 +6,9 @@ import dynamic from "next/dynamic";
 interface Props {
   lat: number | null;
   lng: number | null;
-  address: string;
+  direccion: string;
+  ciudad: string;
+  departamento: string;
   onChange: (lat: number, lng: number) => void;
 }
 
@@ -20,7 +22,7 @@ function MapPlaceholder() {
   );
 }
 
-export function MapPicker({ lat, lng, address, onChange }: Props) {
+export function MapPicker({ lat, lng, direccion, ciudad, departamento, onChange }: Props) {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -31,13 +33,14 @@ export function MapPicker({ lat, lng, address, onChange }: Props) {
   }, [lat, lng]);
 
   async function handleGeocode() {
-    if (address.length < 5) {
+    const fullAddress = [direccion, ciudad, departamento, "Colombia"].filter(Boolean).join(", ");
+    if (fullAddress.length < 10) {
       setSearchError("Escribí una dirección más completa");
       return;
     }
     setSearching(true); setSearchError("");
     try {
-      const res = await fetch(`/api/geocoding?q=${encodeURIComponent(address)}`);
+      const res = await fetch(`/api/geocoding?q=${encodeURIComponent(fullAddress)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No encontrada");
       onChange(data.lat, data.lng);

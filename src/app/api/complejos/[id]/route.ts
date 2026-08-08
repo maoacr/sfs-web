@@ -38,6 +38,8 @@ export async function PUT(
       data: {
         ...(body.nombre !== undefined && { nombre: body.nombre }),
         ...(body.direccion !== undefined && { direccion: body.direccion }),
+        ...(body.ciudad !== undefined && { ciudad: body.ciudad }),
+        ...(body.departamento !== undefined && { departamento: body.departamento }),
         ...(body.descripcion !== undefined && { descripcion: body.descripcion }),
         ...(body.telefono !== undefined && { telefono: body.telefono }),
         ...(body.email !== undefined && { email: body.email }),

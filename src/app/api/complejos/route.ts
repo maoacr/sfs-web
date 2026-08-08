@@ -36,6 +36,8 @@ export async function POST(request: Request) {
         tenantId: user.sub,
         nombre: body.nombre,
         direccion: body.direccion,
+        ciudad: body.ciudad || "",
+        departamento: body.departamento || "",
         descripcion: body.descripcion || null,
         telefono: body.telefono || null,
         email: body.email || null,

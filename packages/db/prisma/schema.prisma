@@ -84,9 +84,10 @@ model Complejo {
   id          String    @id @default(uuid()) @db.Uuid
   tenantId    String    @map("tenant_id") @db.Uuid
   nombre      String    @db.VarChar(100)
-  direccion   String    @db.Text
-  ubicacion   Unsupported("geometry(Point, 4326)")?
-  descripcion String?   @db.Text
+  direccion   String    @db.VarChar(200)
+  ciudad      String    @default("") @db.VarChar(100)
+  departamento String   @default("") @db.VarChar(100)
+  descripcion  String?   @db.Text
   lat          Float?
   lng          Float?
   telefono    String?   @db.VarChar(20)
