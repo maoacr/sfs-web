@@ -152,7 +152,7 @@ export default function PlayerBuscar() {
                   slidesPerView="auto"
                   spaceBetween={12}
                   centeredSlides
-                  className="flex-1 w-full px-4"
+                  className="flex-1 w-full px-4 h-0"
                   pagination={{ clickable: true }}
                   modules={[Pagination]}
                   resistanceRatio={0.5}
@@ -160,7 +160,7 @@ export default function PlayerBuscar() {
                   {comp.canchas.map(cancha => {
                     const libres = cancha.slots.filter(s => s.disponible).length;
                     return (
-                      <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem" }}
+                      <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem", height: "100%" }}
                         onClick={() => {
                           setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng });
                         }}
