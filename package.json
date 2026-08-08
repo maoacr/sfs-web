@@ -22,7 +22,8 @@
     "react-leaflet": "^5.0.0",
     "resend": "^6.18.1",
     "sharp": "^0.35.3",
-    "sileo": "^0.1.5"
+    "sileo": "^0.1.5",
+    "swiper": "^14.1.0"
   },
   "devDependencies": {
     "@serwist/next": "^9.5.12",
