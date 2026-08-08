@@ -79,7 +79,7 @@ export function ProfileForm() {
   const isOwner = user?.role === "OWNER";
 
   return (
-    <div className="p-6 pb-28 lg:p-10">
+    <div className="p-6 lg:p-10">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <button onClick={() => router.back()}
@@ -148,7 +148,7 @@ export function ProfileForm() {
           {saved && <div className="mb-5 rounded-xl bg-success-bg border border-success/20 px-4 py-3 text-sm text-success flex items-center gap-2">✅ Perfil actualizado</div>}
           {error && <div className="mb-5 rounded-xl bg-error-bg px-4 py-3 text-sm text-error">{error}</div>}
 
-          <form onSubmit={handleSave} className="space-y-5">
+          <form id="profile-form" onSubmit={handleSave} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={l}>Primer nombre</label>
@@ -229,14 +229,23 @@ export function ProfileForm() {
                 ))}
               </div>
             </div>
-
-            <div className="pt-4">
-              <button type="submit" disabled={saving}
-                className="rounded-xl bg-gradient-to-r from-grass to-grass-light px-8 py-3 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-md shadow-grass/20">
-                {saving ? "Guardando..." : "Guardar cambios"}
-              </button>
-            </div>
           </form>
+
+          {/* Sticky save bar */}
+          <div className="sticky bottom-0 -mx-6 -mb-6 mt-8 px-6 py-4 bg-bg/90 backdrop-blur-xl border-t border-border lg:hidden">
+            <button type="submit" form="profile-form" disabled={saving}
+              className="w-full rounded-xl bg-gradient-to-r from-grass to-grass-light py-3.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-lg shadow-grass/20">
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </div>
+
+          {/* Desktop save button (inline) */}
+          <div className="hidden lg:block pt-4">
+            <button type="submit" form="profile-form" disabled={saving}
+              className="rounded-xl bg-gradient-to-r from-grass to-grass-light px-8 py-3 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-md shadow-grass/20">
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
