@@ -50,7 +50,7 @@ export default function MapClient({ lat, lng, defaultCenter, onChange }: Props) 
   const center = position || defaultCenter;
 
   return (
-    <div className="rounded-xl overflow-hidden border border-border h-64">
+    <div className="rounded-xl overflow-hidden border border-border h-64 sm:h-80 lg:h-96">
       <MapContainer center={center} zoom={position ? 16 : 12} className="h-full w-full" zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
