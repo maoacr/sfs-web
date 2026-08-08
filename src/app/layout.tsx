@@ -22,6 +22,7 @@ export const metadata: Metadata = {
   },
   description:
     "Plataforma SaaS para dueños de canchas de fútbol y jugadores. Reservá, gestioná y pagá en un solo lugar.",
+  icons: { icon: "/favicon.svg" },
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "SFS" },
 };

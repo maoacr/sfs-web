@@ -1,39 +1,66 @@
 @import "tailwindcss";
 
-/* ─── SFS Design Tokens ──────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   SFS Design Tokens — sync with docs/src/styles/custom.css
    Dark mode by default. Football-field-inspired green palette.
-   Two green tones: field (deep) + grass (vibrant)
-   ─────────────────────────────────────────────────────────────────────────── */
+   Elegance. Future. Minimalism.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme inline {
-  /* Greens — dos tonos como el campo de fútbol */
-  --color-field: #0a5c2a;       /* verde oscuro — fondo de campo */
-  --color-field-light: #0d7234; /* hover states */
-  --color-grass: #16a34a;       /* verde vibrante — CTAs, acentos */
-  --color-grass-light: #22c55e; /* hover CTA */
+  /* ── Greens — dos tonos como el campo de fútbol ── */
+  --color-field:        #0a5c2a;       /* verde oscuro — fondo de campo */
+  --color-field-light:  #0d7234;       /* hover states */
+  --color-grass:        #16a34a;       /* verde vibrante — CTAs, acentos */
+  --color-grass-light:  #22c55e;       /* hover CTA */
+  --color-grass-glow:   #4ade80;       /* resplandor suave para efectos */
 
-  /* Backgrounds */
-  --color-bg: #0a0a0a;          /* fondo principal */
-  --color-surface: #141414;     /* tarjetas, inputs */
-  --color-surface-hover: #1c1c1c; /* hover de tarjetas */
+  /* ── Gradients — la cancha bajo las luces ── */
+  --color-gradient-field: linear-gradient(135deg, #0a5c2a 0%, #0d7234 50%, #0a5c2a 100%);
+  --color-gradient-grass: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  --color-gradient-card:  linear-gradient(135deg, #141414 0%, #1a1a1a 100%);
+  --color-gradient-glow:  radial-gradient(ellipse at center, rgba(22,163,74,0.12) 0%, transparent 70%);
 
-  /* Text */
-  --color-text: #ededed;        /* texto principal */
-  --color-text-muted: #a1a1aa;  /* texto secundario */
-  --color-text-dim: #71717a;    /* texto terciario */
+  /* ── Backgrounds ── */
+  --color-bg:           #0a0a0a;       /* fondo principal */
+  --color-surface:      #141414;       /* tarjetas, inputs */
+  --color-surface-hover:#1c1c1c;       /* hover de tarjetas */
+  --color-elevated:     #1a1a1a;       /* dropdowns, modals, tooltips */
 
-  /* Borders */
-  --color-border: #262626;      /* bordes sutiles */
-  --color-border-hover: #404040; /* borde en hover */
+  /* ── Text ── */
+  --color-text:         #ededed;       /* texto principal */
+  --color-text-muted:   #a1a1aa;       /* texto secundario */
+  --color-text-dim:     #71717a;       /* texto terciario */
 
-  /* States */
-  --color-error: #ef4444;
-  --color-error-bg: #1f0f0f;
-  --color-warning: #f59e0b;
-  --color-warning-bg: #1f1806;
-  --color-success: #22c55e;
-  --color-success-bg: #061a0e;
+  /* ── Borders ── */
+  --color-border:       #262626;       /* bordes sutiles */
+  --color-border-hover: #404040;       /* borde en hover */
+  --color-border-glow:  rgba(22, 163, 74, 0.2); /* borde con tinte verde */
 
+  /* ── Shadows — elegantes, con tinte verde, nunca negro puro ── */
+  --shadow-sm:    0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(10,92,42,0.06);
+  --shadow-md:    0 4px 16px rgba(0,0,0,0.35), 0 2px 8px rgba(10,92,42,0.05);
+  --shadow-lg:    0 12px 40px rgba(0,0,0,0.45), 0 4px 16px rgba(10,92,42,0.06);
+  --shadow-glow:  0 0 30px rgba(22,163,74,0.12), 0 4px 20px rgba(0,0,0,0.4);
+  --shadow-card:  0 1px 2px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.03) inset;
+
+  /* ── Border radius — orgánico, nunca cuadrado ── */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  18px;
+  --radius-2xl: 24px;
+
+  /* ── States ── */
+  --color-error:       #ef4444;
+  --color-error-bg:    #1f0f0f;
+  --color-warning:     #f59e0b;
+  --color-warning-bg:  #1f1806;
+  --color-success:     #22c55e;
+  --color-success-bg:  #061a0e;
+  --color-info:        #3b82f6;
+  --color-info-bg:     #0a1628;
+
+  /* ── Typography ── */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -52,32 +79,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smoother cards and surfaces */
-.rounded-2xl, .rounded-xl {
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-
 /* ─── Scrollbar ────────────────────────────────────────────────────────────── */
 
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--color-bg);
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-hover);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-hover); }
 
 /* ─── Selection ────────────────────────────────────────────────────────────── */
 
-::selection {
-  background: var(--color-grass);
-  color: white;
+::selection { background: var(--color-grass); color: white; }
+
+/* ─── Focus ring ───────────────────────────────────────────────────────────── */
+
+*:focus-visible {
+  outline: 2px solid var(--color-grass);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ─── Animations ───────────────────────────────────────────────────────────── */
@@ -86,33 +107,18 @@ body {
   from { transform: translateY(100%); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
-
-.animate-slide-up {
-  animation: slide-up 0.25s ease-out;
-}
+.animate-slide-up { animation: slide-up 0.25s ease-out; }
 
 /* ─── Safe Area (iPhone notch / home indicator) ────────────────────────────── */
 
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 16px);
-}
+.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
 
 /* ─── Sileo Toast Colors ───────────────────────────────────────────────────── */
 
 :root {
-  --sileo-state-success: #16a34a;
-  --sileo-state-error: #ef4444;
-  --sileo-state-warning: #f59e0b;
-  --sileo-state-info: #3b82f6;
-}
-
-/* ─── Focus ring ───────────────────────────────────────────────────────────── */
-
-*:focus-visible {
-  outline: 2px solid var(--color-grass);
-  outline-offset: 2px;
+  --sileo-state-success: var(--color-grass);
+  --sileo-state-error:   var(--color-error);
+  --sileo-state-warning: var(--color-warning);
+  --sileo-state-info:    var(--color-info);
 }
