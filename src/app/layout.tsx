@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <PwaRegister />
       </head>
-      <body className="min-h-screen flex flex-col bg-bg text-text">
+      <body className="min-h-screen flex flex-col bg-bg text-text" suppressHydrationWarning>
         <Toaster
           position="top-right"
           options={{
