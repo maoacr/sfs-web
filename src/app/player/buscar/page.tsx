@@ -208,9 +208,8 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
           const libres = cancha.slots.filter(s => s.disponible).length;
           return (
             <SwiperSlide key={cancha.id}
-              style={isCompact && isMobile ? { width: "85vw", maxWidth: "24rem" } : undefined}
+              style={isCompact && isMobile ? { width: "85vw", maxWidth: "24rem" } : !isCompact ? { height: "100%" } : undefined}
               className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact ? "!flex !flex-col" : "!flex !flex-row"}`}
-              style={!isCompact ? { height: "100%" } : undefined}
               onClick={() => onSelect(cancha)}>
 
               {isCompact ? (
