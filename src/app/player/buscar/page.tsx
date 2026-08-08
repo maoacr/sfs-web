@@ -214,7 +214,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
               {isCompact ? (
                 /* ─── 4+ canchas: vertical layout ─── */
-                <div className="relative flex-1 min-h-0">
+                <div className="relative flex-1 min-h-0" style={{ minHeight: "16rem" }}>
                   {cancha.imagen ? (
                     <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
