@@ -79,7 +79,7 @@ export function ProfileForm() {
   const isOwner = user?.role === "OWNER";
 
   return (
-    <div className="p-6 lg:p-10">
+    <div className="p-6 pb-28 lg:p-10">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <button onClick={() => router.back()}
