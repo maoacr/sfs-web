@@ -167,7 +167,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   const isCompact = !isMobile || count >= 4; // tablet always compact, mobile only 4+
 
   return (
-    <div className={`flex flex-col ${isMobile ? "flex-1 pb-2 min-h-0" : "p-4"}`}>
+    <div className={`flex flex-col ${isMobile ? "flex-1 pb-2 min-h-0" : "h-full p-4"}`}>
       {/* Header — compact */}
       <div className="px-4 pb-2 flex-shrink-0">
         <h2 className="text-base font-bold text-text">{complejo.nombre}</h2>
