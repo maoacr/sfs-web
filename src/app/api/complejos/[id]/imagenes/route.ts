@@ -22,7 +22,7 @@ export async function POST(
     const file = formData.get("file") as File | null;
     if (!file) return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
 
-    const url = await uploadImage(file, `complejos/${id}`);
+    const url = await uploadImage(file, `complejos/${id}`, "photo");
 
     const imagen = await prisma.complejoImagen.create({
       data: { complejoId: id, url, orden: 0 },
