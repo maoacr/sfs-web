@@ -79,7 +79,7 @@ export function ProfileForm() {
   const isOwner = user?.role === "OWNER";
 
   return (
-    <div className="p-6 lg:p-10">
+    <div className="p-6 pb-24 lg:p-10">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <button onClick={() => router.back()}
@@ -231,8 +231,8 @@ export function ProfileForm() {
             </div>
           </form>
 
-          {/* Sticky save bar — above bottom tab bar */}
-          <div className="sticky bottom-16 -mx-6 -mb-6 mt-8 px-6 py-4 bg-bg/90 backdrop-blur-xl border-t border-border z-50 lg:hidden">
+          {/* Fixed save bar on mobile — floats above bottom tab bar */}
+          <div className="fixed bottom-16 left-0 right-0 px-6 py-4 bg-bg/90 backdrop-blur-xl border-t border-border z-50 lg:hidden">
             <button type="submit" form="profile-form" disabled={saving}
               className="w-full rounded-xl bg-gradient-to-r from-grass to-grass-light py-3.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-lg shadow-grass/20">
               {saving ? "Guardando..." : "Guardar cambios"}
