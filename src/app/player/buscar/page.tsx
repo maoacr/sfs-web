@@ -96,8 +96,8 @@ export default function PlayerBuscar() {
       </div>
 
       {/* Progress bar */}
-      {complejos.length > 1 && (
-        <div className="flex-shrink-0 flex gap-1 px-4 pb-2">
+      {complejos.length > 0 && (
+        <div className="flex-shrink-0 flex gap-1 px-4 pb-1">
           {complejos.map((c, i) => (
             <button key={c.id} onClick={() => verticalRef.current?.slideTo(i)}
               className={`h-1 flex-1 rounded-full transition-all ${i <= activeComplejo ? "bg-grass" : "bg-border"}`} />
@@ -122,11 +122,12 @@ export default function PlayerBuscar() {
         </div>
       ) : (
         <>
-        <Swiper
-          direction="vertical"
-          slidesPerView={1}
-          spaceBetween={0}
-          className="flex-1 w-full md:!hidden"
+          <Swiper
+            direction="vertical"
+            slidesPerView={1}
+            spaceBetween={0}
+            loop
+            className="flex-1 w-full md:!hidden"
           onSwiper={swiper => { verticalRef.current = swiper; }}
           onSlideChange={swiper => setActiveComplejo(swiper.activeIndex)}
           resistanceRatio={0.5}
@@ -178,9 +179,9 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   const isCompact = count >= 4; // vertical layout for 4+
 
   return (
-    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "p-4"}`}>
-      {/* Header */}
-      <div className="px-4 pb-3 flex-shrink-0">
+    <div className={`flex flex-col ${isMobile ? "flex-1 pb-2 min-h-0" : "p-4"}`}>
+      {/* Header — compact */}
+      <div className="px-4 pb-2 flex-shrink-0">
         <h2 className="text-base font-bold text-text">{complejo.nombre}</h2>
         {complejo.lat && complejo.lng ? (
           <a href={`https://www.google.com/maps?q=${complejo.lat},${complejo.lng}`} target="_blank" rel="noopener noreferrer"
@@ -195,19 +196,20 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
       {/* Cancha cards */}
       <Swiper
         slidesPerView={isCompact ? "auto" : count <= 2 ? count : count}
-        spaceBetween={12}
+        spaceBetween={isMobile ? 16 : 12}
         centeredSlides={isCompact}
+        loop={isCompact}
         className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"} ${isCompact ? "!pb-8" : ""}`}
-        style={isMobile && isCompact ? { flex: 1 } : !isMobile ? { height: isCompact ? "24rem" : "12rem" } : {}}
+        style={isMobile ? { flex: 1 } : !isMobile ? { height: isCompact ? "24rem" : "12rem" } : {}}
         pagination={isCompact ? { clickable: true } : false}
         modules={[Pagination]}
-        resistanceRatio={0.5}
+        resistanceRatio={0.3}
       >
         {complejo.canchas.map(cancha => {
           const libres = cancha.slots.filter(s => s.disponible).length;
           return (
             <SwiperSlide key={cancha.id}
-              style={isCompact && isMobile ? { width: "85vw", maxWidth: "24rem" } : undefined}
+              style={isCompact && isMobile ? { width: "90vw", maxWidth: "28rem" } : undefined}
               className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact ? "!flex !flex-col" : "!flex !flex-row"}`}
               onClick={() => onSelect(cancha)}>
 
