@@ -10,7 +10,7 @@ import "swiper/css";
 import "swiper/css/pagination";
 
 interface Slot { inicio: string; fin: string; disponible: boolean }
-interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; slots: Slot[] }
+interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; imagenes: string[]; slots: Slot[] }
 interface ComplejoSlot { id: string; nombre: string; direccion: string; telefono: string | null; lat: number | null; lng: number | null; canchas: CanchaSlot[] }
 
 const TIPOS = ["F5", "F6", "F7", "F8", "F9", "F11"];
@@ -215,12 +215,12 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
               {isCompact ? (
                 /* ─── 4+ canchas: vertical layout ─── */
                 <div className="relative flex-1 min-h-0">
-                  {cancha.imagen ? (
-                    <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  {cancha.imagenes && cancha.imagenes.length > 0 ? (
+                    <ImageSlider images={cancha.imagenes} className="absolute inset-0" />
                   ) : (
                     <div className="absolute inset-0 w-full h-full bg-surface-hover flex items-center justify-center text-5xl">⚽</div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-bg/95 via-bg/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-bg/95 via-bg/40 to-transparent pointer-events-none" />
                   <div className="absolute inset-x-0 bottom-0 p-3">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <span className="rounded-md bg-grass/90 px-2 py-0.5 text-[11px] font-bold text-white">{cancha.tipo}</span>
@@ -242,8 +242,8 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
                 <>
                   {/* Image — left side */}
                   <div className="w-[45%] sm:w-1/2 flex-shrink-0 bg-surface-hover relative">
-                    {cancha.imagen ? (
-                      <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    {cancha.imagenes && cancha.imagenes.length > 0 ? (
+                      <ImageSlider images={cancha.imagenes} className="absolute inset-0" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-4xl">⚽</div>
                     )}
@@ -296,8 +296,8 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
 
         {/* Full-bleed image background (desktop) */}
         <div className="hidden lg:block absolute inset-0">
-          {cancha.imagen ? (
-            <img src={cancha.imagen} alt="" className="w-full h-full object-cover" />
+          {cancha.imagenes && cancha.imagenes.length > 0 ? (
+            <ImageSlider images={cancha.imagenes} className="absolute inset-0" />
           ) : (
             <div className="w-full h-full bg-surface-hover flex items-center justify-center text-6xl">⚽</div>
           )}
@@ -386,8 +386,8 @@ function DetailImage({ cancha, fP, onClose, className = "" }: {
 }) {
   return (
     <div className={`relative bg-surface-hover overflow-hidden ${className || "h-48 lg:h-56"}`}>
-      {cancha.imagen ? (
-        <img src={cancha.imagen} alt="" className="h-full w-full object-cover" />
+      {cancha.imagenes && cancha.imagenes.length > 0 ? (
+        <ImageSlider images={cancha.imagenes} className="absolute inset-0" />
       ) : (
         <div className="h-full w-full flex items-center justify-center text-5xl">⚽</div>
       )}
@@ -476,3 +476,37 @@ const SERVICIO_ICONS: Record<string, string> = {
   vestidores: "🚿", cafeteria: "☕", parqueadero: "🅿️",
   iluminacion: "💡", grama_sintetica: "🟢", techada: "🏠",
 };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Auto-sliding image gallery
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function ImageSlider({ images, className = "" }: { images: string[]; className?: string }) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const timer = setInterval(() => setIndex(i => (i + 1) % images.length), 4000);
+    return () => clearInterval(timer);
+  }, [images.length]);
+
+  if (images.length === 0) return null;
+
+  return (
+    <div className={`relative overflow-hidden ${className}`}>
+      {images.map((url, i) => (
+        <img key={url} src={url} alt=""
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+          style={{ opacity: i === index ? 1 : 0 }} />
+      ))}
+      {/* Dots indicator */}
+      {images.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+          {images.map((_, i) => (
+            <div key={i} className={`h-1.5 w-1.5 rounded-full transition-colors ${i === index ? "bg-white" : "bg-white/40"}`} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

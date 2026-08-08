@@ -47,7 +47,7 @@ export async function GET(request: Request) {
           where: { diaSemana: null }, // Solo tarifa base por ahora
           take: 1,
         },
-        imagenes: { orderBy: { principal: "desc" }, take: 1 },
+        imagenes: { orderBy: { orden: "asc" } },
         reservas: {
           where: {
             estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA"] },
@@ -135,6 +135,7 @@ export async function GET(request: Request) {
         complejo: cancha.complejo,
         precioBase: precio,
         imagen: cancha.imagenes[0]?.url || null,
+        imagenes: cancha.imagenes.map((i: any) => i.url),
         slots,
       };
     });
