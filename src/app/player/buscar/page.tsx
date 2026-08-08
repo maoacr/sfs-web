@@ -139,19 +139,14 @@ export default function PlayerBuscar() {
           ))}
         </Swiper>
 
-        {/* Tablet+: horizontal Swiper, 2 complejos per view */}
-        <Swiper
-          slidesPerView={2}
-          spaceBetween={24}
-          className="hidden md:block flex-1 w-full px-6 py-6"
-          resistanceRatio={0.5}
-        >
+        {/* Tablet+: vertical scroll, one complejo per row */}
+        <div className="hidden md:block flex-1 overflow-y-auto p-4 space-y-6">
           {complejos.map(comp => (
-            <SwiperSlide key={comp.id} style={{ height: "100%" }}>
+            <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden">
               <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
-            </SwiperSlide>
+            </div>
           ))}
-        </Swiper>
+        </div>
         </>
       )}
 
@@ -183,7 +178,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   const isCompact = count >= 4; // vertical layout for 4+
 
   return (
-    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "h-full rounded-2xl border border-border bg-surface overflow-hidden p-4"}`}>
+    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "p-4"}`}>
       {/* Header */}
       <div className="px-4 pb-3 flex-shrink-0">
         <h2 className="text-base font-bold text-text">{complejo.nombre}</h2>
@@ -203,7 +198,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
         spaceBetween={12}
         centeredSlides={isCompact}
         className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"} ${isCompact ? "!pb-8" : ""}`}
-        style={isMobile && isCompact ? { flex: 1 } : isCompact ? { flex: 1 } : { flex: 1 }}
+        style={isMobile && isCompact ? { flex: 1 } : !isMobile ? { height: isCompact ? "24rem" : "12rem" } : {}}
         pagination={isCompact ? { clickable: true } : false}
         modules={[Pagination]}
         resistanceRatio={0.5}
