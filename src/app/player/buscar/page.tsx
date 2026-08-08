@@ -198,7 +198,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
         slidesPerView={isCompact ? "auto" : count <= 2 ? count : count}
         spaceBetween={12}
         centeredSlides={isCompact}
-        className={`w-full px-4 min-h-0 ${!isMobile && !isCompact ? "" : ""} ${isCompact ? "!pb-8" : ""}`}
+        className={`w-full px-4 min-h-0 ${!isMobile && !isCompact ? "h-48 sm:h-56" : ""} ${isCompact ? "!pb-8" : ""}`}
         style={isMobile && isCompact ? { flex: 1 } : {}}
         pagination={isCompact ? { clickable: true } : false}
         modules={[Pagination]}
@@ -209,7 +209,8 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
           return (
             <SwiperSlide key={cancha.id}
               style={isCompact && isMobile ? { width: "85vw", maxWidth: "24rem" } : undefined}
-              className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact ? "!flex !flex-col" : "!flex !flex-row h-40 sm:h-48"}`}
+              className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact ? "!flex !flex-col" : "!flex !flex-row"}`}
+              style={!isCompact ? { height: "100%" } : undefined}
               onClick={() => onSelect(cancha)}>
 
               {isCompact ? (
