@@ -131,7 +131,7 @@ export default function PlayerBuscar() {
         {/* Tablet+: vertical scroll, one complejo per row */}
         <div className="hidden md:block flex-1 overflow-y-auto p-4 space-y-6">
           {complejos.map(comp => (
-              <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden h-[32rem]">
+            <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden">
               <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
             </div>
           ))}
@@ -183,13 +183,13 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
       {/* Cancha cards */}
       <Swiper
-        slidesPerView={1}
+        slidesPerView={isMobile ? 1 : isCompact ? "auto" : count}
         spaceBetween={isMobile ? 16 : 12}
         centeredSlides
         centeredSlidesBounds
         loop={count >= 2}
-        className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"}`}
-        style={isMobile ? { flex: 1 } : { flex: 1 }}
+        className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"} ${isCompact ? "!pb-8" : ""}`}
+        style={isMobile ? { flex: 1 } : !isMobile ? { height: isCompact ? "24rem" : "12rem" } : {}}
         pagination={isCompact ? { clickable: true } : false}
         modules={[Pagination]}
         resistanceRatio={0.3}
@@ -199,10 +199,10 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
           return (
             <SwiperSlide key={cancha.id}
               style={!isMobile && isCompact ? { width: "85vw", maxWidth: "24rem" } : undefined}
-              className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact || !isMobile ? "!flex !flex-col" : "!flex !flex-row"}`}
+              className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact || isMobile ? "!flex !flex-col" : "!flex !flex-row"}`}
               onClick={() => onSelect(cancha)}>
 
-              {isCompact || !isMobile ? (
+              {isCompact || isMobile ? (
                 /* ─── 4+ canchas: vertical layout ─── */
                 <div className="relative flex-1" style={{ minHeight: "20rem" }}>
                   {cancha.imagen ? (
