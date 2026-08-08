@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatAddress } from "@/lib/address";
 
 interface Complejo { id: string; nombre: string; direccion: string; _count: { canchas: number }; canchas: { id: string; nombre: string; tipo: string }[]; }
 
@@ -107,7 +108,7 @@ export default function OwnerDashboard() {
           {complejos.map(c => (
             <div key={c.id} className="rounded-2xl border border-border bg-surface p-6 shadow-sm hover:border-border-hover transition-all duration-150">
               <h3 className="font-semibold text-text text-base">{c.nombre}</h3>
-              <p className="text-sm text-text-dim mt-1">{c.direccion}</p>
+              <p className="text-sm text-text-dim mt-1">{formatAddress(c)}</p>
               <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-field/40 px-3 py-1 text-xs font-medium text-grass-light">
                 <span className="h-1.5 w-1.5 rounded-full bg-grass-light" />
                 {c._count.canchas} cancha{c._count.canchas !== 1 ? "s" : ""}

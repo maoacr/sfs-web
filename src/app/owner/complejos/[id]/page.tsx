@@ -15,7 +15,10 @@ export default function EditarComplejo() {
   const id = params.id as string;
 
   const [nombre, setNombre] = useState("");
-  const [direccion, setDireccion] = useState("");
+  const [tipoVia, setTipoVia] = useState("Calle");
+  const [numeroVia, setNumeroVia] = useState("");
+  const [numeroSec, setNumeroSec] = useState("");
+  const [complemento, setComplemento] = useState("");
   const [ciudad, setCiudad] = useState("");
   const [departamento, setDepartamento] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -39,7 +42,9 @@ export default function EditarComplejo() {
 
   useEffect(() => {
     fetch(`/api/complejos/${id}`).then(r => r.json()).then(c => {
-      setNombre(c.nombre); setDireccion(c.direccion);
+      setNombre(c.nombre);
+      setTipoVia(c.tipoVia || "Calle"); setNumeroVia(c.numeroVia || "");
+      setNumeroSec(c.numeroSec || ""); setComplemento(c.complemento || "");
       setCiudad(c.ciudad || ""); setDepartamento(c.departamento || "");
       setDescripcion(c.descripcion || ""); setTelefono(c.telefono || "");
       setEmail(c.email || "");
@@ -57,7 +62,7 @@ export default function EditarComplejo() {
     try {
       const res = await fetch(`/api/complejos/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, direccion, ciudad: ciudad || null, departamento: departamento || null, descripcion: descripcion || null, telefono: telefono || null, email: email || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null, lat, lng }),
+        body: JSON.stringify({ nombre, tipoVia, numeroVia, numeroSec: numeroSec || null, complemento: complemento || null, ciudad: ciudad || null, departamento: departamento || null, descripcion: descripcion || null, telefono: telefono || null, email: email || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null, lat, lng }),
       });
       if (!res.ok) throw new Error("Error al guardar");
       setSaved(true);
@@ -130,7 +135,29 @@ export default function EditarComplejo() {
             </div>
             <div>
               <label className={l}>Dirección</label>
-              <input type="text" required value={direccion} onChange={e => setDireccion(e.target.value)} className={i} placeholder="Calle, carrera, número" />
+              <div className="grid grid-cols-[auto_1fr] gap-2 mt-1.5">
+                <select value={tipoVia} onChange={e => setTipoVia(e.target.value)}
+                  className="rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
+                  <option value="Calle">Calle</option>
+                  <option value="Carrera">Carrera</option>
+                  <option value="Diagonal">Diagonal</option>
+                  <option value="Transversal">Transversal</option>
+                  <option value="Avenida">Avenida</option>
+                  <option value="Autopista">Autopista</option>
+                </select>
+                <input type="text" required value={numeroVia} onChange={e => setNumeroVia(e.target.value)} className={i}
+                  placeholder="Número (ej: 123)" />
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="flex rounded-xl">
+                  <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-surface px-3 text-sm text-text-dim">#</span>
+                  <input type="text" value={numeroSec || ""} onChange={e => setNumeroSec(e.target.value)}
+                    className="block w-full rounded-r-xl border border-border bg-surface px-3 py-3 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass"
+                    placeholder="45-67" />
+                </div>
+                <input type="text" value={complemento || ""} onChange={e => setComplemento(e.target.value)} className={i}
+                  placeholder="Complemento (Apto, Local...)" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -160,7 +187,7 @@ export default function EditarComplejo() {
             {/* Ubicación en mapa */}
             <div className="pt-2 border-t border-border">
               <p className="text-sm font-medium text-text mb-3">Ubicación</p>
-              <MapPicker lat={lat} lng={lng} direccion={direccion} ciudad={ciudad} departamento={departamento} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
+              <MapPicker lat={lat} lng={lng} tipoVia={tipoVia} numeroVia={numeroVia} numeroSec={numeroSec} complemento={complemento} ciudad={ciudad} departamento={departamento} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
             </div>
 
             {/* Redes sociales */}

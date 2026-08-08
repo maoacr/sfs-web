@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { formatAddress } from "@/lib/address";
 import { sileo } from "sileo";
 
 const TIPOS = [
@@ -96,7 +97,7 @@ function NuevaCanchaForm() {
               <select value={complejoId} onChange={e => setComplejoId(e.target.value)} required
                 className={`${inputClass} bg-surface`}>
                 <option value="">Seleccionar complejo...</option>
-                {complejos.map(c => <option key={c.id} value={c.id}>{c.nombre} — {c.direccion}</option>)}
+                {complejos.map(c => <option key={c.id} value={c.id}>{c.nombre} — {formatAddress(c)}</option>)}
               </select>
             )}
             <Link href="/owner/complejos/nuevo" className="mt-1 inline-block text-xs text-grass hover:text-grass-light">+ Nuevo complejo</Link>

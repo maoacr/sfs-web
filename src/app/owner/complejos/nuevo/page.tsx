@@ -9,7 +9,10 @@ export default function NuevoComplejo() {
   const [error, setError] = useState("");
 
   const [nombre, setNombre] = useState("");
-  const [direccion, setDireccion] = useState("");
+  const [tipoVia, setTipoVia] = useState("Calle");
+  const [numeroVia, setNumeroVia] = useState("");
+  const [numeroSec, setNumeroSec] = useState("");
+  const [complemento, setComplemento] = useState("");
   const [ciudad, setCiudad] = useState("");
   const [departamento, setDepartamento] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -26,7 +29,7 @@ export default function NuevoComplejo() {
     try {
       const res = await fetch("/api/complejos", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, direccion, ciudad: ciudad || undefined, departamento: departamento || undefined, descripcion: descripcion || undefined, telefono: telefono || undefined, email: email || undefined, instagram: instagram || undefined, tiktok: tiktok || undefined, twitter: twitter || undefined, facebook: facebook || undefined }),
+        body: JSON.stringify({ nombre, tipoVia, numeroVia, numeroSec: numeroSec || undefined, complemento: complemento || undefined, ciudad: ciudad || undefined, departamento: departamento || undefined, descripcion: descripcion || undefined, telefono: telefono || undefined, email: email || undefined, instagram: instagram || undefined, tiktok: tiktok || undefined, twitter: twitter || undefined, facebook: facebook || undefined }),
       });
       if (!res.ok) { const data = await res.json(); throw new Error(data.error || "Error al crear"); }
       router.push("/owner/dashboard"); router.refresh();
@@ -56,7 +59,29 @@ export default function NuevoComplejo() {
           </div>
           <div>
             <label className={l}>Dirección</label>
-            <input type="text" required value={direccion} onChange={e => setDireccion(e.target.value)} className={i} placeholder="Calle, carrera, número" />
+            <div className="grid grid-cols-[auto_1fr] gap-2 mt-1">
+              <select value={tipoVia} onChange={e => setTipoVia(e.target.value)}
+                className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
+                <option value="Calle">Calle</option>
+                <option value="Carrera">Carrera</option>
+                <option value="Diagonal">Diagonal</option>
+                <option value="Transversal">Transversal</option>
+                <option value="Avenida">Avenida</option>
+                <option value="Autopista">Autopista</option>
+              </select>
+              <input type="text" required value={numeroVia} onChange={e => setNumeroVia(e.target.value)} className={i}
+                placeholder="Número (ej: 123)" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="flex rounded-lg">
+                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-border bg-surface px-3 text-sm text-text-dim">#</span>
+                <input type="text" value={numeroSec} onChange={e => setNumeroSec(e.target.value)}
+                  className="block w-full rounded-r-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass"
+                  placeholder="45-67" />
+              </div>
+              <input type="text" value={complemento} onChange={e => setComplemento(e.target.value)} className={i}
+                placeholder="Complemento (Apto, Local...)" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

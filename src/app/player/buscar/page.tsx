@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { sileo } from "sileo";
+import { formatAddress } from "@/lib/address";
 
 interface Slot { inicio: string; fin: string; disponible: boolean }
 interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; slots: Slot[] }
@@ -31,7 +32,7 @@ export default function PlayerBuscar() {
             if (!byComplejo[c.complejo.id]) {
               byComplejo[c.complejo.id] = {
                 id: c.complejo.id, nombre: c.complejo.nombre,
-                direccion: c.complejo.direccion, telefono: c.complejo.telefono, canchas: [],
+                direccion: formatAddress(c.complejo), telefono: c.complejo.telefono, canchas: [],
               };
             }
             byComplejo[c.complejo.id].canchas.push(c);

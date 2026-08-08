@@ -37,7 +37,10 @@ export async function PUT(
       where: { id },
       data: {
         ...(body.nombre !== undefined && { nombre: body.nombre }),
-        ...(body.direccion !== undefined && { direccion: body.direccion }),
+        ...(body.tipoVia !== undefined && { tipoVia: body.tipoVia }),
+        ...(body.numeroVia !== undefined && { numeroVia: body.numeroVia }),
+        ...(body.numeroSec !== undefined && { numeroSec: body.numeroSec }),
+        ...(body.complemento !== undefined && { complemento: body.complemento }),
         ...(body.ciudad !== undefined && { ciudad: body.ciudad }),
         ...(body.departamento !== undefined && { departamento: body.departamento }),
         ...(body.descripcion !== undefined && { descripcion: body.descripcion }),

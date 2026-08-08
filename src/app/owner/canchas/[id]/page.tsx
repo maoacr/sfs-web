@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AgendaView } from "@/components/agenda-view";
 import { ImageUploadZone } from "@/components/image-upload-zone";
+import { formatAddress } from "@/lib/address";
 import { useRouter, useParams } from "next/navigation";
 
 const TIPOS = [
@@ -93,7 +94,7 @@ export default function GestionarCancha() {
             {cancha.tipo} · {cancha.capacidad} jugadores
             {cancha.complejo && <span className="text-text-dim"> · {cancha.complejo.nombre}</span>}
           </p>
-          {cancha.complejo && <p className="text-xs text-text-dim mt-0.5">{cancha.complejo.direccion}</p>}
+          {cancha.complejo && <p className="text-xs text-text-dim mt-0.5">{formatAddress(cancha.complejo)}</p>}
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatAddress } from "@/lib/address";
 
 interface Complejo { id: string; nombre: string; direccion: string; telefono: string | null; email: string | null; _count: { canchas: number }; }
 
@@ -39,7 +40,7 @@ export default function OwnerComplejos() {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-semibold text-text text-base group-hover:text-grass-light transition-colors">{c.nombre}</h3>
-                  <p className="text-sm text-text-muted mt-1">{c.direccion}</p>
+                  <p className="text-sm text-text-muted mt-1">{formatAddress(c)}</p>
                 </div>
                 <span className="text-text-dim opacity-0 group-hover:opacity-100 transition-opacity text-sm">Editar →</span>
               </div>

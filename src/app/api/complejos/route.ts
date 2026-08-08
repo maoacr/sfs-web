@@ -27,15 +27,18 @@ export async function POST(request: Request) {
     const user = await getAuthUser(request);
     const body = await request.json();
 
-    if (!body.nombre || !body.direccion) {
-      return NextResponse.json({ error: "Nombre y dirección son requeridos" }, { status: 400 });
+    if (!body.nombre || !body.numeroVia) {
+      return NextResponse.json({ error: "Nombre y número de dirección son requeridos" }, { status: 400 });
     }
 
     const complejo = await prisma.complejo.create({
       data: {
         tenantId: user.sub,
         nombre: body.nombre,
-        direccion: body.direccion,
+        tipoVia: body.tipoVia || "Calle",
+        numeroVia: body.numeroVia || "",
+        numeroSec: body.numeroSec || null,
+        complemento: body.complemento || null,
         ciudad: body.ciudad || "",
         departamento: body.departamento || "",
         descripcion: body.descripcion || null,

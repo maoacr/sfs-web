@@ -6,7 +6,10 @@ import dynamic from "next/dynamic";
 interface Props {
   lat: number | null;
   lng: number | null;
-  direccion: string;
+  tipoVia: string;
+  numeroVia: string;
+  numeroSec: string | null;
+  complemento: string | null;
   ciudad: string;
   departamento: string;
   onChange: (lat: number, lng: number) => void;
@@ -22,7 +25,7 @@ function MapPlaceholder() {
   );
 }
 
-export function MapPicker({ lat, lng, direccion, ciudad, departamento, onChange }: Props) {
+export function MapPicker({ lat, lng, tipoVia, numeroVia, numeroSec, complemento, ciudad, departamento, onChange }: Props) {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -33,7 +36,8 @@ export function MapPicker({ lat, lng, direccion, ciudad, departamento, onChange 
   }, [lat, lng]);
 
   async function handleGeocode() {
-    const fullAddress = [direccion, ciudad, departamento, "Colombia"].filter(Boolean).join(", ");
+    const numPart = [numeroVia, numeroSec ? `#${numeroSec}` : null].filter(Boolean).join(" ");
+    const fullAddress = [`${tipoVia} ${numPart}`, complemento, ciudad, departamento, "Colombia"].filter(Boolean).join(", ");
     if (fullAddress.length < 10) {
       setSearchError("Escribí una dirección más completa");
       return;
