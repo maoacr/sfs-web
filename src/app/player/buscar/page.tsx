@@ -292,9 +292,21 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div onClick={e => e.stopPropagation()}
-        className="relative w-full lg:max-w-6xl xl:max-w-7xl lg:h-[70vh] max-h-[85vh] lg:max-h-[70vh] overflow-hidden rounded-t-3xl lg:rounded-3xl border border-border bg-surface shadow-2xl animate-slide-up lg:flex">
+        className="relative w-full lg:max-w-6xl xl:max-w-7xl lg:h-[70vh] max-h-[85vh] lg:max-h-[70vh] overflow-hidden rounded-t-3xl lg:rounded-3xl shadow-2xl animate-slide-up">
 
-        {/* ─── Mobile: full-width image + scrollable content ─── */}
+        {/* Full-bleed image background (desktop) */}
+        <div className="hidden lg:block absolute inset-0">
+          {cancha.imagen ? (
+            <img src={cancha.imagen} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-surface-hover flex items-center justify-center text-6xl">⚽</div>
+          )}
+          {/* Gradient overlays: dark at bottom, transparent at top */}
+          <div className="absolute inset-0 bg-gradient-to-t from-bg/90 via-bg/30 to-transparent" />
+          <div className="absolute inset-0 bg-black/25" />
+        </div>
+
+        {/* ─── Mobile: image + scrollable content ─── */}
         <div className="lg:hidden flex flex-col max-h-[85vh] overflow-y-auto">
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-10 h-1 rounded-full bg-border" />
@@ -305,15 +317,63 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
             booking={booking} onReservar={onReservar} />
         </div>
 
-        {/* ─── Desktop: split layout — image left, content right ─── */}
-        <div className="hidden lg:flex w-full h-full">
-          <div className="w-1/2 flex-shrink-0 h-full">
-            <DetailImage cancha={cancha} fP={fP} onClose={onClose} className="h-full rounded-l-3xl" />
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <DetailContent cancha={cancha} complejoNombre={complejoNombre} complejoDireccion={complejoDireccion}
-              complejoLat={complejoLat} complejoLng={complejoLng} fH={fH} slotsLibres={slotsLibres}
-              booking={booking} onReservar={onReservar} />
+        {/* ─── Desktop: full-bleed image + glass content overlay ─── */}
+        <div className="hidden lg:flex flex-col justify-end h-full relative z-10">
+          {/* Close button */}
+          <button onClick={onClose} className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center text-lg hover:bg-white/20 transition-colors">✕</button>
+
+          {/* Glass content panel at the bottom */}
+          <div className="mx-6 mb-6 rounded-2xl bg-bg/60 backdrop-blur-xl border border-white/10 p-6 max-h-[60%] overflow-y-auto">
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="rounded-lg bg-grass/90 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
+                {cancha.precioBase && <span className="rounded-lg bg-white/10 backdrop-blur px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+              </div>
+              <h2 className="text-2xl font-bold text-white">{cancha.nombre}</h2>
+              {complejoLat && complejoLng ? (
+                <a href={`https://www.google.com/maps?q=${complejoLat},${complejoLng}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-grass-light hover:underline mt-1">📍 {complejoNombre} · {complejoDireccion}</a>
+              ) : (
+                <p className="text-sm text-white/60 mt-1">{complejoNombre} · {complejoDireccion}</p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-sm text-white/60"><span className="font-medium text-white">{cancha.capacidad}</span> jugadores</span>
+              <span className="text-white/30">·</span>
+              <span className="text-sm text-white/60"><span className="font-medium text-white">{cancha.duracionSlotMinutos} min</span> por slot</span>
+            </div>
+
+            {cancha.descripcion && <p className="text-sm text-white/70 mb-4 leading-relaxed">{cancha.descripcion}</p>}
+
+            {cancha.servicios.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-5">
+                {cancha.servicios.map(s => (
+                  <span key={s} className="inline-flex items-center gap-1 rounded-lg bg-white/10 backdrop-blur-sm px-2.5 py-1.5 text-xs text-grass-light">
+                    {SERVICIO_ICONS[s] || "•"} {SERVICIO_LABELS[s] || s}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="border-t border-white/10 my-4" />
+
+            <p className="text-sm font-semibold text-white mb-3">
+              {slotsLibres.length > 0 ? `${slotsLibres.length} horario${slotsLibres.length !== 1 ? "s" : ""} disponible${slotsLibres.length !== 1 ? "s" : ""}` : "Sin horarios disponibles"}
+            </p>
+            {slotsLibres.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {slotsLibres.map(slot => (
+                  <button key={slot.inicio} disabled={booking === slot.inicio}
+                    onClick={() => onReservar(cancha.id, slot)}
+                    className={`rounded-xl border border-grass/30 bg-white/5 backdrop-blur-sm px-3 py-2.5 text-sm font-medium text-grass-light hover:bg-grass/10 hover:border-grass active:scale-[0.97] transition-all ${booking === slot.inicio ? "opacity-40" : ""}`}>
+                    {fH(slot.inicio)} – {fH(slot.fin)}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-white/40 text-center py-4">Todos los horarios están ocupados.</p>
+            )}
           </div>
         </div>
       </div>
