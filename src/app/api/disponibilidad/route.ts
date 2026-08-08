@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         slots: { some: { diaSemana } },
       },
       include: {
-        complejo: { select: { id: true, nombre: true, tipoVia: true, numeroVia: true, numeroSec: true, ciudad: true, departamento: true, telefono: true } },
+        complejo: { select: { id: true, nombre: true, tipoVia: true, numeroVia: true, numeroSec: true, ciudad: true, departamento: true, telefono: true, lat: true, lng: true } },
         slots: { where: { diaSemana }, orderBy: { horaApertura: "asc" } },
         tarifas: {
           where: { diaSemana: null }, // Solo tarifa base por ahora

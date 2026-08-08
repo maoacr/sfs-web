@@ -6,7 +6,7 @@ import { formatAddress } from "@/lib/address";
 
 interface Slot { inicio: string; fin: string; disponible: boolean }
 interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; slots: Slot[] }
-interface ComplejoSlot { id: string; nombre: string; direccion: string; telefono: string | null; canchas: CanchaSlot[] }
+interface ComplejoSlot { id: string; nombre: string; direccion: string; telefono: string | null; lat: number | null; lng: number | null; canchas: CanchaSlot[] }
 
 const TIPOS = ["F5", "F6", "F7", "F8", "F9", "F11"];
 
@@ -32,7 +32,8 @@ export default function PlayerBuscar() {
             if (!byComplejo[c.complejo.id]) {
               byComplejo[c.complejo.id] = {
                 id: c.complejo.id, nombre: c.complejo.nombre,
-                direccion: formatAddress(c.complejo), telefono: c.complejo.telefono, canchas: [],
+                direccion: formatAddress(c.complejo), telefono: c.complejo.telefono,
+                lat: c.complejo.lat ?? null, lng: c.complejo.lng ?? null, canchas: [],
               };
             }
             byComplejo[c.complejo.id].canchas.push(c);
@@ -138,7 +139,14 @@ export default function PlayerBuscar() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <h3 className="font-semibold text-text text-base truncate">{comp.nombre}</h3>
-                      <p className="text-xs text-text-dim mt-0.5 truncate">{comp.direccion}</p>
+                      {comp.lat && comp.lng ? (
+                        <a href={`https://www.google.com/maps?q=${comp.lat},${comp.lng}`} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-grass-light hover:underline mt-0.5 truncate">
+                          📍 {comp.direccion}
+                        </a>
+                      ) : (
+                        <p className="text-xs text-text-dim mt-0.5 truncate">📍 {comp.direccion}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-text-dim flex-shrink-0 pt-0.5">
                       <span>{comp.canchas.length} cancha{comp.canchas.length !== 1 ? "s" : ""}</span>
