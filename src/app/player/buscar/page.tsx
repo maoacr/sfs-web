@@ -292,74 +292,118 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div onClick={e => e.stopPropagation()}
-        className="relative w-full lg:max-w-lg max-h-[85vh] lg:max-h-[80vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl border border-border bg-surface shadow-2xl animate-slide-up">
-        <div className="lg:hidden flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-border" />
+        className="relative w-full lg:max-w-4xl lg:h-[85vh] max-h-[85vh] lg:max-h-[85vh] overflow-hidden rounded-t-3xl lg:rounded-3xl border border-border bg-surface shadow-2xl animate-slide-up lg:flex">
+
+        {/* ─── Mobile: full-width image + scrollable content ─── */}
+        <div className="lg:hidden flex flex-col max-h-[85vh] overflow-y-auto">
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 rounded-full bg-border" />
+          </div>
+          <DetailImage cancha={cancha} fP={fP} onClose={onClose} />
+          <DetailContent cancha={cancha} complejoNombre={complejoNombre} complejoDireccion={complejoDireccion}
+            complejoLat={complejoLat} complejoLng={complejoLng} fH={fH} slotsLibres={slotsLibres}
+            booking={booking} onReservar={onReservar} />
         </div>
-        <div className="relative h-48 lg:h-56 bg-surface-hover rounded-t-3xl overflow-hidden">
-          {cancha.imagen ? (
-            <img src={cancha.imagen} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="h-full w-full flex items-center justify-center text-5xl">⚽</div>
-          )}
-          <button onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 text-white flex items-center justify-center text-sm">✕</button>
-          <div className="absolute bottom-3 left-3 flex gap-2">
-            <span className="rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
-            {cancha.precioBase && <span className="rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+
+        {/* ─── Desktop: split layout — image left, content right ─── */}
+        <div className="hidden lg:flex w-full h-full">
+          <div className="w-[45%] flex-shrink-0 h-full">
+            <DetailImage cancha={cancha} fP={fP} onClose={onClose} className="h-full rounded-l-3xl" />
           </div>
-        </div>
-        <div className="p-5">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-text">{cancha.nombre}</h2>
-            {complejoLat && complejoLng ? (
-              <a href={`https://www.google.com/maps?q=${complejoLat},${complejoLng}`} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-grass-light hover:underline mt-0.5">📍 {complejoNombre} · {complejoDireccion}</a>
-            ) : (
-              <p className="text-sm text-text-dim mt-0.5">{complejoNombre} · {complejoDireccion}</p>
-            )}
+          <div className="flex-1 overflow-y-auto">
+            <DetailContent cancha={cancha} complejoNombre={complejoNombre} complejoDireccion={complejoDireccion}
+              complejoLat={complejoLat} complejoLng={complejoLng} fH={fH} slotsLibres={slotsLibres}
+              booking={booking} onReservar={onReservar} />
           </div>
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-xs text-text-dim"><span className="font-medium text-text">{cancha.capacidad}</span> jugadores</span>
-            <span className="text-text-dim">·</span>
-            <span className="text-xs text-text-dim"><span className="font-medium text-text">{cancha.duracionSlotMinutos} min</span> por slot</span>
-          </div>
-          {cancha.descripcion && <p className="text-sm text-text-muted mb-4 leading-relaxed">{cancha.descripcion}</p>}
-          {cancha.servicios.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-5">
-              {cancha.servicios.map(s => (
-                <span key={s} className="inline-flex items-center gap-1 rounded-lg bg-field/20 px-2.5 py-1.5 text-xs text-grass-light border border-grass/10">
-                  {SERVICIO_ICONS[s] || "•"} {SERVICIO_LABELS[s] || s}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="border-t border-border my-4" />
-          <div>
-            <p className="text-sm font-semibold text-text mb-3">
-              {slotsLibres.length > 0 ? `${slotsLibres.length} horario${slotsLibres.length !== 1 ? "s" : ""} disponible${slotsLibres.length !== 1 ? "s" : ""}` : "Sin horarios disponibles"}
-            </p>
-            {slotsLibres.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {slotsLibres.map(slot => (
-                  <button key={slot.inicio} disabled={booking === slot.inicio}
-                    onClick={() => onReservar(cancha.id, slot)}
-                    className={`rounded-xl border border-grass/40 px-4 py-3 text-sm font-medium text-grass-light hover:bg-field hover:border-grass active:scale-[0.97] transition-all ${booking === slot.inicio ? "opacity-60" : ""}`}>
-                    {fH(slot.inicio)} – {fH(slot.fin)}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-border bg-bg p-6 text-center">
-                <p className="text-sm text-text-dim">Todos los horarios están ocupados.</p>
-                <p className="text-xs text-text-dim mt-1">Probá con otra fecha.</p>
-              </div>
-            )}
-          </div>
-          {cancha.slots.filter(s => !s.disponible).length > 0 && (
-            <p className="text-xs text-text-dim mt-3 text-center">+{cancha.slots.filter(s => !s.disponible).length} ocupado{cancha.slots.filter(s => !s.disponible).length !== 1 ? "s" : ""}</p>
-          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DetailImage({ cancha, fP, onClose, className = "" }: {
+  cancha: CanchaSlot; fP: (n: number) => string; onClose: () => void; className?: string;
+}) {
+  return (
+    <div className={`relative bg-surface-hover overflow-hidden ${className || "h-48 lg:h-56"}`}>
+      {cancha.imagen ? (
+        <img src={cancha.imagen} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="h-full w-full flex items-center justify-center text-5xl">⚽</div>
+      )}
+      <button onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 text-white flex items-center justify-center text-sm hover:bg-black/70">✕</button>
+      <div className="absolute bottom-3 left-3 flex gap-2">
+        <span className="rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
+        {cancha.precioBase && <span className="rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+      </div>
+    </div>
+  );
+}
+
+function DetailContent({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, fH, slotsLibres, booking, onReservar }: {
+  cancha: CanchaSlot; complejoNombre: string; complejoDireccion: string;
+  complejoLat: number | null; complejoLng: number | null;
+  fH: (iso: string) => string; slotsLibres: Slot[]; booking: string | null;
+  onReservar: (canchaId: string, slot: Slot) => void;
+}) {
+  return (
+    <div className="p-5 lg:p-8">
+      <div className="mb-5">
+        <h2 className="text-xl lg:text-2xl font-bold text-text">{cancha.nombre}</h2>
+        {complejoLat && complejoLng ? (
+          <a href={`https://www.google.com/maps?q=${complejoLat},${complejoLng}`} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm text-grass-light hover:underline mt-1">📍 {complejoNombre} · {complejoDireccion}</a>
+        ) : (
+          <p className="text-sm text-text-dim mt-1">{complejoNombre} · {complejoDireccion}</p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3 mb-4 lg:mb-5">
+        <span className="text-sm text-text-dim"><span className="font-medium text-text">{cancha.capacidad}</span> jugadores</span>
+        <span className="text-text-dim">·</span>
+        <span className="text-sm text-text-dim"><span className="font-medium text-text">{cancha.duracionSlotMinutos} min</span> por slot</span>
+      </div>
+
+      {cancha.descripcion && <p className="text-sm text-text-muted mb-5 leading-relaxed">{cancha.descripcion}</p>}
+
+      {cancha.servicios.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-5">
+          {cancha.servicios.map(s => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-lg bg-field/20 px-2.5 py-1.5 text-xs text-grass-light border border-grass/10">
+              {SERVICIO_ICONS[s] || "•"} {SERVICIO_LABELS[s] || s}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="border-t border-border my-5" />
+
+      <div>
+        <p className="text-sm font-semibold text-text mb-3">
+          {slotsLibres.length > 0 ? `${slotsLibres.length} horario${slotsLibres.length !== 1 ? "s" : ""} disponible${slotsLibres.length !== 1 ? "s" : ""}` : "Sin horarios disponibles"}
+        </p>
+        {slotsLibres.length > 0 ? (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+            {slotsLibres.map(slot => (
+              <button key={slot.inicio} disabled={booking === slot.inicio}
+                onClick={() => onReservar(cancha.id, slot)}
+                className={`rounded-xl border border-grass/40 px-4 py-3 text-sm font-medium text-grass-light hover:bg-field hover:border-grass active:scale-[0.97] transition-all ${booking === slot.inicio ? "opacity-60" : ""}`}>
+                {fH(slot.inicio)} – {fH(slot.fin)}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border bg-bg p-6 text-center">
+            <p className="text-sm text-text-dim">Todos los horarios están ocupados.</p>
+          </div>
+        )}
+      </div>
+
+      {cancha.slots.filter(s => !s.disponible).length > 0 && (
+        <p className="text-xs text-text-dim mt-3 text-center">
+          +{cancha.slots.filter(s => !s.disponible).length} ocupado{cancha.slots.filter(s => !s.disponible).length !== 1 ? "s" : ""}
+        </p>
+      )}
     </div>
   );
 }
