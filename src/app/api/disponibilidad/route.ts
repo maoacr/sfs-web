@@ -134,8 +134,8 @@ export async function GET(request: Request) {
         duracionSlotMinutos: cancha.duracionSlotMinutos,
         complejo: cancha.complejo,
         precioBase: precio,
-        imagen: cancha.imagenes[0]?.url || null,
-        imagenes: cancha.imagenes.map((i: any) => i.url),
+        imagen: cancha.imagenes?.[0]?.url || null,
+        imagenes: cancha.imagenes?.map(i => i.url) || [],
         slots,
       };
     });
