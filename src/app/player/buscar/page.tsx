@@ -195,10 +195,10 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
       {/* Cancha cards */}
       <Swiper
-        slidesPerView={isCompact ? "auto" : count <= 2 ? count : count}
+        slidesPerView={isMobile ? "auto" : isCompact ? "auto" : count}
         spaceBetween={isMobile ? 16 : 12}
-        centeredSlides={isCompact}
-        loop={isCompact}
+        centeredSlides={isMobile || isCompact}
+        loop={isMobile || isCompact}
         className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"} ${isCompact ? "!pb-8" : ""}`}
         style={isMobile ? { flex: 1 } : !isMobile ? { height: isCompact ? "24rem" : "12rem" } : {}}
         pagination={isCompact ? { clickable: true } : false}
@@ -209,11 +209,11 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
           const libres = cancha.slots.filter(s => s.disponible).length;
           return (
             <SwiperSlide key={cancha.id}
-              style={isCompact && isMobile ? { width: "90vw", maxWidth: "28rem" } : undefined}
-              className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact ? "!flex !flex-col" : "!flex !flex-row"}`}
+              style={isMobile ? { width: "90vw", maxWidth: "28rem" } : undefined}
+              className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact || isMobile ? "!flex !flex-col" : "!flex !flex-row"}`}
               onClick={() => onSelect(cancha)}>
 
-              {isCompact ? (
+              {isCompact || isMobile ? (
                 /* ─── 4+ canchas: vertical layout ─── */
                 <div className="relative flex-1" style={{ minHeight: "16rem" }}>
                   {cancha.imagen ? (
