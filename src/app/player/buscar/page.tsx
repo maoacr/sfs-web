@@ -204,25 +204,28 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
               {isCompact || isMobile ? (
                 /* ─── 4+ canchas: vertical layout ─── */
-                <div className="relative flex-1" style={{ minHeight: "16rem" }}>
+                <div className="relative flex-1" style={{ minHeight: "20rem" }}>
                   {cancha.imagen ? (
                     <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
                     <div className="absolute inset-0 w-full h-full bg-surface-hover flex items-center justify-center text-5xl">⚽</div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-bg/95 via-bg/40 to-transparent pointer-events-none" />
-                  <div className="absolute inset-x-0 bottom-0 p-3">
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <span className="rounded-md bg-grass/90 px-2 py-0.5 text-[11px] font-bold text-white">{cancha.tipo}</span>
-                      {cancha.precioBase && <span className="rounded-md bg-black/50 px-2 py-0.5 text-[11px] font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+                  <div className="absolute inset-x-0 bottom-0 p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="rounded-lg bg-grass/90 px-3 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
+                      {cancha.precioBase && <span className="rounded-lg bg-black/50 px-3 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
                     </div>
-                    <h3 className="font-bold text-white text-sm leading-tight">{cancha.nombre}</h3>
-                    <p className="text-xs text-white/70 mt-0.5">{cancha.capacidad} jug · {cancha.duracionSlotMinutos}min</p>
-                    <div className="mt-1.5">
+                    <h3 className="font-bold text-white text-xl leading-tight mb-1">{cancha.nombre}</h3>
+                    <p className="text-sm text-white/70">{cancha.capacidad} jugadores · {cancha.duracionSlotMinutos} min</p>
+                    <div className="mt-3">
                       {libres > 0 ? (
-                        <span className="text-[11px] font-medium text-grass-light">{libres} libre{libres !== 1 ? "s" : ""}</span>
+                        <div className="inline-flex items-center gap-2 rounded-full bg-grass/20 px-3 py-1.5">
+                          <span className="h-2 w-2 rounded-full bg-grass-light" />
+                          <span className="text-sm font-medium text-grass-light">{libres} horario{libres !== 1 ? "s" : ""} libre{libres !== 1 ? "s" : ""}</span>
+                        </div>
                       ) : (
-                        <span className="text-[11px] text-white/50">Sin horarios</span>
+                        <span className="text-sm text-white/50">Sin horarios disponibles</span>
                       )}
                     </div>
                   </div>
