@@ -20,7 +20,7 @@ export default function OwnerDashboard() {
         fetch("/api/complejos").then(r => r.json()),
         fetch(`/api/reservas?fecha=${new Date().toISOString().slice(0, 10)}&estado=CONFIRMADA`).then(r => r.json()),
       ]).then(([complejosData, reservasData]) => {
-        setComplejos(complejosData);
+        setComplejos(Array.isArray(complejosData) ? complejosData : []);
         setReservasHoy(Array.isArray(reservasData) ? reservasData.length : 0);
         setReservasActivas(Array.isArray(reservasData) ? reservasData.slice(0, 5) : []);
       }).catch(console.error).finally(() => setLoading(false));
