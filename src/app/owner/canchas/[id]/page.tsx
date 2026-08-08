@@ -47,13 +47,15 @@ export default function GestionarCancha() {
   const [servicios, setServicios] = useState<string[]>([]);
   const [duracionSlot, setDuracionSlot] = useState(60);
 
-  useEffect(() => {
+  useEffect(() => { loadCancha(); }, [id]);
+
+  function loadCancha() {
     fetch(`/api/canchas/${id}`).then(r => r.json()).then(data => {
       setCancha(data); setNombre(data.nombre); setTipo(data.tipo); setCapacidad(data.capacidad);
       setDescripcion(data.descripcion || ""); setServicios(data.servicios || []);
       setDuracionSlot(data.duracionSlotMinutos);
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
-  }, [id]);
+  }
 
   async function handleSave() {
     setSaving(true); setError("");
@@ -161,7 +163,7 @@ export default function GestionarCancha() {
           <ImageUploadZone
             imagenes={cancha.imagenes || []}
             uploadUrl={`/api/canchas/${id}/imagenes`}
-            onRefresh={() => router.refresh()}
+            onRefresh={loadCancha}
           />
         </div>
       )}
