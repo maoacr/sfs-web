@@ -121,6 +121,7 @@ export default function PlayerBuscar() {
           </div>
         </div>
       ) : (
+        <>
         <Swiper
           direction="vertical"
           slidesPerView={1}
@@ -151,6 +152,7 @@ export default function PlayerBuscar() {
             </SwiperSlide>
           ))}
         </Swiper>
+        </>
       )}
 
       {/* Detail sheet */}
