@@ -147,20 +147,7 @@ export default function EditarComplejo() {
             {/* Ubicación en mapa */}
             <div className="pt-2 border-t border-border">
               <p className="text-sm font-medium text-text mb-3">Ubicación</p>
-              <MapPicker lat={lat} lng={lng} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
-              {lat && lng && (
-                <div className="flex gap-2 mt-2">
-                  <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-text-muted hover:text-text hover:border-border-hover transition-colors">
-                    🗺️ Google Maps
-                  </a>
-                  <a href={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-text-muted hover:text-text hover:border-border-hover transition-colors">
-                    🚗 Waze
-                  </a>
-                </div>
-              )}
-              <p className="mt-2 text-xs text-text-dim">Hacé clic en el mapa o arrastrá el marcador para ajustar la ubicación.</p>
+              <MapPicker lat={lat} lng={lng} address={direccion} onChange={(la, ln) => { setLat(la); setLng(ln); }} />
             </div>
 
             {/* Redes sociales */}
