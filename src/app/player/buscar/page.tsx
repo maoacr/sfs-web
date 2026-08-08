@@ -141,8 +141,8 @@ export default function PlayerBuscar() {
           </Swiper>
 
           {/* Tablet+: grid */}
-          <div className="absolute inset-0 hidden md:block overflow-y-auto px-4 pt-2 pb-4">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="absolute inset-0 hidden md:block overflow-y-auto p-4 md:p-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {complejos.map(comp => (
                 <ComplejoCard key={comp.id} complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
               ))}
@@ -179,7 +179,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   const isCompact = count >= 4; // vertical layout for 4+
 
   return (
-    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "h-[26rem] rounded-2xl border border-border bg-surface overflow-hidden"}`}>
+    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "h-[26rem] rounded-2xl border border-border bg-surface overflow-hidden p-4"}`}>
       {/* Header */}
       <div className="px-4 pb-3 flex-shrink-0">
         <h2 className="text-base font-bold text-text">{complejo.nombre}</h2>
@@ -198,7 +198,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
         slidesPerView={isCompact ? "auto" : count <= 2 ? count : count}
         spaceBetween={12}
         centeredSlides={isCompact}
-        className={`w-full px-4 min-h-0 ${isCompact ? "!pb-8" : ""}`}
+        className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"} ${isCompact ? "!pb-8" : ""}`}
         style={isMobile && isCompact ? { flex: 1 } : isCompact ? { flex: 1 } : { flex: 1 }}
         pagination={isCompact ? { clickable: true } : false}
         modules={[Pagination]}
