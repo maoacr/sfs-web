@@ -232,7 +232,7 @@ export function ProfileForm() {
           </form>
 
           {/* Fixed save bar on mobile — floats above bottom tab bar */}
-          <div className="fixed bottom-16 left-0 right-0 px-6 py-4 bg-bg/90 backdrop-blur-xl border-t border-border z-50 lg:hidden">
+          <div className="fixed bottom-16 left-0 right-0 px-6 py-4 bg-bg/90 backdrop-blur-xl border-t border-border z-50 md:hidden">
             <button type="submit" form="profile-form" disabled={saving}
               className="w-full rounded-xl bg-gradient-to-r from-grass to-grass-light py-3.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-lg shadow-grass/20">
               {saving ? "Guardando..." : "Guardar cambios"}
@@ -240,7 +240,7 @@ export function ProfileForm() {
           </div>
 
           {/* Desktop save button (inline) */}
-          <div className="hidden lg:block pt-4">
+          <div className="hidden md:block pt-4">
             <button type="submit" form="profile-form" disabled={saving}
               className="rounded-xl bg-gradient-to-r from-grass to-grass-light px-8 py-3 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-md shadow-grass/20">
               {saving ? "Guardando..." : "Guardar cambios"}
