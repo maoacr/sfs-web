@@ -306,8 +306,8 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
 
         {/* Full-bleed image background (desktop) */}
         <div className="hidden lg:block absolute inset-0">
-          {cancha.imagenes && cancha.imagenes.length > 0 ? (
-            <ImageSlider images={cancha.imagenes} className="absolute inset-0" />
+          {cancha.imagen ? (
+            <img src={cancha.imagen} alt="" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-surface-hover flex items-center justify-center text-6xl">⚽</div>
           )}
@@ -396,8 +396,8 @@ function DetailImage({ cancha, fP, onClose, className = "" }: {
 }) {
   return (
     <div className={`relative bg-surface-hover overflow-hidden ${className || "h-48 lg:h-56"}`}>
-      {cancha.imagenes && cancha.imagenes.length > 0 ? (
-        <ImageSlider images={cancha.imagenes} className="absolute inset-0" />
+      {cancha.imagen ? (
+        <img src={cancha.imagen} alt="" className="h-full w-full object-cover" />
       ) : (
         <div className="h-full w-full flex items-center justify-center text-5xl">⚽</div>
       )}
