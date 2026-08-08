@@ -292,7 +292,7 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div onClick={e => e.stopPropagation()}
-        className="relative w-full lg:max-w-6xl xl:max-w-7xl lg:h-[85vh] max-h-[85vh] lg:max-h-[85vh] overflow-hidden rounded-t-3xl lg:rounded-3xl border border-border bg-surface shadow-2xl animate-slide-up lg:flex">
+        className="relative w-full lg:max-w-6xl xl:max-w-7xl lg:h-[70vh] max-h-[85vh] lg:max-h-[70vh] overflow-hidden rounded-t-3xl lg:rounded-3xl border border-border bg-surface shadow-2xl animate-slide-up lg:flex">
 
         {/* ─── Mobile: full-width image + scrollable content ─── */}
         <div className="lg:hidden flex flex-col max-h-[85vh] overflow-y-auto">
