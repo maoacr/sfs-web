@@ -156,7 +156,6 @@ export default function PlayerBuscar() {
                   pagination={{ clickable: true }}
                   modules={[Pagination]}
                   resistanceRatio={0.5}
-                  style={{ height: "100%" }}
                 >
                   {comp.canchas.map(cancha => {
                     const libres = cancha.slots.filter(s => s.disponible).length;
@@ -165,7 +164,7 @@ export default function PlayerBuscar() {
                         onClick={() => {
                           setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng });
                         }}
-                        className="h-full flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border">
+                        className="flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border" style={{ height: "calc(100dvh - 18rem)", minHeight: "22rem" }}>
                         {/* Full-bleed image with gradient overlay */}
                         <div className="relative flex-1 min-h-0">
                           {cancha.imagen ? (
