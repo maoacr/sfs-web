@@ -7,6 +7,10 @@ const NAV = [
   { label: "Mis reservas", href: "/player/reservas", icon: "📅" },
 ];
 
+const OVERFLOW = [
+  { label: "Perfil", href: "/player/perfil", icon: "👤" },
+];
+
 export default function PlayerLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
@@ -16,7 +20,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
           <NotificationBell />
         </div>
         <div className="flex-1">{children}</div>
-        <BottomTabBar role="PLAYER" tabs={NAV} />
+        <BottomTabBar role="PLAYER" tabs={NAV} overflow={OVERFLOW} />
       </main>
     </div>
   );

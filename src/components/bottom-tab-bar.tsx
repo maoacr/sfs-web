@@ -91,6 +91,15 @@ export function BottomTabBar({ tabs, overflow, role }: {
                     <span className="text-lg">{item.icon}</span> {item.label}
                   </button>
                 ))}
+
+                {/* Logout */}
+                <button onClick={async () => {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                  window.location.href = "/auth/login";
+                }}
+                  className="w-full flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-error hover:bg-error-bg transition-colors">
+                  <span className="text-lg">🚪</span> Cerrar sesión
+                </button>
               </div>
             </div>
           </div>
