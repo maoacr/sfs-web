@@ -164,7 +164,18 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   isMobile?: boolean;
 }) {
   const count = complejo.canchas.length;
-  const isCompact = !isMobile || count >= 4; // tablet always compact, mobile only 4+
+  const isCompact = !isMobile || count >= 4;
+  const [isXl, setIsXl] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    setIsXl(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsXl(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const slidesPerView = isXl && count >= 2 ? 2 : 1;
 
   return (
     <div className={`flex flex-col ${isMobile ? "flex-1 pb-2 min-h-0" : "h-full p-4"}`}>
@@ -183,7 +194,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
       {/* Cancha cards */}
       <Swiper
-        slidesPerView={isMobile ? 1 : 1}
+        slidesPerView={slidesPerView}
         spaceBetween={isMobile ? 16 : 12}
         centeredSlides
         centeredSlidesBounds
