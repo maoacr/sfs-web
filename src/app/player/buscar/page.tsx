@@ -183,10 +183,10 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
       {/* Cancha cards */}
       <Swiper
-        slidesPerView={isMobile ? "auto" : isCompact ? "auto" : count}
+        slidesPerView={isMobile ? 1 : isCompact ? "auto" : count}
         spaceBetween={isMobile ? 16 : 12}
-        centeredSlides={isMobile || isCompact}
-        loop={isMobile || isCompact}
+        centeredSlides
+        loop={count >= 2}
         className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"} ${isCompact ? "!pb-8" : ""}`}
         style={isMobile ? { flex: 1 } : !isMobile ? { height: isCompact ? "24rem" : "12rem" } : {}}
         pagination={isCompact ? { clickable: true } : false}
