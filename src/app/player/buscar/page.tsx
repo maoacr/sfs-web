@@ -121,13 +121,13 @@ export default function PlayerBuscar() {
           </div>
         </div>
       ) : (
-        <>
-          {/* Mobile: vertical Swiper (one complejo at a time) */}
+        <div className="flex-1 min-h-0 relative">
+          {/* Mobile: vertical Swiper */}
           <Swiper
             direction="vertical"
             slidesPerView={1}
             spaceBetween={0}
-            className="flex-1 w-full md:hidden"
+            className="absolute inset-0 w-full md:hidden"
             onSwiper={swiper => { verticalRef.current = swiper; }}
             onSlideChange={swiper => setActiveComplejo(swiper.activeIndex)}
             resistanceRatio={0.5}
@@ -140,15 +140,15 @@ export default function PlayerBuscar() {
             ))}
           </Swiper>
 
-          {/* Tablet+: grid of complejos */}
-          <div className="hidden md:block flex-1 overflow-y-auto px-4 pt-2 pb-4">
+          {/* Tablet+: grid */}
+          <div className="absolute inset-0 hidden md:block overflow-y-auto px-4 pt-2 pb-4">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {complejos.map(comp => (
                 <ComplejoCard key={comp.id} complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
               ))}
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Detail sheet */}
