@@ -20,8 +20,11 @@ export async function POST(
 
     const url = await uploadImage(file, `canchas/${id}`, "photo");
 
+    // Si es la primera imagen, marcarla como principal
+    const existingCount = await prisma.imagenCancha.count({ where: { canchaId: id } });
+
     const imagen = await prisma.imagenCancha.create({
-      data: { canchaId: id, url, orden: 0 },
+      data: { canchaId: id, url, orden: existingCount, principal: existingCount === 0 },
     });
 
     return NextResponse.json(imagen, { status: 201 });

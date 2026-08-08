@@ -47,7 +47,7 @@ export async function GET(request: Request) {
           where: { diaSemana: null }, // Solo tarifa base por ahora
           take: 1,
         },
-        imagenes: { where: { principal: true }, take: 1 },
+        imagenes: { orderBy: { principal: "desc" }, take: 1 },
         reservas: {
           where: {
             estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA"] },
