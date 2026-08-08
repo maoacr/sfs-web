@@ -188,6 +188,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
         centeredSlides
         centeredSlidesBounds
         loop={count >= 2}
+        loopAdditionalSlides={count >= 2 ? 1 : 0}
         className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"}`}
         style={isMobile ? { flex: 1 } : { flex: 1 }}
         pagination={isCompact ? { clickable: true } : false}
@@ -198,7 +199,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
           const libres = cancha.slots.filter(s => s.disponible).length;
           return (
             <SwiperSlide key={cancha.id}
-              style={!isMobile && isCompact ? { width: "85vw", maxWidth: "24rem" } : undefined}
+              style={undefined}
               className={`rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isCompact || isMobile ? "!flex !flex-col" : "!flex !flex-row"}`}
               onClick={() => onSelect(cancha)}>
 
