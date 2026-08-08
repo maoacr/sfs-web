@@ -152,10 +152,11 @@ export default function PlayerBuscar() {
                   slidesPerView="auto"
                   spaceBetween={12}
                   centeredSlides
-                  className="flex-1 w-full px-4 h-0"
+                  className="flex-1 w-full px-4"
                   pagination={{ clickable: true }}
                   modules={[Pagination]}
                   resistanceRatio={0.5}
+                  style={{ overflow: "visible" }}
                 >
                   {comp.canchas.map(cancha => {
                     const libres = cancha.slots.filter(s => s.disponible).length;
@@ -164,7 +165,7 @@ export default function PlayerBuscar() {
                         onClick={() => {
                           setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng });
                         }}
-                        className="flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border">
+                        className="flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border min-h-[24rem]">
                         {/* Full-bleed image with gradient overlay */}
                         <div className="relative flex-1 min-h-0">
                           {cancha.imagen ? (
