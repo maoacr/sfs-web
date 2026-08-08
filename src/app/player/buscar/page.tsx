@@ -121,95 +121,34 @@ export default function PlayerBuscar() {
           </div>
         </div>
       ) : (
-        <Swiper
-          direction="vertical"
-          slidesPerView={1}
-          spaceBetween={0}
-          className="flex-1 w-full"
-          onSwiper={swiper => { verticalRef.current = swiper; }}
-          onSlideChange={swiper => setActiveComplejo(swiper.activeIndex)}
-          resistanceRatio={0.5}
-          speed={400}
-        >
-          {complejos.map(comp => (
-            <SwiperSlide key={comp.id} className="!flex !flex-col" style={{ height: "100%" }}>
-              <div className="flex-1 flex flex-col min-h-0 pb-4">
-                {/* Complejo header */}
-                <div className="px-4 pb-3 flex-shrink-0">
-                  <h2 className="text-base font-bold text-text">{comp.nombre}</h2>
-                  {comp.lat && comp.lng ? (
-                    <a href={`https://www.google.com/maps?q=${comp.lat},${comp.lng}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-grass-light hover:underline mt-0.5">
-                      📍 {comp.direccion}
-                    </a>
-                  ) : (
-                    <p className="text-xs text-text-dim mt-0.5">📍 {comp.direccion}</p>
-                  )}
-                </div>
+        <>
+          {/* Mobile: vertical Swiper (one complejo at a time) */}
+          <Swiper
+            direction="vertical"
+            slidesPerView={1}
+            spaceBetween={0}
+            className="flex-1 w-full md:hidden"
+            onSwiper={swiper => { verticalRef.current = swiper; }}
+            onSlideChange={swiper => setActiveComplejo(swiper.activeIndex)}
+            resistanceRatio={0.5}
+            speed={400}
+          >
+            {complejos.map(comp => (
+              <SwiperSlide key={comp.id} className="!flex !flex-col" style={{ height: "100%" }}>
+                <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} isMobile />
+              </SwiperSlide>
+            ))}
+          </Swiper>
 
-                {/* Horizontal cancha swiper */}
-                <Swiper
-                  slidesPerView="auto"
-                  spaceBetween={12}
-                  centeredSlides
-                  className="w-full px-4 min-h-0"
-                  style={{ flex: 1 }}
-                  pagination={{ clickable: true }}
-                  modules={[Pagination]}
-                  resistanceRatio={0.5}
-                >
-                  {comp.canchas.map(cancha => {
-                    const libres = cancha.slots.filter(s => s.disponible).length;
-                    return (
-                      <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem" }}
-                        onClick={() => {
-                          setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng });
-                        }}
-                        className="!flex !flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border">
-                        {/* Full-bleed image with gradient overlay */}
-                        <div className="relative flex-1 min-h-0" style={{ height: "100%" }}>
-                          {cancha.imagen ? (
-                            <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                          ) : (
-                            <div className="absolute inset-0 w-full h-full bg-surface-hover flex items-center justify-center text-6xl">⚽</div>
-                          )}
-                          {/* Gradient overlay — transparent at top, dark at bottom */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-bg/95 via-bg/40 to-transparent" />
-
-                          {/* Info overlay */}
-                          <div className="absolute inset-x-0 bottom-0 p-4">
-                            {/* Tipo + Precio */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="rounded-lg bg-grass/90 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
-                              {cancha.precioBase && (
-                                <span className="rounded-lg bg-black/50 px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>
-                              )}
-                            </div>
-                            {/* Nombre */}
-                            <h3 className="font-bold text-white text-lg leading-tight">{cancha.nombre}</h3>
-                            {/* Capacidad */}
-                            <p className="text-sm text-white/70 mt-0.5">{cancha.capacidad} jugadores · {cancha.duracionSlotMinutos} min</p>
-                            {/* Disponibilidad */}
-                            <div className="mt-2">
-                              {libres > 0 ? (
-                                <div className="inline-flex items-center gap-1.5 rounded-full bg-grass/20 px-3 py-1">
-                                  <span className="h-1.5 w-1.5 rounded-full bg-grass-light" />
-                                  <span className="text-xs font-medium text-grass-light">{libres} horario{libres !== 1 ? "s" : ""} libre{libres !== 1 ? "s" : ""}</span>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-white/50">Sin horarios disponibles</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </SwiperSlide>
-                    );
-                  })}
-                </Swiper>
-              </div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
+          {/* Tablet+: grid of complejos */}
+          <div className="hidden md:block flex-1 overflow-y-auto px-4 pt-2 pb-4">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {complejos.map(comp => (
+                <ComplejoCard key={comp.id} complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Detail sheet */}
@@ -222,6 +161,85 @@ export default function PlayerBuscar() {
           onReservar={reservar} onClose={() => setSelectedCancha(null)}
         />
       )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ComplejoCard — used in mobile Swiper and tablet+ grid
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
+  complejo: ComplejoSlot;
+  fP: (n: number) => string;
+  onSelect: (cancha: CanchaSlot) => void;
+  isMobile?: boolean;
+}) {
+  return (
+    <div className={`flex flex-col min-h-0 ${isMobile ? "flex-1 pb-4" : ""}`}>
+      {/* Header */}
+      <div className="px-4 pb-3 flex-shrink-0">
+        <h2 className="text-base font-bold text-text">{complejo.nombre}</h2>
+        {complejo.lat && complejo.lng ? (
+          <a href={`https://www.google.com/maps?q=${complejo.lat},${complejo.lng}`} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-grass-light hover:underline mt-0.5">
+            📍 {complejo.direccion}
+          </a>
+        ) : (
+          <p className="text-xs text-text-dim mt-0.5">📍 {complejo.direccion}</p>
+        )}
+      </div>
+
+      {/* Cancha cards */}
+      <Swiper
+        slidesPerView="auto"
+        spaceBetween={12}
+        centeredSlides
+        className={`w-full px-4 min-h-0 ${isMobile ? "" : "!pb-8"}`}
+        style={isMobile ? { flex: 1 } : {}}
+        pagination={{ clickable: true }}
+        modules={[Pagination]}
+        resistanceRatio={0.5}
+      >
+        {complejo.canchas.map(cancha => {
+          const libres = cancha.slots.filter(s => s.disponible).length;
+          return (
+            <SwiperSlide key={cancha.id}
+              style={isMobile ? { width: "85vw", maxWidth: "24rem" } : undefined}
+              className={`!flex !flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border ${isMobile ? "" : "w-[85%] max-w-[22rem] h-64"}`}
+              onClick={() => onSelect(cancha)}>
+              <div className="relative flex-1 min-h-0">
+                {cancha.imagen ? (
+                  <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <div className="absolute inset-0 w-full h-full bg-surface-hover flex items-center justify-center text-6xl">⚽</div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-bg/95 via-bg/40 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="rounded-lg bg-grass/90 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
+                    {cancha.precioBase && (
+                      <span className="rounded-lg bg-black/50 px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-white text-lg leading-tight">{cancha.nombre}</h3>
+                  <p className="text-sm text-white/70 mt-0.5">{cancha.capacidad} jugadores · {cancha.duracionSlotMinutos} min</p>
+                  <div className="mt-2">
+                    {libres > 0 ? (
+                      <div className="inline-flex items-center gap-1.5 rounded-full bg-grass/20 px-3 py-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-grass-light" />
+                        <span className="text-xs font-medium text-grass-light">{libres} libre{libres !== 1 ? "s" : ""}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-white/50">Sin horarios</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </SwiperSlide>
+          );
+        })}
+      </Swiper>
     </div>
   );
 }
