@@ -96,7 +96,7 @@ export function ProfileForm() {
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-8 items-start">
 
         {/* ─── LEFT: Profile Card ─── */}
-        <div className="rounded-2xl border border-border bg-surface p-8 flex flex-col items-center text-center shadow-card sticky top-24">
+        <div className="rounded-2xl border border-border bg-surface p-8 flex flex-col items-center text-center shadow-card lg:sticky lg:top-24">
           {/* Avatar — large, with gradient ring */}
           <div className="relative mb-5">
             <div className="h-28 w-28 rounded-full bg-gradient-to-br from-field via-grass to-grass-light p-[3px] shadow-glow">
