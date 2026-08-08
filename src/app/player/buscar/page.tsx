@@ -16,7 +16,7 @@ export default function PlayerBuscar() {
   const [complejos, setComplejos] = useState<ComplejoSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState<string | null>(null);
-  const [selectedCancha, setSelectedCancha] = useState<CanchaSlot & { complejoNombre: string; complejoDireccion: string } | null>(null);
+  const [selectedCancha, setSelectedCancha] = useState<CanchaSlot & { complejoNombre: string; complejoDireccion: string; complejoLat: number | null; complejoLng: number | null } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -163,7 +163,7 @@ export default function PlayerBuscar() {
                     const proximoSlot = cancha.slots.find(s => s.disponible);
                     return (
                       <button key={cancha.id}
-                        onClick={() => setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion })}
+                        onClick={() => setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng })}
                         className="flex-shrink-0 w-[160px] rounded-xl border border-border bg-bg hover:border-grass/40 hover:shadow-sm transition-all text-left snap-start overflow-hidden group">
                         {/* Imagen */}
                         <div className="h-24 bg-surface-hover relative">
@@ -211,7 +211,8 @@ export default function PlayerBuscar() {
         <CanchaDetailSheet
           cancha={selectedCancha}
           complejoNombre={selectedCancha.complejoNombre}
-          complejoDireccion={selectedCancha.complejoDireccion}
+          complejoLat={selectedCancha.complejoLat}
+          complejoLng={selectedCancha.complejoLng}
           fH={fH}
           fP={fP}
           booking={booking}
@@ -225,10 +226,12 @@ export default function PlayerBuscar() {
 
 // ─── Cancha Detail Bottom Sheet ─────────────────────────────────────────────
 
-function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, fH, fP, booking, onReservar, onClose }: {
+function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, fH, fP, booking, onReservar, onClose }: {
   cancha: CanchaSlot;
   complejoNombre: string;
   complejoDireccion: string;
+  complejoLat: number | null;
+  complejoLng: number | null;
   fH: (iso: string) => string;
   fP: (n: number) => string;
   booking: string | null;
@@ -277,7 +280,14 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, fH, fP, 
           {/* Name + complex */}
           <div className="mb-4">
             <h2 className="text-xl font-bold text-text">{cancha.nombre}</h2>
-            <p className="text-sm text-text-dim mt-0.5">{complejoNombre} · {complejoDireccion}</p>
+            {complejoLat && complejoLng ? (
+              <a href={`https://www.google.com/maps?q=${complejoLat},${complejoLng}`} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-grass-light hover:underline mt-0.5">
+                📍 {complejoNombre} · {complejoDireccion}
+              </a>
+            ) : (
+              <p className="text-sm text-text-dim mt-0.5">{complejoNombre} · {complejoDireccion}</p>
+            )}
           </div>
 
           {/* Quick stats */}
