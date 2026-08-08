@@ -95,7 +95,17 @@ export default function PlayerBuscar() {
         </select>
       </div>
 
-      {/* Progress bar */}
+      {/* DEBUG: test image */}
+      {complejos.length > 0 && complejos[0].canchas.length > 0 && (
+        <div className="px-4 py-2 bg-red-500/20">
+          <p className="text-xs text-white">DEBUG imagen: {complejos[0].canchas[0].imagen?.slice(0,60)}...</p>
+          {complejos[0].canchas[0].imagen && (
+            <img src={complejos[0].canchas[0].imagen} className="h-32 w-full object-cover rounded border border-red-500" />
+          )}
+        </div>
+      )}
+
+      {/* Main vertical swiper */}
       {complejos.length > 1 && (
         <div className="flex-shrink-0 flex gap-1 px-4 pb-2">
           {complejos.map((c, i) => (
