@@ -159,40 +159,46 @@ export default function PlayerBuscar() {
                 >
                   {comp.canchas.map(cancha => {
                     const libres = cancha.slots.filter(s => s.disponible).length;
-                    const proximoSlot = cancha.slots.find(s => s.disponible);
                     return (
                       <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem" }}
                         onClick={() => {
                           setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng });
                         }}
-                        className="flex flex-col rounded-2xl border border-border bg-surface overflow-hidden cursor-pointer active:scale-[0.98] transition-transform">
-                        {/* Image */}
-                        <div className="relative h-48 sm:h-56 bg-surface-hover flex-shrink-0">
+                        className="flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border">
+                        {/* Full-bleed image with gradient overlay */}
+                        <div className="relative flex-1 min-h-0">
                           {cancha.imagen ? (
-                            <img src={cancha.imagen} alt="" className="h-full w-full object-cover" />
+                            <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                           ) : (
-                            <div className="h-full w-full flex items-center justify-center text-5xl">⚽</div>
+                            <div className="absolute inset-0 w-full h-full bg-surface-hover flex items-center justify-center text-6xl">⚽</div>
                           )}
-                          <span className="absolute top-3 left-3 rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
-                          {cancha.precioBase && (
-                            <span className="absolute top-3 right-3 rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>
-                          )}
-                        </div>
-                        {/* Info */}
-                        <div className="p-4 flex-1 flex flex-col justify-between">
-                          <div>
-                            <h3 className="font-semibold text-text">{cancha.nombre}</h3>
-                            <p className="text-xs text-text-dim mt-0.5">{cancha.capacidad} jug · {cancha.duracionSlotMinutos}min</p>
-                          </div>
-                          <div className="mt-3">
-                            {libres > 0 ? (
-                              <p className="text-sm text-grass-light font-medium">{libres} horario{libres !== 1 ? "s" : ""} libre{libres !== 1 ? "s" : ""}</p>
-                            ) : (
-                              <p className="text-sm text-text-dim">Sin horarios</p>
-                            )}
-                            {proximoSlot && libres > 0 && (
-                              <p className="text-xs text-text-dim mt-0.5">Próximo: {fH(proximoSlot.inicio)}</p>
-                            )}
+                          {/* Gradient overlay — transparent at top, dark at bottom */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-bg/95 via-bg/40 to-transparent" />
+
+                          {/* Info overlay */}
+                          <div className="absolute inset-x-0 bottom-0 p-4">
+                            {/* Tipo + Precio */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="rounded-lg bg-grass/90 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
+                              {cancha.precioBase && (
+                                <span className="rounded-lg bg-black/50 px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>
+                              )}
+                            </div>
+                            {/* Nombre */}
+                            <h3 className="font-bold text-white text-lg leading-tight">{cancha.nombre}</h3>
+                            {/* Capacidad */}
+                            <p className="text-sm text-white/70 mt-0.5">{cancha.capacidad} jugadores · {cancha.duracionSlotMinutos} min</p>
+                            {/* Disponibilidad */}
+                            <div className="mt-2">
+                              {libres > 0 ? (
+                                <div className="inline-flex items-center gap-1.5 rounded-full bg-grass/20 px-3 py-1">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-grass-light" />
+                                  <span className="text-xs font-medium text-grass-light">{libres} horario{libres !== 1 ? "s" : ""} libre{libres !== 1 ? "s" : ""}</span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-white/50">Sin horarios disponibles</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </SwiperSlide>
