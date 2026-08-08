@@ -106,9 +106,14 @@ export default function OwnerDashboard() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {complejos.map(c => (
-            <div key={c.id} className="rounded-2xl border border-border bg-surface p-6 shadow-sm hover:border-border-hover transition-all duration-150">
-              <h3 className="font-semibold text-text text-base">{c.nombre}</h3>
-              <p className="text-sm text-text-dim mt-1">{formatAddress(c)}</p>
+            <Link key={c.id} href={`/owner/complejos/${c.id}`} className="rounded-2xl border border-border bg-surface p-6 shadow-sm hover:border-grass/30 hover:shadow-md transition-all duration-150 block">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-text text-base">{c.nombre}</h3>
+                  <p className="text-sm text-text-dim mt-1">{formatAddress(c)}</p>
+                </div>
+                <span className="text-text-dim text-xs group-hover:text-grass-light">Gestionar →</span>
+              </div>
               <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-field/40 px-3 py-1 text-xs font-medium text-grass-light">
                 <span className="h-1.5 w-1.5 rounded-full bg-grass-light" />
                 {c._count.canchas} cancha{c._count.canchas !== 1 ? "s" : ""}
@@ -124,7 +129,7 @@ export default function OwnerDashboard() {
                   ))}
                 </div>
               )}
-            </div>
+            </Link>
           ))}
         </div>
       )}
