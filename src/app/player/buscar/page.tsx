@@ -121,31 +121,36 @@ export default function PlayerBuscar() {
           </div>
         </div>
       ) : (
-        <>
-          <Swiper
-            direction="vertical"
-            slidesPerView={1}
-            spaceBetween={0}
-            className="flex-1 w-full md:!hidden"
-            onSwiper={swiper => { verticalRef.current = swiper; }}
-            onSlideChange={swiper => setActiveComplejo(swiper.activeIndex)}
-            resistanceRatio={0.5}
-            speed={400}
-          >
-            {complejos.map(comp => (
-              <SwiperSlide key={comp.id} className="!flex !flex-col" style={{ height: "100%" }}>
-                <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} isMobile />
-              </SwiperSlide>
-            ))}
-          </Swiper>
-          <div className="hidden md:block flex-1 overflow-y-auto p-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-max">
-              {complejos.map(comp => (
-                <ComplejoCard key={comp.id} complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
-              ))}
-            </div>
-          </div>
-        </>
+        <Swiper
+          direction="vertical"
+          slidesPerView={1}
+          spaceBetween={0}
+          className="flex-1 w-full md:!hidden"
+          onSwiper={swiper => { verticalRef.current = swiper; }}
+          onSlideChange={swiper => setActiveComplejo(swiper.activeIndex)}
+          resistanceRatio={0.5}
+          speed={400}
+        >
+          {complejos.map(comp => (
+            <SwiperSlide key={comp.id} className="!flex !flex-col" style={{ height: "100%" }}>
+              <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} isMobile />
+            </SwiperSlide>
+          ))}
+        </Swiper>
+
+        {/* Tablet+: horizontal Swiper, 2 complejos per view */}
+        <Swiper
+          slidesPerView={2}
+          spaceBetween={24}
+          className="hidden md:block flex-1 w-full px-6 py-6"
+          resistanceRatio={0.5}
+        >
+          {complejos.map(comp => (
+            <SwiperSlide key={comp.id} style={{ height: "100%" }}>
+              <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
+            </SwiperSlide>
+          ))}
+        </Swiper>
       )}
 
       {/* Detail sheet */}
@@ -176,7 +181,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   const isCompact = count >= 4; // vertical layout for 4+
 
   return (
-    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "h-[26rem] rounded-2xl border border-border bg-surface overflow-hidden p-4"}`}>
+    <div className={`flex flex-col ${isMobile ? "flex-1 pb-4 min-h-0" : "h-full rounded-2xl border border-border bg-surface overflow-hidden p-4"}`}>
       {/* Header */}
       <div className="px-4 pb-3 flex-shrink-0">
         <h2 className="text-base font-bold text-text">{complejo.nombre}</h2>
