@@ -131,7 +131,7 @@ export default function PlayerBuscar() {
         {/* Tablet+: vertical scroll, one complejo per row */}
         <div className="hidden md:block flex-1 overflow-y-auto p-4 space-y-6">
           {complejos.map(comp => (
-              <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden h-[38rem] lg:h-[42rem]">
+              <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden h-[28rem] lg:h-[32rem]">
               <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
             </div>
           ))}
@@ -204,7 +204,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
               {isCompact || isMobile ? (
                 /* ─── 4+ canchas: vertical layout ─── */
-                <div className="relative flex-1" style={{ minHeight: "20rem" }}>
+                <div className="relative flex-1" style={{ minHeight: isMobile ? "20rem" : "100%" }}>
                   {cancha.imagen ? (
                     <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
