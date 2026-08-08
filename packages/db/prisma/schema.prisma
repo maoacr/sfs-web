@@ -62,6 +62,10 @@ model User {
   apodo          String?   @unique @db.VarChar(30)
   telefono       String?   @db.VarChar(15)
   codigoPais     String    @default("+57") @map("codigo_pais") @db.VarChar(5)
+  instagram      String?   @db.VarChar(30)
+  tiktok         String?   @db.VarChar(30)
+  twitter        String?   @db.VarChar(30)
+  facebook       String?   @db.VarChar(50)
   role           Role
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz()

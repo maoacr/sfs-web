@@ -13,7 +13,9 @@ export async function GET(request: Request) {
       where: { id: user.sub },
       select: {
         id: true, email: true, primerNombre: true, segundoNombre: true,
-        apellidos: true, apodo: true, telefono: true, codigoPais: true, role: true,
+        apellidos: true, apodo: true, telefono: true, codigoPais: true,
+        instagram: true, tiktok: true, twitter: true, facebook: true,
+        role: true,
       },
     });
     if (!data) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
@@ -50,10 +52,16 @@ export async function PATCH(request: Request) {
         ...(body.apodo !== undefined && { apodo: body.apodo }),
         ...(body.telefono !== undefined && { telefono: body.telefono }),
         ...(body.codigoPais !== undefined && { codigoPais: body.codigoPais }),
+        ...(body.instagram !== undefined && { instagram: body.instagram }),
+        ...(body.tiktok !== undefined && { tiktok: body.tiktok }),
+        ...(body.twitter !== undefined && { twitter: body.twitter }),
+        ...(body.facebook !== undefined && { facebook: body.facebook }),
       },
       select: {
         id: true, email: true, primerNombre: true, segundoNombre: true,
-        apellidos: true, apodo: true, telefono: true, codigoPais: true, role: true,
+        apellidos: true, apodo: true, telefono: true, codigoPais: true,
+        instagram: true, tiktok: true, twitter: true, facebook: true,
+        role: true,
       },
     });
 

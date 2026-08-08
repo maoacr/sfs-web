@@ -24,6 +24,11 @@ export function ProfileForm() {
   const [codigoPais, setCodigoPais] = useState("+57");
   const [telefono, setTelefono] = useState("");
 
+  const [instagram, setInstagram] = useState("");
+  const [tiktok, setTiktok] = useState("");
+  const [twitter, setTwitter] = useState("");
+  const [facebook, setFacebook] = useState("");
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(data => {
       setUser(data);
@@ -33,6 +38,10 @@ export function ProfileForm() {
       setApodo(data.apodo || "");
       setCodigoPais(data.codigoPais || "+57");
       setTelefono(data.telefono || "");
+      setInstagram(data.instagram || "");
+      setTiktok(data.tiktok || "");
+      setTwitter(data.twitter || "");
+      setFacebook(data.facebook || "");
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
   }, []);
 
@@ -42,7 +51,7 @@ export function ProfileForm() {
     try {
       const res = await fetch("/api/auth/me", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ primerNombre, segundoNombre: segundoNombre || null, apellidos, apodo: apodo || null, codigoPais, telefono: telefono || null }),
+        body: JSON.stringify({ primerNombre, segundoNombre: segundoNombre || null, apellidos, apodo: apodo || null, codigoPais, telefono: telefono || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       setSaved(true);
@@ -199,12 +208,23 @@ export function ProfileForm() {
 
             {/* Social */}
             <div className="pt-4 border-t border-border">
-              <p className="text-sm font-medium text-text mb-3">Redes sociales <span className="font-normal text-text-dim">(próximamente)</span></p>
-              <div className="grid grid-cols-2 gap-3">
-                {["instagram", "tiktok", "twitter", "facebook"].map(r => (
-                  <div key={r} className="flex items-center gap-2 rounded-xl border border-dashed border-border bg-bg/30 px-4 py-3 opacity-50">
-                    <span className="text-sm capitalize">{r}</span>
-                    <input disabled className="flex-1 bg-transparent text-xs text-text-dim" placeholder="Conectar..." />
+              <p className="text-sm font-medium text-text mb-3">Redes sociales</p>
+              <div className="space-y-3">
+                {[
+                  { id: "instagram", label: "Instagram", value: instagram, set: setInstagram, prefix: "instagram.com/", icon: "📷" },
+                  { id: "tiktok", label: "TikTok", value: tiktok, set: setTiktok, prefix: "tiktok.com/@", icon: "🎵" },
+                  { id: "twitter", label: "Twitter / X", value: twitter, set: setTwitter, prefix: "x.com/", icon: "𝕏" },
+                  { id: "facebook", label: "Facebook", value: facebook, set: setFacebook, prefix: "facebook.com/", icon: "📘" },
+                ].map(({ id, label, value, set, prefix, icon }) => (
+                  <div key={id}>
+                    <label htmlFor={`social-${id}`} className="text-xs font-medium text-text-muted mb-1 block">{icon} {label}</label>
+                    <div className="flex rounded-xl">
+                      <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-surface px-3 text-xs text-text-dim">{prefix}</span>
+                      <input id={`social-${id}`} type="text" value={value}
+                        onChange={e => set(e.target.value)}
+                        className="block w-full rounded-r-xl border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
+                        placeholder="tuusuario" />
+                    </div>
                   </div>
                 ))}
               </div>
