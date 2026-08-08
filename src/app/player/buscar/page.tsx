@@ -160,11 +160,11 @@ export default function PlayerBuscar() {
                   {comp.canchas.map(cancha => {
                     const libres = cancha.slots.filter(s => s.disponible).length;
                     return (
-                      <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem", height: "100%" }}
+                      <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem", height: "calc(100dvh - 18rem)", minHeight: "22rem" }}
                         onClick={() => {
                           setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng });
                         }}
-                        className="flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border" style={{ height: "calc(100dvh - 18rem)", minHeight: "22rem" }}>
+                        className="flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border">
                         {/* Full-bleed image with gradient overlay */}
                         <div className="relative flex-1 min-h-0">
                           {cancha.imagen ? (
