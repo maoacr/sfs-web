@@ -27,7 +27,7 @@ export default function OwnerReservas() {
   const [filter, setFilter] = useState<Filter>({ complejoId: "", canchaId: "" });
 
   useEffect(() => {
-    fetch("/api/complejos").then(r => r.json()).then(setComplejos);
+    fetch("/api/complejos").then(r => r.json()).then(data => setComplejos(Array.isArray(data) ? data : []));
   }, []);
 
   useEffect(() => {

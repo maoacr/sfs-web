@@ -37,8 +37,9 @@ function NuevaCanchaForm() {
 
   useEffect(() => {
     fetch("/api/complejos").then(r => r.json()).then(data => {
-      setComplejos(data);
-      if (preselectedComplejo && data.find((c: Complejo) => c.id === preselectedComplejo)) {
+      const list = Array.isArray(data) ? data : [];
+      setComplejos(list);
+      if (preselectedComplejo && list.find((c: Complejo) => c.id === preselectedComplejo)) {
         setComplejoId(preselectedComplejo);
       } else if (data.length === 1) {
         setComplejoId(data[0].id);

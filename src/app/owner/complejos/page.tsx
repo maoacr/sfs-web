@@ -11,7 +11,7 @@ export default function OwnerComplejos() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/complejos").then(r => r.json()).then(setComplejos).catch(console.error).finally(() => setLoading(false));
+    fetch("/api/complejos").then(r => r.json()).then(data => setComplejos(Array.isArray(data) ? data : [])).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   return (
