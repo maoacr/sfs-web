@@ -95,13 +95,13 @@ export default function PlayerBuscar() {
         </select>
       </div>
 
-      {/* DEBUG: test image */}
-      {complejos.length > 0 && complejos[0].canchas.length > 0 && (
-        <div className="px-4 py-2 bg-red-500/20">
-          <p className="text-xs text-white">DEBUG imagen: {complejos[0].canchas[0].imagen?.slice(0,60)}...</p>
-          {complejos[0].canchas[0].imagen && (
-            <img src={complejos[0].canchas[0].imagen} className="h-32 w-full object-cover rounded border border-red-500" />
-          )}
+      {/* Progress bar */}
+      {complejos.length > 1 && (
+        <div className="flex-shrink-0 flex gap-1 px-4 pb-2">
+          {complejos.map((c, i) => (
+            <button key={c.id} onClick={() => verticalRef.current?.slideTo(i)}
+              className={`h-1 flex-1 rounded-full transition-all ${i <= activeComplejo ? "bg-grass" : "bg-border"}`} />
+          ))}
         </div>
       )}
 
@@ -224,7 +224,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 
               {isCompact ? (
                 /* ─── 4+ canchas: vertical layout ─── */
-                <div className="relative flex-1 min-h-0" style={{ minHeight: "16rem" }}>
+                <div className="relative flex-1" style={{ minHeight: "16rem" }}>
                   {cancha.imagen ? (
                     <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   ) : (
@@ -251,9 +251,9 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
                 /* ─── 1-3 canchas: horizontal split layout ─── */
                 <>
                   {/* Image — left side */}
-                  <div className="w-[45%] sm:w-1/2 flex-shrink-0 bg-surface-hover relative">
-                    {cancha.imagenes && cancha.imagenes.length > 0 ? (
-                      <ImageSlider images={cancha.imagenes} className="absolute inset-0" />
+                  <div className="w-[45%] sm:w-1/2 flex-shrink-0 bg-surface-hover relative" style={{ minHeight: "10rem" }}>
+                    {cancha.imagen ? (
+                      <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-4xl">⚽</div>
                     )}
