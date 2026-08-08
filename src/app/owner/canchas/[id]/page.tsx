@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AgendaView } from "@/components/agenda-view";
+import { ImageUploadZone } from "@/components/image-upload-zone";
 import { useRouter, useParams } from "next/navigation";
 
 const TIPOS = [
@@ -20,7 +21,7 @@ const DIAS = [
   { value: 3, label: "Mié" }, { value: 4, label: "Jue" }, { value: 5, label: "Vie" }, { value: 6, label: "Sáb" },
 ];
 
-interface Cancha { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; slots: Slot[]; tarifas: Tarifa[]; complejo: { id: string; nombre: string; direccion: string } };
+interface Cancha { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; slots: Slot[]; tarifas: Tarifa[]; imagenes: { id: string; url: string; orden: number }[]; complejo: { id: string; nombre: string; direccion: string } };
 interface Slot { id: string; diaSemana: number; horaApertura: string; horaCierre: string; }
 interface Tarifa { id: string; precioBase: number; diaSemana: number | null; horaInicio: string | null; horaFin: string | null; factor: number; }
 
@@ -36,7 +37,7 @@ export default function GestionarCancha() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"datos" | "slots" | "tarifas" | "agenda">("datos");
+  const [tab, setTab] = useState<"datos" | "slots" | "tarifas" | "agenda" | "imagenes">("datos");
 
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState("F5");
@@ -97,12 +98,12 @@ export default function GestionarCancha() {
       </div>
 
       <div className="flex gap-1 rounded-lg bg-surface p-1 border border-border">
-        {(["datos", "slots", "tarifas", "agenda"] as const).map(t => (
+        {(["datos", "slots", "tarifas", "agenda", "imagenes"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               tab === t ? "bg-field text-grass-light shadow-sm" : "text-text-muted hover:text-text"
             }`}>
-            {t === "datos" ? "Datos" : t === "slots" ? "Horarios" : t === "tarifas" ? "Precios" : "Agenda"}
+            {t === "datos" ? "Datos" : t === "slots" ? "Horarios" : t === "tarifas" ? "Precios" : t === "agenda" ? "Agenda" : "Fotos"}
           </button>
         ))}
       </div>
@@ -153,6 +154,16 @@ export default function GestionarCancha() {
       {tab === "slots" && <SlotsTab canchaId={id} slots={cancha.slots} onUpdate={() => router.refresh()} />}
       {tab === "tarifas" && <TarifasTab canchaId={id} tarifas={cancha.tarifas} onUpdate={() => router.refresh()} />}
       {tab === "agenda" && <AgendaView canchaId={id} />}
+
+      {tab === "imagenes" && (
+        <div className="mt-6 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <ImageUploadZone
+            imagenes={cancha.imagenes || []}
+            uploadUrl={`/api/canchas/${id}/imagenes`}
+            onRefresh={() => router.refresh()}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,25 @@ import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getAuthUser(request);
+    const { id } = await params;
+    const complejo = await prisma.complejo.findFirst({
+      where: { id, tenantId: user.sub },
+      include: { imagenes: { orderBy: { orden: "asc" } }, canchas: true },
+    });
+    if (!complejo) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    return NextResponse.json(complejo);
+  } catch (error) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

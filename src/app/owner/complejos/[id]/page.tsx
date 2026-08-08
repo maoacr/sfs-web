@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ImageUploadZone } from "@/components/image-upload-zone";
 
 interface CanchaInfo { id: string; nombre: string; tipo: string; capacidad: number; _count: { reservas: number } }
+interface ImagenInfo { id: string; url: string; orden: number; principal: boolean }
 
 export default function EditarComplejo() {
   const router = useRouter();
@@ -21,8 +23,9 @@ export default function EditarComplejo() {
   const [twitter, setTwitter] = useState("");
   const [facebook, setFacebook] = useState("");
   const [canchas, setCanchas] = useState<CanchaInfo[]>([]);
+  const [imagenes, setImagenes] = useState<ImagenInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"datos" | "canchas">("datos");
+  const [tab, setTab] = useState<"datos" | "canchas" | "imagenes">("datos");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -30,16 +33,14 @@ export default function EditarComplejo() {
   const [showDelete, setShowDelete] = useState(false);
 
   useEffect(() => {
-    fetch("/api/complejos").then(r => r.json()).then(data => {
-      const c = data.find((x: any) => x.id === id);
-      if (c) {
-        setNombre(c.nombre); setDireccion(c.direccion);
-        setDescripcion(c.descripcion || ""); setTelefono(c.telefono || "");
-        setEmail(c.email || "");
-        setInstagram(c.instagram || ""); setTiktok(c.tiktok || "");
-        setTwitter(c.twitter || ""); setFacebook(c.facebook || "");
-        setCanchas(c.canchas || []);
-      }
+    fetch(`/api/complejos/${id}`).then(r => r.json()).then(c => {
+      setNombre(c.nombre); setDireccion(c.direccion);
+      setDescripcion(c.descripcion || ""); setTelefono(c.telefono || "");
+      setEmail(c.email || "");
+      setInstagram(c.instagram || ""); setTiktok(c.tiktok || "");
+      setTwitter(c.twitter || ""); setFacebook(c.facebook || "");
+      setCanchas(c.canchas || []);
+      setImagenes(c.imagenes || []);
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
   }, [id]);
 
@@ -99,12 +100,12 @@ export default function EditarComplejo() {
 
       {/* Tabs */}
       <div className="mt-6 flex gap-1 rounded-xl bg-surface p-1 border border-border">
-        {(["datos", "canchas"] as const).map(t => (
+        {(["datos", "canchas", "imagenes"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               tab === t ? "bg-field text-grass-light shadow-sm" : "text-text-muted hover:text-text"
             }`}>
-            {t === "datos" ? "Información" : `Canchas (${canchas.length})`}
+            {t === "datos" ? "Información" : t === "canchas" ? `Canchas (${canchas.length})` : "Fotos"}
           </button>
         ))}
       </div>
@@ -210,6 +211,21 @@ export default function EditarComplejo() {
               </Link>
             ))
           )}
+        </div>
+      )}
+
+      {/* Tab: Imágenes del complejo */}
+      {tab === "imagenes" && (
+        <div className="mt-6 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <ImageUploadZone
+            imagenes={imagenes}
+            uploadUrl={`/api/complejos/${id}/imagenes`}
+            onRefresh={async () => {
+              const res = await fetch(`/api/complejos/${id}`);
+              const c = await res.json();
+              setImagenes(c.imagenes || []);
+            }}
+          />
         </div>
       )}
 
