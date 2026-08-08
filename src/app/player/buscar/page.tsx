@@ -132,8 +132,8 @@ export default function PlayerBuscar() {
           speed={400}
         >
           {complejos.map(comp => (
-            <SwiperSlide key={comp.id} className="flex flex-col">
-              <div className="flex-1 flex flex-col">
+            <SwiperSlide key={comp.id} className="!flex !flex-col" style={{ height: "100%" }}>
+              <div className="flex-1 flex flex-col min-h-0 pb-4">
                 {/* Complejo header */}
                 <div className="px-4 pb-3 flex-shrink-0">
                   <h2 className="text-base font-bold text-text">{comp.nombre}</h2>
@@ -152,7 +152,8 @@ export default function PlayerBuscar() {
                   slidesPerView="auto"
                   spaceBetween={12}
                   centeredSlides
-                  className="flex-1 w-full px-4 py-4"
+                  className="w-full px-4 min-h-0"
+                  style={{ flex: 1 }}
                   pagination={{ clickable: true }}
                   modules={[Pagination]}
                   resistanceRatio={0.5}
@@ -160,13 +161,13 @@ export default function PlayerBuscar() {
                   {comp.canchas.map(cancha => {
                     const libres = cancha.slots.filter(s => s.disponible).length;
                     return (
-                      <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem", height: "calc(100dvh - 18rem)", minHeight: "22rem" }}
+                      <SwiperSlide key={cancha.id} style={{ width: "85vw", maxWidth: "24rem" }}
                         onClick={() => {
                           setSelectedCancha({ ...cancha, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng });
                         }}
-                        className="flex flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border">
+                        className="!flex !flex-col rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform border border-border">
                         {/* Full-bleed image with gradient overlay */}
-                        <div className="relative flex-1 min-h-0">
+                        <div className="relative flex-1 min-h-0" style={{ height: "100%" }}>
                           {cancha.imagen ? (
                             <img src={cancha.imagen} alt="" className="absolute inset-0 w-full h-full object-cover" />
                           ) : (
