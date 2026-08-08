@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabase";
+import { getSupabaseAdmin } from "./supabase";
 import sharp from "sharp";
 
 const BUCKET = "imagenes";
@@ -32,7 +32,7 @@ export async function optimizeImage(file: File, type: ImageType = "photo"): Prom
  * Sube una imagen optimizada a Supabase Storage y retorna la URL pública.
  */
 export async function uploadImage(file: File, folder: string, type: ImageType = "photo"): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
   const optimized = await optimizeImage(file, type);
   const filename = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
 
@@ -50,7 +50,7 @@ export async function uploadImage(file: File, folder: string, type: ImageType = 
  * Elimina una imagen de Supabase Storage dada su URL pública.
  */
 export async function deleteImage(publicUrl: string): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getSupabaseAdmin();
   const url = new URL(publicUrl);
   const path = url.pathname.split(`/storage/v1/object/public/${BUCKET}/`)[1];
   if (!path) return;
