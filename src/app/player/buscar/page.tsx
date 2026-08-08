@@ -106,16 +106,6 @@ export default function PlayerBuscar() {
       )}
 
       {/* Main vertical swiper */}
-      {complejos.length > 1 && (
-        <div className="flex-shrink-0 flex gap-1 px-4 pb-2">
-          {complejos.map((c, i) => (
-            <button key={c.id} onClick={() => verticalRef.current?.slideTo(i)}
-              className={`h-1 flex-1 rounded-full transition-all ${i <= activeComplejo ? "bg-grass" : "bg-border"}`} />
-          ))}
-        </div>
-      )}
-
-      {/* Main vertical swiper */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="space-y-4 w-full max-w-sm px-4">
