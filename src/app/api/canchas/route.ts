@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { apiHandler } from "@/lib/api-handler";
+import {
+  createCanchaSchema,
+  type CreateCanchaInput,
+} from "@/lib/schemas";
 
 /**
  * GET /api/canchas
- * Lista las canchas del dueño autenticado.
  */
-export async function GET(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-
-    // Solo dueños pueden listar sus canchas
-    if (user.role !== "OWNER") {
-      return NextResponse.json(
-        { error: "Solo dueños pueden gestionar canchas" },
-        { status: 403 }
-      );
-    }
-
+export const GET = apiHandler(
+  async (request, ctx, _validated) => {
+    const user = ctx.user!;
     const { searchParams } = new URL(request.url);
     const activas = searchParams.get("activas") === "true";
 
@@ -37,46 +31,31 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(canchas);
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error("GET /api/canchas error:", error);
-    return NextResponse.json(
-      { error: "Error interno" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);
 
 /**
  * POST /api/canchas
- * Crea una nueva cancha para el dueño autenticado.
  */
-export async function POST(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-
-    if (user.role !== "OWNER") {
-      return NextResponse.json(
-        { error: "Solo dueños pueden crear canchas" },
-        { status: 403 }
-      );
+export const POST = apiHandler<CreateCanchaInput>(
+  async (_request, _ctx, { body }) => {
+    if (!body) {
+      return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
 
-    const body = await request.json();
+    const {
+      nombre,
+      tipo,
+      capacidad,
+      complejoId,
+      descripcion,
+      servicios,
+      duracionSlotMinutos,
+    } = body;
 
-    // Validación básica
-    if (!body.nombre || !body.tipo || !body.capacidad || !body.complejoId) {
-      return NextResponse.json(
-        { error: "Nombre, tipo, capacidad y complejo son requeridos" },
-        { status: 400 }
-      );
-    }
-
-    // Verificar que el complejo pertenece al dueño
     const complejo = await prisma.complejo.findFirst({
-      where: { id: body.complejoId, tenantId: user.sub },
+      where: { id: complejoId },
     });
 
     if (!complejo) {
@@ -86,25 +65,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const tiposValidos = ["F5", "F6", "F7", "F8", "F9", "F11"];
-    if (!tiposValidos.includes(body.tipo)) {
-      return NextResponse.json(
-        { error: `Tipo inválido. Debe ser: ${tiposValidos.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
     const cancha = await prisma.cancha.create({
       data: {
-        tenantId: user.sub,
-        complejoId: body.complejoId,
-        nombre: body.nombre,
-        tipo: body.tipo,
-        capacidad: body.capacidad,
-        descripcion: body.descripcion || null,
-        servicios: body.servicios || [],
-        duracionSlotMinutos: body.duracionSlotMinutos || 60,
-      },
+        complejoId,
+        nombre,
+        tipo,
+        capacidad,
+        descripcion: descripcion || null,
+        servicios: servicios || [],
+        duracionSlotMinutos: duracionSlotMinutos ?? 60,
+      } as any, // tenantId injected by middleware
       include: {
         complejo: true,
         imagenes: true,
@@ -114,14 +84,10 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(cancha, { status: 201 });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error("POST /api/canchas error:", error);
-    return NextResponse.json(
-      { error: "Error interno al crear la cancha" },
-      { status: 500 }
-    );
+  },
+  {
+    requireAuth: true,
+    requiredRole: "OWNER",
+    bodySchema: createCanchaSchema,
   }
-}
+);

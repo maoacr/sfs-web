@@ -1,38 +1,26 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { apiHandler } from "@/lib/api-handler";
+import { createReservaSchema, type CreateReservaInput } from "@/lib/schemas";
 import { notificarCambioReserva } from "@/lib/event-listeners";
 import { liberarReservasExpiradas } from "@/lib/ttl";
+import { RATE_LIMITS } from "@/lib/rate-limit";
 
 /**
  * POST /api/reservas
- * Crea una reserva. Puede ser creada por un PLAYER o por un OWNER (manual).
- * 
- * Body:
- *   - canchaId: string
- *   - slotInicio: ISO datetime
- *   - slotFin: ISO datetime
- *   - playerId?: string (solo si OWNER crea para un cliente)
  */
-export async function POST(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-
-    // Limpiar reservas expiradas
-    liberarReservasExpiradas().catch(() => {});
-
-    const body = await request.json();
-
-    const { canchaId, slotInicio, slotFin, playerId, playerNombre } = body;
-
-    if (!canchaId || !slotInicio || !slotFin) {
-      return NextResponse.json(
-        { error: "canchaId, slotInicio y slotFin son requeridos" },
-        { status: 400 }
-      );
+export const POST = apiHandler<CreateReservaInput>(
+  async (_request, ctx, { body }) => {
+    if (!body) {
+      return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
 
-    // Obtener la cancha y verificar que existe
+    const user = ctx.user!;
+    const { canchaId, slotInicio, slotFin, playerId } = body;
+
+    // Limpiar reservas expiradas (fire-and-forget)
+    liberarReservasExpiradas().catch(() => {});
+
     const cancha = await prisma.cancha.findFirst({
       where: { id: canchaId, deletedAt: null },
       include: { complejo: true },
@@ -59,12 +47,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Determinar el player
     let finalPlayerId = user.sub;
     let finalTenantId = cancha.tenantId;
 
     if (user.role === "OWNER") {
-      // Owner crea reserva manual — puede especificar playerId
       finalPlayerId = playerId || user.sub;
       finalTenantId = user.sub;
     }
@@ -73,7 +59,9 @@ export async function POST(request: Request) {
     const tarifa = await prisma.tarifa.findFirst({
       where: { canchaId, diaSemana: null },
     });
-    const montoTotal = tarifa ? Number(tarifa.precioBase) * Number(tarifa.factor) : 0;
+    const montoTotal = tarifa
+      ? Number(tarifa.precioBase) * Number(tarifa.factor)
+      : 0;
 
     const reserva = await prisma.reserva.create({
       data: {
@@ -87,13 +75,15 @@ export async function POST(request: Request) {
       },
       include: {
         cancha: { include: { complejo: true } },
-        player: { select: { id: true, primerNombre: true, apellidos: true, email: true } },
+        player: {
+          select: { id: true, primerNombre: true, apellidos: true, email: true },
+        },
         tenant: { select: { id: true, email: true } },
       },
     });
 
-    // Notificar a ambos
-    const eventTipo = user.role === "OWNER" ? "RESERVA_CONFIRMADA" : "RESERVA_CREADA";
+    const eventTipo =
+      user.role === "OWNER" ? "RESERVA_CONFIRMADA" : "RESERVA_CREADA";
     notificarCambioReserva({
       tipo: eventTipo as any,
       reservaId: reserva.id,
@@ -109,31 +99,25 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(reserva, { status: 201 });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("POST /api/reservas error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  },
+  {
+    requireAuth: true,
+    bodySchema: createReservaSchema,
+    rateLimit: RATE_LIMITS.STRICT,
   }
-}
+);
 
 /**
  * GET /api/reservas
- * Lista reservas del usuario autenticado.
- * OWNER: ve todas las reservas de sus canchas.
- * PLAYER: ve sus propias reservas.
- * 
- * Query params:
- *   - fecha: YYYY-MM-DD — filtra por día
- *   - estado: PENDIENTE_PAGO|CONFIRMADA|COMPLETADA|CANCELADA
  */
-export async function GET(request: Request) {
-  try {
-    const user = await getAuthUser(request);
+export const GET = apiHandler(
+  async (request, ctx, _validated) => {
+    const user = ctx.user!;
     const { searchParams } = new URL(request.url);
     const fecha = searchParams.get("fecha");
     const estado = searchParams.get("estado");
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (user.role === "OWNER") {
       where.tenantId = user.sub;
@@ -154,16 +138,26 @@ export async function GET(request: Request) {
     const reservas = await prisma.reserva.findMany({
       where,
       include: {
-        cancha: { select: { nombre: true, tipo: true, complejo: { select: { nombre: true } } } },
-        player: { select: { primerNombre: true, apellidos: true, apodo: true, telefono: true } },
+        cancha: {
+          select: {
+            nombre: true,
+            tipo: true,
+            complejo: { select: { nombre: true } },
+          },
+        },
+        player: {
+          select: {
+            primerNombre: true,
+            apellidos: true,
+            apodo: true,
+            telefono: true,
+          },
+        },
       },
       orderBy: { slotInicio: "asc" },
     });
 
     return NextResponse.json(reservas);
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("GET /api/reservas error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true }
+);

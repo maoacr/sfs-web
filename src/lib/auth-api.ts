@@ -4,7 +4,7 @@ import { jwtVerify } from "jose";
  * Extrae y verifica el usuario desde la cookie JWT en API routes.
  * Retorna el payload del JWT o lanza error.
  */
-export async function getAuthUser(request: Request) {
+export async function getAuthUser(request: Request | import("next/server").NextRequest) {
   const token = request.headers
     .get("cookie")
     ?.split(";")

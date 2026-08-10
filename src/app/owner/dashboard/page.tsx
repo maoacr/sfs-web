@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatAddress } from "@/lib/address";
 
-interface Complejo { id: string; nombre: string; direccion: string; _count: { canchas: number }; canchas: { id: string; nombre: string; tipo: string }[]; }
+interface Complejo { id: string; nombre: string; direccion: string; canchas: { id: string; nombre: string; tipo: string }[]; }
 
 export default function OwnerDashboard() {
+  const router = useRouter();
   const [complejos, setComplejos] = useState<Complejo[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +33,7 @@ export default function OwnerDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const totalCanchas = complejos.reduce((acc, c) => acc + c._count.canchas, 0);
+  const totalCanchas = complejos.reduce((acc, c) => acc + c.canchas.length, 0);
 
   return (
     <div className="p-6 lg:p-8">
@@ -116,16 +118,17 @@ export default function OwnerDashboard() {
               </div>
               <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-field/40 px-3 py-1 text-xs font-medium text-grass-light">
                 <span className="h-1.5 w-1.5 rounded-full bg-grass-light" />
-                {c._count.canchas} cancha{c._count.canchas !== 1 ? "s" : ""}
+                {c.canchas.length} cancha{c.canchas.length !== 1 ? "s" : ""}
               </span>
               {c.canchas.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-border space-y-1">
                   {c.canchas.map(ch => (
-                    <Link key={ch.id} href={`/owner/canchas/${ch.id}`}
-                      className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-text-muted hover:text-grass hover:bg-surface-hover transition-colors">
+                    <div key={ch.id}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/owner/canchas/${ch.id}`); }}
+                      className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-text-muted hover:text-grass hover:bg-surface-hover transition-colors cursor-pointer">
                       <span>{ch.nombre}</span>
                       <span className="text-xs text-text-dim">{ch.tipo}</span>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               )}

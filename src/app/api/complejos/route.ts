@@ -1,62 +1,55 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { apiHandler } from "@/lib/api-handler";
+import {
+  createComplejoSchema,
+  type CreateComplejoInput,
+} from "@/lib/schemas";
 
-export async function GET(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-
+/**
+ * GET /api/complejos
+ */
+export const GET = apiHandler(
+  async (_request, ctx, _validated) => {
     const complejos = await prisma.complejo.findMany({
-      where: { tenantId: user.sub, deletedAt: null },
+      where: { tenantId: ctx.user!.sub, deletedAt: null },
       include: {
-        _count: { select: { canchas: true } },
-        canchas: { select: { id: true, nombre: true, tipo: true } },
+        canchas: {
+          where: { deletedAt: null },
+          include: { imagenes: { where: { principal: true }, take: 1 } },
+        },
+        imagenes: { orderBy: { orden: "asc" } },
       },
       orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(complejos);
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);
 
-export async function POST(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-    const body = await request.json();
-
-    if (!body.nombre || !body.numeroVia) {
-      return NextResponse.json({ error: "Nombre y número de dirección son requeridos" }, { status: 400 });
+/**
+ * POST /api/complejos
+ */
+export const POST = apiHandler<CreateComplejoInput>(
+  async (_request, _ctx, { body }) => {
+    if (!body) {
+      return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
 
     const complejo = await prisma.complejo.create({
       data: {
-        tenantId: user.sub,
-        nombre: body.nombre,
-        tipoVia: body.tipoVia || "Calle",
-        numeroVia: body.numeroVia || "",
-        numeroSec: body.numeroSec || null,
-        complemento: body.complemento || null,
-        ciudad: body.ciudad || "",
-        departamento: body.departamento || "",
-        descripcion: body.descripcion || null,
-        telefono: body.telefono || null,
+        ...body,
         email: body.email || null,
-        instagram: body.instagram || null,
-        tiktok: body.tiktok || null,
-        twitter: body.twitter || null,
-        facebook: body.facebook || null,
-        lat: body.lat || null,
-        lng: body.lng || null,
-      },
-      include: { _count: { select: { canchas: true } } },
+      } as any, // tenantId + owner injected by middleware
+      include: { canchas: true, imagenes: true },
     });
 
     return NextResponse.json(complejo, { status: 201 });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  },
+  {
+    requireAuth: true,
+    requiredRole: "OWNER",
+    bodySchema: createComplejoSchema,
   }
-}
+);

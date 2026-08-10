@@ -1,73 +1,86 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import bcrypt from "bcryptjs";
+import { apiHandler } from "@/lib/api-handler";
+import { updateProfileSchema } from "@/lib/schemas";
+import { generateCsrfToken } from "@/lib/csrf";
 
 /**
  * GET /api/auth/me
- * Devuelve los datos del usuario autenticado.
+ * Obtiene el perfil del usuario autenticado.
  */
-export async function GET(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-    const data = await prisma.user.findUnique({
-      where: { id: user.sub },
+export const GET = apiHandler(
+  async (_request, ctx, _validated) => {
+    const user = await prisma.user.findUnique({
+      where: { id: ctx.user!.sub },
       select: {
-        id: true, email: true, primerNombre: true, segundoNombre: true,
-        apellidos: true, apodo: true, telefono: true, codigoPais: true,
-        instagram: true, tiktok: true, twitter: true, facebook: true,
+        id: true,
+        email: true,
+        primerNombre: true,
+        segundoNombre: true,
+        apellidos: true,
+        apodo: true,
+        codigoPais: true,
+        telefono: true,
         role: true,
+        instagram: true,
+        tiktok: true,
+        twitter: true,
+        facebook: true,
+        createdAt: true,
       },
     });
-    if (!data) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    return NextResponse.json(data);
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+
+    if (!user) {
+      return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+    }
+
+    const response = NextResponse.json({ user });
+
+    // Incluir CSRF token para que el frontend lo cachee
+    const csrfToken = generateCsrfToken();
+    response.cookies.set("csrf_token", csrfToken, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24,
+    });
+    response.headers.set("X-CSRF-Token", csrfToken);
+
+    return response;
+  },
+  { requireAuth: true }
+);
 
 /**
  * PATCH /api/auth/me
- * Actualiza los datos del usuario autenticado.
+ * Actualiza el perfil del usuario autenticado.
  */
-export async function PATCH(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-    const body = await request.json();
-
-    // Verificar si el apodo está disponible
-    if (body.apodo) {
-      const existing = await prisma.user.findUnique({ where: { apodo: body.apodo } });
-      if (existing && existing.id !== user.sub) {
-        return NextResponse.json({ error: "Este nombre de usuario ya está en uso" }, { status: 409 });
-      }
-    }
+export const PATCH = apiHandler(
+  async (_request, ctx, { body }) => {
+    const userId = ctx.user!.sub;
 
     const updated = await prisma.user.update({
-      where: { id: user.sub },
-      data: {
-        ...(body.primerNombre !== undefined && { primerNombre: body.primerNombre }),
-        ...(body.segundoNombre !== undefined && { segundoNombre: body.segundoNombre }),
-        ...(body.apellidos !== undefined && { apellidos: body.apellidos }),
-        ...(body.apodo !== undefined && { apodo: body.apodo }),
-        ...(body.telefono !== undefined && { telefono: body.telefono }),
-        ...(body.codigoPais !== undefined && { codigoPais: body.codigoPais }),
-        ...(body.instagram !== undefined && { instagram: body.instagram }),
-        ...(body.tiktok !== undefined && { tiktok: body.tiktok }),
-        ...(body.twitter !== undefined && { twitter: body.twitter }),
-        ...(body.facebook !== undefined && { facebook: body.facebook }),
-      },
+      where: { id: userId },
+      data: body!,
       select: {
-        id: true, email: true, primerNombre: true, segundoNombre: true,
-        apellidos: true, apodo: true, telefono: true, codigoPais: true,
-        instagram: true, tiktok: true, twitter: true, facebook: true,
+        id: true,
+        email: true,
+        primerNombre: true,
+        segundoNombre: true,
+        apellidos: true,
+        apodo: true,
+        codigoPais: true,
+        telefono: true,
         role: true,
       },
     });
 
-    return NextResponse.json(updated);
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ user: updated });
+  },
+  {
+    requireAuth: true,
+    bodySchema: updateProfileSchema,
   }
-}
+);

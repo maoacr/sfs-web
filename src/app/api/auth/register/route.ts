@@ -2,9 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import bcrypt from "bcryptjs";
 import { signAccessToken, signRefreshToken } from "@/lib/jwt";
+import { apiHandler } from "@/lib/api-handler";
+import { registerSchema, type RegisterInput } from "@/lib/schemas";
+import { RATE_LIMITS } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
-  try {
+/**
+ * POST /api/auth/register
+ */
+export const POST = apiHandler<RegisterInput>(
+  async (_request, _ctx, { body }) => {
+    if (!body) {
+      return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
+    }
+
     const {
       email,
       password,
@@ -12,54 +22,21 @@ export async function POST(request: Request) {
       segundoNombre,
       apellidos,
       apodo,
-      telefono,
       codigoPais,
+      telefono,
       role,
-    } = await request.json();
+      instagram,
+      tiktok,
+      twitter,
+      facebook,
+    } = body;
 
-    if (!email || !password || !primerNombre || !apellidos || !role) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
       return NextResponse.json(
-        {
-          error:
-            "Email, contraseña, primer nombre, apellidos y tipo de cuenta son requeridos",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!["OWNER", "PLAYER"].includes(role)) {
-      return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "La contraseña debe tener al menos 8 caracteres" },
-        { status: 400 }
-      );
-    }
-
-    // Verificar si el email ya existe
-    const existingEmail = await prisma.user.findUnique({
-      where: { email },
-    });
-    if (existingEmail) {
-      return NextResponse.json(
-        { error: "Este email ya está registrado" },
+        { error: "El email ya está registrado" },
         { status: 409 }
       );
-    }
-
-    // Verificar si el apodo ya existe (si se proporcionó)
-    if (apodo) {
-      const existingApodo = await prisma.user.findUnique({
-        where: { apodo },
-      });
-      if (existingApodo) {
-        return NextResponse.json(
-          { error: "Este nombre de usuario ya está en uso" },
-          { status: 409 }
-        );
-      }
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -72,18 +49,23 @@ export async function POST(request: Request) {
         segundoNombre: segundoNombre || null,
         apellidos,
         apodo: apodo || null,
-        telefono: telefono || null,
         codigoPais: codigoPais || "+57",
+        telefono: telefono || null,
         role,
+        instagram: instagram || null,
+        tiktok: tiktok || null,
+        twitter: twitter || null,
+        facebook: facebook || null,
       },
     });
 
-    const accessToken = await signAccessToken({
+    const tokenPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
-    });
+    };
 
+    const accessToken = await signAccessToken(tokenPayload);
     const refreshToken = await signRefreshToken(user.id);
 
     const response = NextResponse.json(
@@ -91,9 +73,7 @@ export async function POST(request: Request) {
         user: {
           id: user.id,
           email: user.email,
-          nombre: [user.primerNombre, user.segundoNombre, user.apellidos]
-            .filter(Boolean)
-            .join(" "),
+          nombre: `${user.primerNombre} ${user.segundoNombre ?? ""} ${user.apellidos}`.trim(),
           apodo: user.apodo,
           role: user.role,
         },
@@ -104,7 +84,7 @@ export async function POST(request: Request) {
     response.cookies.set("sfs_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       maxAge: 15 * 60,
     });
@@ -112,17 +92,16 @@ export async function POST(request: Request) {
     response.cookies.set("sfs_refresh", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/api/auth",
+      sameSite: "strict",
+      path: "/",
       maxAge: 7 * 24 * 60 * 60,
     });
 
     return response;
-  } catch (error) {
-    console.error("Register error:", error);
-    return NextResponse.json(
-      { error: "Error interno del servidor" },
-      { status: 500 }
-    );
+  },
+  {
+    bodySchema: registerSchema,
+    rateLimit: RATE_LIMITS.AUTH_REGISTER,
+    requireCsrf: false,
   }
-}
+);
