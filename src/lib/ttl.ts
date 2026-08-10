@@ -1,10 +1,12 @@
 import { prisma } from "@sfs/db";
 import { notificarCambioReserva } from "./event-listeners";
+import { refundPayment, isMercadoPagoConfigured } from "./mercadopago";
 
 const TTL_MINUTOS = 15;
 
 /**
- * Libera reservas en estado PENDIENTE_PAGO que excedieron el TTL.
+ * Libera reservas en estado PENDIENTE_PAGO o PAGO_PARCIAL que excedieron el TTL.
+ * Si hubo pagos vía MP, intenta reembolsarlos.
  * Retorna las reservas que fueron canceladas.
  */
 export async function liberarReservasExpiradas() {
@@ -12,26 +14,54 @@ export async function liberarReservasExpiradas() {
 
   const expiradas = await prisma.reserva.findMany({
     where: {
-      estado: "PENDIENTE_PAGO",
+      estado: { in: ["PENDIENTE_PAGO", "PAGO_PARCIAL"] },
       createdAt: { lt: limite },
     },
     include: {
       cancha: { include: { complejo: true } },
       player: { select: { id: true, primerNombre: true, apellidos: true, email: true } },
       tenant: { select: { id: true, email: true } },
+      pagos: {
+        where: { estadoPago: "APROBADO", mpPaymentId: { not: null } },
+      },
     },
   });
 
   if (expiradas.length === 0) return [];
 
-  // Cancelar todas en una transacción
-  const ids = expiradas.map(r => r.id);
+  // ─── Reembolsar pagos MP ─────────────────────────────────────────────
+
+  if (isMercadoPagoConfigured()) {
+    for (const r of expiradas) {
+      for (const pago of r.pagos) {
+        if (pago.mpPaymentId) {
+          try {
+            await refundPayment(pago.mpPaymentId);
+            await prisma.pago.update({
+              where: { id: pago.id },
+              data: { estadoPago: "REEMBOLSADO" },
+            });
+          } catch (err) {
+            console.error(
+              `[TTL] Error reembolsando pago ${pago.id}:`,
+              err
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // ─── Cancelar todas en una transacción ───────────────────────────────
+
+  const ids = expiradas.map((r) => r.id);
   await prisma.reserva.updateMany({
     where: { id: { in: ids } },
-    data: { estado: "CANCELADA" },
+    data: { estado: "CANCELADA", saldoPendiente: 0 },
   });
 
-  // Notificar a cada jugador y dueño
+  // ─── Notificar a cada jugador y dueño ────────────────────────────────
+
   for (const r of expiradas) {
     await notificarCambioReserva({
       tipo: "RESERVA_EXPIRADA",
