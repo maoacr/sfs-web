@@ -181,6 +181,45 @@ export const paginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+// ─── Fase 1: Pagos, Partidos, Equipos ────────────────────────────────────────
+
+export const crearPagoSchema = z.object({
+  reservaId: z.string().uuid("ID de reserva inválido"),
+  monto: z.number().min(1, "El monto debe ser mayor a 0"),
+});
+
+export const pagarSaldoSchema = z.object({
+  monto: z.number().min(1, "El monto debe ser mayor a 0"),
+});
+
+export const confirmarPagoSchema = z.object({
+  metodo: z.enum(["efectivo", "nequi", "transferencia"]).default("efectivo"),
+});
+
+export const cancelarReservaSchema = z.object({
+  motivo: z.string().max(500).optional(),
+});
+
+export const crearPartidoSchema = z.object({
+  reservaId: z.string().uuid("ID de reserva inválido"),
+  equipoAId: z.string().uuid().optional(),
+  equipoBId: z.string().uuid().optional(),
+  jugadores: z.array(z.string().uuid()).max(30, "Máximo 30 jugadores").default([]),
+});
+
+export const crearEquipoSchema = z.object({
+  nombre: z.string().min(1, "Nombre requerido").max(100),
+  fotoUrl: z.string().url("URL inválida").max(500).optional(),
+  descripcion: z.string().max(500).optional(),
+});
+
+export const updateEquipoSchema = crearEquipoSchema.partial();
+
+export const invitarMiembroSchema = z.object({
+  userId: z.string().uuid("ID de usuario inválido"),
+  rol: z.enum(["CAPITAN", "MIEMBRO"]).default("MIEMBRO"),
+});
+
 // ─── Utilidad ────────────────────────────────────────────────────────────────
 
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -191,3 +230,7 @@ export type CreateComplejoInput = z.infer<typeof createComplejoSchema>;
 export type CreateSlotInput = z.infer<typeof createSlotSchema>;
 export type CreateTarifaInput = z.infer<typeof createTarifaSchema>;
 export type CreateReservaInput = z.infer<typeof createReservaSchema>;
+export type CrearPagoInput = z.infer<typeof crearPagoSchema>;
+export type PagarSaldoInput = z.infer<typeof pagarSaldoSchema>;
+export type CrearPartidoInput = z.infer<typeof crearPartidoSchema>;
+export type CrearEquipoInput = z.infer<typeof crearEquipoSchema>;

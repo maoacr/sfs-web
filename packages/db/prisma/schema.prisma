@@ -25,6 +25,7 @@ enum TipoCancha {
 
 enum EstadoReserva {
   PENDIENTE_PAGO
+  PAGO_PARCIAL
   CONFIRMADA
   COMPLETADA
   CANCELADA
@@ -48,6 +49,9 @@ enum TipoNotificacion {
   RESERVA_CANCELADA
   RESERVA_COMPLETADA
   RESERVA_EXPIRADA
+  RESERVA_PAGO_PARCIAL
+  INVITACION_EQUIPO
+  INVITACION_PARTIDO
 }
 
 // ─── Models ─────────────────────────────────────────────────────────────────
@@ -76,6 +80,11 @@ model User {
   canchas           Cancha[]
   reservas          Reserva[] @relation("PlayerReservas")
   reservasRecibidas Reserva[] @relation("TenantReservas")
+  pagos             Pago[]
+  equiposCreados    Equipo[]
+  miembrosEquipo    EquipoMiembro[]
+  partidosJugados   PartidoJugador[]
+  partidosCreados   Partido[]
 
   @@map("users")
 }
@@ -102,6 +111,8 @@ model Complejo {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz()
+  plazoCancelacionHoras    Int  @default(24) @map("plazo_cancelacion_horas")
+  penalizacionPorcentaje   Int  @default(0)  @map("penalizacion_porcentaje")
 
   owner    User             @relation(fields: [tenantId], references: [id])
   canchas  Cancha[]
@@ -179,23 +190,26 @@ model Tarifa {
 }
 
 model Reserva {
-  id          String        @id @default(uuid()) @db.Uuid
-  tenantId    String        @map("tenant_id") @db.Uuid
-  canchaId    String        @map("cancha_id") @db.Uuid
-  playerId    String        @map("player_id") @db.Uuid
-  slotInicio  DateTime      @map("slot_inicio") @db.Timestamptz()
-  slotFin     DateTime      @map("slot_fin") @db.Timestamptz()
-  montoTotal  Decimal       @map("monto_total") @db.Decimal(10, 2)
-  estado      EstadoReserva @default(PENDIENTE_PAGO)
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
-  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz()
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  canchaId       String        @map("cancha_id") @db.Uuid
+  playerId       String        @map("player_id") @db.Uuid
+  slotInicio     DateTime      @map("slot_inicio") @db.Timestamptz()
+  slotFin        DateTime      @map("slot_fin") @db.Timestamptz()
+  montoTotal     Decimal       @map("monto_total") @db.Decimal(10, 2)
+  montoPagado    Decimal       @default(0) @map("monto_pagado") @db.Decimal(10, 2)
+  saldoPendiente Decimal       @default(0) @map("saldo_pendiente") @db.Decimal(10, 2)
+  estado         EstadoReserva @default(PENDIENTE_PAGO)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz()
 
   // Relaciones
-  tenant User   @relation("TenantReservas", fields: [tenantId], references: [id])
-  cancha Cancha @relation(fields: [canchaId], references: [id])
-  player User   @relation("PlayerReservas", fields: [playerId], references: [id])
-  pago   Pago?
+  tenant  User    @relation("TenantReservas", fields: [tenantId], references: [id])
+  cancha  Cancha  @relation(fields: [canchaId], references: [id])
+  player  User    @relation("PlayerReservas", fields: [playerId], references: [id])
+  pagos   Pago[]
+  partido Partido?
 
   @@index([tenantId])
   @@index([canchaId, slotInicio, slotFin])
@@ -204,17 +218,20 @@ model Reserva {
 
 model Pago {
   id              String     @id @default(uuid()) @db.Uuid
-  reservaId       String     @unique @map("reserva_id") @db.Uuid
+  reservaId       String     @map("reserva_id") @db.Uuid
+  userId          String     @map("user_id") @db.Uuid
   monto           Decimal    @db.Decimal(10, 2)
   estadoPago      EstadoPago @default(PENDIENTE) @map("estado_pago")
-  mpPreferenceId  String?    @map("mp_preference_id") @db.VarChar(255)
+  mpSplitId       String?    @map("mp_split_id") @db.VarChar(255)
   mpPaymentId     String?    @map("mp_payment_id") @db.VarChar(255)
   mpMetadata      Json?      @map("mp_metadata") @db.JsonB
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz()
 
   reserva Reserva @relation(fields: [reservaId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 
+  @@index([reservaId])
   @@map("pagos")
 }
 
@@ -260,4 +277,65 @@ model Notificacion {
   @@index([userId, leida])
   @@index([userId, createdAt(sort: Desc)])
   @@map("notificaciones")
+}
+
+// ─── Fase 1: Partidos y Equipos ───────────────────────────────────────────
+
+model Partido {
+  id         String   @id @default(uuid()) @db.Uuid
+  reservaId  String   @unique @map("reserva_id") @db.Uuid
+  creadorId  String   @map("creador_id") @db.Uuid
+  equipoAId  String?  @map("equipo_a_id") @db.Uuid
+  equipoBId  String?  @map("equipo_b_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  reserva  Reserva         @relation(fields: [reservaId], references: [id])
+  creador  User            @relation(fields: [creadorId], references: [id])
+  equipoA  Equipo?         @relation("EquipoA", fields: [equipoAId], references: [id])
+  equipoB  Equipo?         @relation("EquipoB", fields: [equipoBId], references: [id])
+  jugadores PartidoJugador[]
+
+  @@map("partidos")
+}
+
+model PartidoJugador {
+  id        String @id @default(uuid()) @db.Uuid
+  partidoId String @map("partido_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+
+  partido Partido @relation(fields: [partidoId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([partidoId, userId])
+  @@map("partido_jugadores")
+}
+
+model Equipo {
+  id          String   @id @default(uuid()) @db.Uuid
+  nombre      String   @db.VarChar(100)
+  fotoUrl     String?  @map("foto_url") @db.VarChar(500)
+  descripcion String?  @db.Text
+  creadorId   String   @map("creador_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  creador         User            @relation(fields: [creadorId], references: [id])
+  miembros        EquipoMiembro[]
+  partidosComoA   Partido[]       @relation("EquipoA")
+  partidosComoB   Partido[]       @relation("EquipoB")
+
+  @@map("equipos")
+}
+
+model EquipoMiembro {
+  id       String @id @default(uuid()) @db.Uuid
+  equipoId String @map("equipo_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  rol      String @default("MIEMBRO") @db.VarChar(20) // CAPITAN, MIEMBRO
+
+  equipo Equipo @relation(fields: [equipoId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([equipoId, userId])
+  @@map("equipo_miembros")
 }
