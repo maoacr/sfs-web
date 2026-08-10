@@ -24,6 +24,10 @@ const mensajes: Record<string, { player: { titulo: string; mensaje: string }; ow
     player: { titulo: "Reserva expirada", mensaje: "Tu reserva expiró porque no se completó el pago a tiempo." },
     owner:  { titulo: "Reserva expirada", mensaje: "no completó el pago. El slot fue liberado." },
   },
+  RESERVA_PAGO_PARCIAL: {
+    player: { titulo: "Pago parcial recibido", mensaje: "Tu pago parcial fue recibido. Completá el saldo pendiente para confirmar." },
+    owner:  { titulo: "Pago parcial recibido", mensaje: "pagó parcialmente su reserva. Queda saldo pendiente." },
+  },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────

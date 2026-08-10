@@ -88,6 +88,38 @@ const templates: Record<
       <p style="color:#71717a;font-size:14px">El slot fue liberado. Podés buscar otro horario en SFS.</p>
     `,
   }),
+
+  // ─── Fase 1: Nuevos templates ──────────────────────────────────────
+
+  RESERVA_PAGO_PARCIAL: (e) => ({
+    subject: `💳 Pago parcial — ${e.canchaNombre} ${fD(e.slotInicio)}`,
+    html: `
+      <h2>¡Pago parcial recibido!</h2>
+      <p>Tu reserva en <strong>${e.complejoNombre}</strong> tiene un saldo pendiente.</p>
+      <table style="margin:16px 0;border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Cancha</td><td>${e.canchaNombre}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Fecha</td><td>${fD(e.slotInicio)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Horario</td><td>${fH(e.slotInicio)} – ${fH(e.slotFin)}</td></tr>
+      </table>
+      <p style="font-size:18px;font-weight:bold;color:#eab308">⚠️ Saldo pendiente: COP ${(e as any).saldoPendiente || "—"}</p>
+      <p style="color:#71717a;font-size:14px">Completá el pago antes de que expire la reserva. Podés pagar desde la app o compartir el link con otros jugadores del partido.</p>
+    `,
+  }),
+
+  RECIBO_PAGO: (e) => ({
+    subject: `🧾 Recibo — ${e.canchaNombre} ${fD(e.slotInicio)}`,
+    html: `
+      <h2>🧾 Recibo de pago</h2>
+      <p>Tu reserva en <strong>${e.complejoNombre}</strong> está completamente pagada.</p>
+      <table style="margin:16px 0;border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Cancha</td><td>${e.canchaNombre}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Fecha</td><td>${fD(e.slotInicio)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Horario</td><td>${fH(e.slotInicio)} – ${fH(e.slotFin)}</td></tr>
+      </table>
+      <p style="font-size:16px;font-weight:bold;color:#16a34a">✅ Total pagado: COP ${(e as any).montoTotal || "—"}</p>
+      <p style="color:#71717a;font-size:14px">Presentate 10 minutos antes. ¡Buen partido!</p>
+    `,
+  }),
 };
 
 // ─── Owner templates ────────────────────────────────────────────────────────
@@ -113,6 +145,21 @@ const ownerTemplates: Record<
       <h2>Reserva cancelada</h2>
       <p><strong>${e.playerNombre}</strong> canceló su reserva en ${e.canchaNombre}.</p>
       <p style="color:#71717a;font-size:14px">El slot del ${fD(e.slotInicio)} de ${fH(e.slotInicio)} a ${fH(e.slotFin)} quedó liberado.</p>
+    `,
+  }),
+
+  RESERVA_PAGO_PARCIAL: (e) => ({
+    subject: `💳 Pago parcial recibido — ${e.canchaNombre} ${fD(e.slotInicio)}`,
+    html: `
+      <h2>Pago parcial recibido</h2>
+      <p><strong>${e.playerNombre}</strong> realizó un pago parcial para ${e.canchaNombre}.</p>
+      <table style="margin:16px 0;border-collapse:collapse">
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Cancha</td><td>${e.canchaNombre}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Fecha</td><td>${fD(e.slotInicio)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#71717a">Horario</td><td>${fH(e.slotInicio)} – ${fH(e.slotFin)}</td></tr>
+      </table>
+      <p style="font-size:16px;color:#eab308">⚠️ Saldo pendiente: COP ${(e as any).saldoPendiente || "—"}</p>
+      <p style="color:#71717a;font-size:14px">El jugador debe completar el pago antes de que expire la reserva.</p>
     `,
   }),
 };
