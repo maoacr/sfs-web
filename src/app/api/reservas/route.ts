@@ -4,6 +4,7 @@ import { apiHandler } from "@/lib/api-handler";
 import { createReservaSchema, type CreateReservaInput } from "@/lib/schemas";
 import { notificarCambioReserva } from "@/lib/event-listeners";
 import { liberarReservasExpiradas } from "@/lib/ttl";
+import { calcularPrecio, usarPromocion } from "@/lib/pricing";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 
 /**
@@ -18,7 +19,29 @@ export const POST = apiHandler<CreateReservaInput>(
     const user = ctx.user!;
     const { canchaId, slotInicio, slotFin, playerId } = body;
 
-    // Limpiar reservas expiradas (fire-and-forget)
+    // ─── 1. Bloqueo por saldo pendiente ──────────────────────────────────
+
+    const saldoPendiente = await prisma.reserva.aggregate({
+      where: {
+        playerId: user.sub,
+        estado: "PAGO_PARCIAL",
+      },
+      _sum: { saldoPendiente: true },
+    });
+
+    const totalSaldo = Number(saldoPendiente._sum.saldoPendiente || 0);
+    if (totalSaldo > 0) {
+      return NextResponse.json(
+        {
+          error: "Tenés saldo pendiente. Regularizá tus pagos antes de reservar.",
+          saldoPendiente: totalSaldo,
+        },
+        { status: 403 }
+      );
+    }
+
+    // ─── 2. Limpiar reservas expiradas (fire-and-forget) ─────────────────
+
     liberarReservasExpiradas().catch(() => {});
 
     const cancha = await prisma.cancha.findFirst({
@@ -30,11 +53,12 @@ export const POST = apiHandler<CreateReservaInput>(
       return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
-    // Verificar solapamiento
+    // ─── 3. Verificar solapamiento ────────────────────────────────────────
+
     const conflicto = await prisma.reserva.findFirst({
       where: {
         canchaId,
-        estado: { in: ["PENDIENTE_PAGO", "CONFIRMADA"] },
+        estado: { in: ["PENDIENTE_PAGO", "PAGO_PARCIAL", "CONFIRMADA"] },
         slotInicio: { lt: new Date(slotFin) },
         slotFin: { gt: new Date(slotInicio) },
       },
@@ -55,13 +79,31 @@ export const POST = apiHandler<CreateReservaInput>(
       finalTenantId = user.sub;
     }
 
-    // Calcular precio
-    const tarifa = await prisma.tarifa.findFirst({
-      where: { canchaId, diaSemana: null },
-    });
-    const montoTotal = tarifa
-      ? Number(tarifa.precioBase) * Number(tarifa.factor)
-      : 0;
+    // ─── 4. Calcular precio con el motor ─────────────────────────────────
+
+    const fecha = new Date(slotInicio).toISOString().slice(0, 10);
+    const hora = new Date(slotInicio).toISOString().slice(11, 16);
+
+    const precio = await calcularPrecio(canchaId, fecha, hora);
+
+    let montoTotal = 0;
+    if (precio.success) {
+      montoTotal = precio.data.precioFinal;
+      // Usar promoción si se aplicó
+      if (precio.data.promocionAplicada) {
+        await usarPromocion(precio.data.promocionAplicada);
+      }
+    } else {
+      // Fallback: usar tarifa genérica
+      const tarifa = await prisma.tarifa.findFirst({
+        where: { canchaId, diaSemana: null },
+      });
+      montoTotal = tarifa
+        ? Number(tarifa.precioBase) * Number(tarifa.factor)
+        : 0;
+    }
+
+    // ─── 5. Crear reserva ─────────────────────────────────────────────────
 
     const reserva = await prisma.reserva.create({
       data: {
@@ -71,6 +113,8 @@ export const POST = apiHandler<CreateReservaInput>(
         slotInicio: new Date(slotInicio),
         slotFin: new Date(slotFin),
         montoTotal,
+        montoPagado: user.role === "OWNER" ? montoTotal : 0,
+        saldoPendiente: user.role === "OWNER" ? 0 : montoTotal,
         estado: user.role === "OWNER" ? "CONFIRMADA" : "PENDIENTE_PAGO",
       },
       include: {
