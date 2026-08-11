@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { calcularPrecio } from "@/lib/pricing";
 import { apiHandler } from "@/lib/api-handler";
 import { RATE_LIMITS } from "@/lib/rate-limit";
+import { z } from "zod";
 
-interface PrecioQuery {
-  fecha: string;
-  hora: string;
-  codigo?: string;
-}
+const precioQuerySchema = z.object({
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD requerido"),
+  hora: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido"),
+  codigo: z.string().optional(),
+});
 
 /**
  * GET /api/canchas/:id/precio?fecha=YYYY-MM-DD&hora=HH:MM&codigo=PROMO
@@ -15,11 +16,8 @@ interface PrecioQuery {
  * Calcula el precio de una cancha para una fecha y hora específicas.
  * Acepta código de promoción opcional.
  */
-export const GET = apiHandler<never, PrecioQuery>(
+export const GET = apiHandler<never, { fecha: string; hora: string; codigo?: string }>(
   async (request, _ctx, { query }) => {
-    const { searchParams } = new URL(request.url);
-    const canchaId = searchParams.get("id") || request.url.split("/canchas/")[1]?.split("/")[0];
-    
     // Extraer canchaId de la URL
     const urlParts = request.url.split("/");
     const idIndex = urlParts.indexOf("canchas") + 1;
@@ -56,7 +54,7 @@ export const GET = apiHandler<never, PrecioQuery>(
     });
   },
   {
-    querySchema: undefined, // validación manual en el handler
+    querySchema: precioQuerySchema,
     rateLimit: RATE_LIMITS.DISPONIBILIDAD,
   }
 );
