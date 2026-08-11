@@ -61,7 +61,7 @@ export default function PlayerBuscar() {
     setBooking(slot.inicio);
     try {
       // Redirigir al checkout con fecha y hora preseleccionadas
-      const hora = new Date(slot.inicio).toISOString().slice(11, 16);
+      const hora = new Date(slot.inicio).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false });
       router.push(`/player/reservar/${canchaId}?fecha=${fecha}&hora=${hora}`);
     } finally { setBooking(null); }
   }

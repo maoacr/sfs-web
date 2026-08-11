@@ -120,6 +120,7 @@ export const POST = apiHandler<CrearPagoInput>(
   },
   {
     requireAuth: true,
+    requireCsrf: false,
     bodySchema: crearPagoSchema,
     rateLimit: RATE_LIMITS.STRICT,
   }
