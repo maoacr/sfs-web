@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+
+// Helper para leer query params sin useSearchParams (evita necesidad de Suspense)
+function getQueryParam(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  const url = new URL(window.location.href);
+  return url.searchParams.get(key);
+}
 
 interface PrecioData {
   canchaId: string;
@@ -26,13 +33,12 @@ interface CanchaInfo {
 export default function ReservarPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const canchaId = params.id as string;
 
   const [cancha, setCancha] = useState<CanchaInfo | null>(null);
   const [precio, setPrecio] = useState<PrecioData | null>(null);
-  const [fecha, setFecha] = useState(searchParams.get("fecha") || "");
-  const [hora, setHora] = useState(searchParams.get("hora") || "");
+  const [fecha, setFecha] = useState("");
+  const [hora, setHora] = useState("");
   const [codigo, setCodigo] = useState("");
   const [montoSeleccionado, setMontoSeleccionado] = useState<"50" | "100" | "otro">("50");
   const [montoOtro, setMontoOtro] = useState("");
@@ -41,6 +47,16 @@ export default function ReservarPage() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [saldoPendiente, setSaldoPendiente] = useState(0);
   const [step, setStep] = useState<"select" | "precio" | "pagar">("select");
+  const [initialized, setInitialized] = useState(false);
+
+  // Leer query params al montar (solo cliente)
+  useEffect(() => {
+    const f = getQueryParam("fecha");
+    const h = getQueryParam("hora");
+    if (f) setFecha(f);
+    if (h) setHora(h);
+    setInitialized(true);
+  }, []);
 
   // Verificar saldo al cargar
   useEffect(() => {
@@ -49,13 +65,6 @@ export default function ReservarPage() {
       .then((d) => setSaldoPendiente(d.saldoPendiente || 0))
       .catch(() => {});
   }, []);
-
-  // Si vienen fecha y hora de la búsqueda, calcular precio automáticamente
-  useEffect(() => {
-    if (fecha && hora && step === "select") {
-      calcularPrecio();
-    }
-  }, [fecha, hora]);
 
   // Cargar info de la cancha
   useEffect(() => {
@@ -91,6 +100,14 @@ export default function ReservarPage() {
     }
     setLoading(false);
   };
+
+  // Auto-calcular precio si vienen fecha y hora de la búsqueda
+  useEffect(() => {
+    if (initialized && fecha && hora && step === "select") {
+      calcularPrecio();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialized]);
 
   const iniciarPago = async () => {
     if (!precio) return;
