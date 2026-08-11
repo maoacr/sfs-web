@@ -179,9 +179,7 @@ export default function ReservarPage() {
   const bloqueado = saldoPendiente > 0;
 
   return (
-    <div className="flex flex-col min-h-full">
-      {/* Contenido scrolleable */}
-      <div className="flex-1 px-4 pt-4 max-w-lg mx-auto w-full">
+    <div className="px-4 pt-4 pb-32 max-w-lg mx-auto w-full">
         <Link href="/player/buscar" className="text-sm text-text-dim hover:text-grass mb-4 inline-block">
           ← Volver
         </Link>
@@ -330,21 +328,18 @@ export default function ReservarPage() {
             <p className="text-sm text-text-muted">Completá el pago para confirmar tu reserva.</p>
           </div>
         )}
-      </div>
 
-      {/* Bottom CTA — sticky */}
-      {step === "precio" && precio && (
-        <div className="sticky bottom-0 p-4 pb-safe bg-surface border-t border-border mt-auto z-30">
-          <div className="max-w-lg mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-text-muted">Total a pagar</span>
-              <span className="text-xl font-bold text-text">{montoSeleccionado.toLocaleString("es-CO")} COP</span>
-            </div>
-            <button onClick={iniciarPago} disabled={submitting || bloqueado}
-              className="w-full rounded-xl bg-grass px-5 py-3.5 text-base font-semibold text-white hover:bg-grass-light transition-colors disabled:opacity-50 active:scale-[0.98]">
-              {submitting ? "Procesando..." : bloqueado ? "Saldo pendiente — no podés pagar" : "Pagar con PSE"}
-            </button>
+        {/* Bottom CTA */}
+        {step === "precio" && precio && (
+        <div className="mt-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-text-muted">Total a pagar</span>
+            <span className="text-xl font-bold text-text">{montoSeleccionado.toLocaleString("es-CO")} COP</span>
           </div>
+          <button onClick={iniciarPago} disabled={submitting || bloqueado}
+            className="w-full rounded-xl bg-grass px-5 py-3.5 text-base font-semibold text-white hover:bg-grass-light transition-colors disabled:opacity-50 active:scale-[0.98]">
+            {submitting ? "Procesando..." : bloqueado ? "Saldo pendiente — no podés pagar" : "Pagar con PSE"}
+          </button>
         </div>
       )}
     </div>
