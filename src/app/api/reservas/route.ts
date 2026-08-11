@@ -55,6 +55,14 @@ export const POST = apiHandler<CreateReservaInput>(
 
     // ─── 3. Verificar solapamiento ────────────────────────────────────────
 
+    let finalPlayerId = user.sub;
+    let finalTenantId = cancha.tenantId;
+
+    if (user.role === "OWNER") {
+      finalPlayerId = playerId || user.sub;
+      finalTenantId = user.sub;
+    }
+
     const conflicto = await prisma.reserva.findFirst({
       where: {
         canchaId,
@@ -65,18 +73,14 @@ export const POST = apiHandler<CreateReservaInput>(
     });
 
     if (conflicto) {
+      // Si la reserva conflictiva es del mismo jugador, retornarla para continuar el pago
+      if (conflicto.playerId === finalPlayerId && conflicto.estado !== "CONFIRMADA") {
+        return NextResponse.json(conflicto, { status: 200 });
+      }
       return NextResponse.json(
         { error: "El slot ya está reservado" },
         { status: 409 }
       );
-    }
-
-    let finalPlayerId = user.sub;
-    let finalTenantId = cancha.tenantId;
-
-    if (user.role === "OWNER") {
-      finalPlayerId = playerId || user.sub;
-      finalTenantId = user.sub;
     }
 
     // ─── 4. Calcular precio con el motor ─────────────────────────────────
