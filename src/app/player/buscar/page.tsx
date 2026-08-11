@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import type { Swiper as SwiperType } from "swiper";
 import { Pagination } from "swiper/modules";
+import { useRouter } from "next/navigation";
 import { sileo } from "sileo";
 import { formatAddress } from "@/lib/address";
 import "swiper/css";
@@ -16,6 +17,7 @@ interface ComplejoSlot { id: string; nombre: string; direccion: string; telefono
 const TIPOS = ["F5", "F6", "F7", "F8", "F9", "F11"];
 
 export default function PlayerBuscar() {
+  const router = useRouter();
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [tipo, setTipo] = useState("");
   const [complejos, setComplejos] = useState<ComplejoSlot[]>([]);
@@ -58,19 +60,9 @@ export default function PlayerBuscar() {
   async function reservar(canchaId: string, slot: Slot) {
     setBooking(slot.inicio);
     try {
-      const res = await fetch("/api/reservas", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canchaId, slotInicio: slot.inicio, slotFin: slot.fin }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        if (res.status === 409) throw new Error("Este slot ya fue reservado.");
-        throw new Error(d.error || "Error");
-      }
-      sileo.success({ title: "¡Reserva creada!", description: "Podés verla en Mis reservas." });
-      setSelectedCancha(null);
-    } catch (err) {
-      sileo.error({ title: "Error al reservar", description: err instanceof Error ? err.message : "Error" });
+      // Redirigir al checkout con fecha y hora preseleccionadas
+      const hora = new Date(slot.inicio).toISOString().slice(11, 16);
+      router.push(`/player/reservar/${canchaId}?fecha=${fecha}&hora=${hora}`);
     } finally { setBooking(null); }
   }
 

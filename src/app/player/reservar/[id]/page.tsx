@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface PrecioData {
@@ -26,12 +26,13 @@ interface CanchaInfo {
 export default function ReservarPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const canchaId = params.id as string;
 
   const [cancha, setCancha] = useState<CanchaInfo | null>(null);
   const [precio, setPrecio] = useState<PrecioData | null>(null);
-  const [fecha, setFecha] = useState("");
-  const [hora, setHora] = useState("");
+  const [fecha, setFecha] = useState(searchParams.get("fecha") || "");
+  const [hora, setHora] = useState(searchParams.get("hora") || "");
   const [codigo, setCodigo] = useState("");
   const [montoSeleccionado, setMontoSeleccionado] = useState<"50" | "100" | "otro">("50");
   const [montoOtro, setMontoOtro] = useState("");
