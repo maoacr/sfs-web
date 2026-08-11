@@ -1,169 +1,84 @@
-import { MercadoPagoConfig, Payment, PaymentRefund } from "mercadopago";
+import MercadoPago, { Preference, Payment, PaymentRefund } from "mercadopago";
 import crypto from "crypto";
 
 /**
- * MercadoPago wrapper — Split Payments 1:N + Webhook verification.
+ * MercadoPago wrapper — Checkout Pro Preferences + Webhook verification.
  *
  * Configuración desde variables de entorno:
- * - MP_ACCESS_TOKEN: token de acceso (producción o sandbox)
+ * - MP_ACCESS_TOKEN: token de acceso (TEST-xxx para sandbox, APP_USR-xxx para prod)
  * - MP_WEBHOOK_SECRET: secreto para verificar webhooks
- * - MP_PUBLIC_KEY: clave pública (frontend)
  */
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const accessToken = process.env.MP_ACCESS_TOKEN || "";
 const webhookSecret = process.env.MP_WEBHOOK_SECRET || "";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-const mp = accessToken ? new MercadoPagoConfig({ accessToken }) : null;
-
-// IDs de receptor — el dueño es dinámico, la plataforma es fija
-const PLATFORM_RECEIVER_ID = "sfs-platform";
-
-// ─── Split API (vía fetch — el SDK no expone splits nativamente) ─────────────
-
-const MP_API = "https://api.mercadopago.com";
-
-interface SplitResult {
-  splitId: string;
-  checkoutUrl: string;
-}
+// ─── Preference (Checkout Pro) ───────────────────────────────────────────────
 
 /**
- * Crea un split de pago 1:N entre el dueño (85%) y SFS (15%).
- * Retorna el ID del split y la URL de checkout.
- */
-export async function createSplit(
-  reservaId: string,
-  monto: number,
-  payerEmail: string,
-  ownerReceiverId: string
-): Promise<SplitResult> {
-  const totalAmount = monto.toFixed(2);
-  const ownerAmount = (monto * 0.85).toFixed(2);
-  const platformAmount = (monto * 0.15).toFixed(2);
-
-  const body = {
-    id: `RES-${reservaId}-${Date.now()}`,
-    type: "online",
-    total_amount: totalAmount,
-    config: {
-      online: {
-        transaction_security: {
-          validation: "always",
-          liability_shift: "required",
-        },
-      },
-      split_rules: {
-        amount_type: "FIXED",
-      },
-    },
-    splits: [
-      {
-        receiver_id: ownerReceiverId,
-        receiver_type: "owner",
-        amount: ownerAmount,
-        description: "Pago al dueño de la cancha",
-      },
-      {
-        receiver_id: PLATFORM_RECEIVER_ID,
-        receiver_type: "partner",
-        amount: platformAmount,
-        description: "Comisión SFS",
-      },
-    ],
-    external_reference: reservaId,
-    payer: {
-      email: payerEmail,
-    },
-    processing_mode: "automatic",
-    capture_mode: "automatic_async",
-  };
-
-  const response = await fetch(`${MP_API}/v1/splits`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`MP Split error: ${response.status} — ${err}`);
-  }
-
-  const data = await response.json();
-
-  // El checkout URL viene en la respuesta o se construye
-  const splitId = data.id;
-  const checkoutUrl = `https://www.mercadopago.com.co/checkout/v1/redirect?preference-id=${splitId}`;
-
-  return { splitId, checkoutUrl };
-}
-
-// ─── Checkout Pro (fallback sin split) ──────────────────────────────────────
-
-/**
- * Crea un preference simple de Checkout Pro (sin split).
- * Fallback cuando el dueño no tiene cuenta MP configurada.
+ * Crea un Checkout Pro preference y retorna la URL de pago.
  */
 export async function createCheckoutPreference(
   reservaId: string,
   monto: number,
   payerEmail: string
 ): Promise<{ preferenceId: string; checkoutUrl: string }> {
-  const body = {
-    items: [
-      {
-        id: reservaId,
-        title: "Reserva de cancha SFS",
-        description: `Reserva #${reservaId.slice(0, 8)}`,
-        quantity: 1,
-        unit_price: Number(monto.toFixed(2)),
-        currency_id: "COP",
-      },
-    ],
-    payer: { email: payerEmail },
-    external_reference: reservaId,
-    back_urls: {
-      success: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/player/reservas`,
-      failure: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/player/buscar`,
-      pending: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/player/reservas`,
-    },
-    auto_return: "approved",
-  };
-
-  const response = await fetch(`${MP_API}/checkout/preferences`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    console.error("[MP] Preference error:", response.status, err);
-    throw new Error(`MP Preference: ${response.status} — ${err}`);
+  if (!accessToken) {
+    throw new Error("MP_ACCESS_TOKEN no configurado en .env");
   }
 
-  const data = await response.json();
+  const client = new MercadoPago({ accessToken, options: { timeout: 5000 } });
+  const preference = new Preference(client);
+
+  const result = await preference.create({
+    body: {
+      items: [
+        {
+          id: reservaId,
+          title: "Reserva de cancha SFS",
+          description: `Reserva #${reservaId.slice(0, 8)}`,
+          quantity: 1,
+          unit_price: Number(monto.toFixed(2)),
+          currency_id: "COP",
+        },
+      ],
+      payer: { email: payerEmail },
+      external_reference: reservaId,
+      back_urls: {
+        success: `${APP_URL}/player/reservas`,
+        failure: `${APP_URL}/player/buscar`,
+        pending: `${APP_URL}/player/reservas`,
+      },
+      notification_url: `${APP_URL}/api/webhooks/mercadopago`,
+    },
+  });
 
   return {
-    preferenceId: data.id,
-    checkoutUrl: data.init_point || data.sandbox_init_point,
+    preferenceId: result.id!,
+    checkoutUrl: result.init_point!,
   };
+}
+
+// ─── Split (fallback — mismo comportamiento) ─────────────────────────────────
+
+/**
+ * Por ahora, mismo que createCheckoutPreference — el split se implementa
+ * cuando los dueños tengan cuentas MP con receiver_id numérico.
+ */
+export async function createSplit(
+  reservaId: string,
+  monto: number,
+  payerEmail: string,
+  _ownerReceiverId: string
+): Promise<{ splitId: string; checkoutUrl: string }> {
+  const result = await createCheckoutPreference(reservaId, monto, payerEmail);
+  return { splitId: result.preferenceId, checkoutUrl: result.checkoutUrl };
 }
 
 // ─── Webhook Verification ────────────────────────────────────────────────────
 
-/**
- * Verifica la firma HMAC del webhook de MercadoPago.
- * MP envía el header x-signature con formato: ts={timestamp},v1={hmac}
- */
 export function verifyWebhookSignature(
   dataId: string,
   ts: string,
@@ -186,54 +101,38 @@ export function verifyWebhookSignature(
   );
 }
 
-/**
- * Parsea el header x-signature de MP y verifica.
- */
 export function verifyWebhookRequest(
   dataId: string,
   signatureHeader: string | null
 ): boolean {
   if (!signatureHeader) return false;
-
   const parts = signatureHeader.split(",");
   const ts = parts.find((p) => p.startsWith("ts="))?.split("=")[1];
   const sig = parts.find((p) => p.startsWith("v1="))?.split("=")[1];
-
   if (!ts || !sig) return false;
-
   return verifyWebhookSignature(dataId, ts, sig);
 }
 
 // ─── Payment Operations ──────────────────────────────────────────────────────
 
-/**
- * Obtiene el estado de un pago por su ID de MercadoPago.
- */
 export async function getPayment(mpPaymentId: string) {
-  if (!mp) throw new Error("MercadoPago no configurado");
-
-  const payment = new Payment(mp);
+  if (!accessToken) throw new Error("MP no configurado");
+  const client = new MercadoPago({ accessToken, options: { timeout: 5000 } });
+  const payment = new Payment(client);
   return payment.get({ id: mpPaymentId });
 }
 
-/**
- * Reembolsa un pago total o parcialmente.
- */
 export async function refundPayment(mpPaymentId: string, amount?: number) {
-  if (!mp) throw new Error("MercadoPago no configurado");
-
-  const refund = new PaymentRefund(mp);
+  if (!accessToken) throw new Error("MP no configurado");
+  const client = new MercadoPago({ accessToken, options: { timeout: 5000 } });
+  const refund = new PaymentRefund(client);
   const body: Record<string, unknown> = { payment_id: mpPaymentId };
   if (amount) body.amount = amount;
-
   return refund.create({ payment_id: mpPaymentId, body });
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Devuelve true si MercadoPago está configurado.
- */
 export function isMercadoPagoConfigured(): boolean {
   return !!accessToken;
 }
