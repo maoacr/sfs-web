@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -42,41 +42,65 @@ export default function ReservarPage() {
   const [codigo, setCodigo] = useState("");
   const [montoSeleccionado, setMontoSeleccionado] = useState<"50" | "100" | "otro">("50");
   const [montoOtro, setMontoOtro] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // empieza cargando si hay params
   const [error, setError] = useState("");
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [saldoPendiente, setSaldoPendiente] = useState(0);
   const [step, setStep] = useState<"select" | "precio" | "pagar">("select");
-  const [initialized, setInitialized] = useState(false);
+  const [prefilledFecha, setPrefilledFecha] = useState<string | null>(null);
+  const [prefilledHora, setPrefilledHora] = useState<string | null>(null);
 
-  // Leer query params al montar (solo cliente)
+  // Inicializar: leer query params + saldo + info cancha + auto-calcular
   useEffect(() => {
     const f = getQueryParam("fecha");
     const h = getQueryParam("hora");
-    if (f) setFecha(f);
-    if (h) setHora(h);
-    setInitialized(true);
-  }, []);
 
-  // Verificar saldo al cargar
-  useEffect(() => {
+    if (f && h) {
+      setPrefilledFecha(f);
+      setPrefilledHora(h);
+      setFecha(f);
+      setHora(h);
+    } else {
+      setLoading(false);
+    }
+
+    // Saldo
     fetch("/api/me/saldo")
       .then((r) => r.json())
       .then((d) => setSaldoPendiente(d.saldoPendiente || 0))
       .catch(() => {});
-  }, []);
 
-  // Cargar info de la cancha
+    // Info cancha (solo si tenemos canchaId)
+    if (canchaId) {
+      fetch(`/api/canchas?tipo=&complejoId=&page=1&limit=100`)
+        .then((r) => r.json())
+        .then((data) => {
+          const c = Array.isArray(data) ? data.find((c: any) => c.id === canchaId) : null;
+          if (c) setCancha(c);
+        })
+        .catch(() => {});
+    }
+  }, [canchaId]);
+
+  // Auto-calcular cuando tenemos fecha y hora pre-llenadas
   useEffect(() => {
-    if (!canchaId) return;
-    fetch(`/api/canchas?tipo=&complejoId=&page=1&limit=100`)
+    if (!prefilledFecha || !prefilledHora) return;
+
+    const params = new URLSearchParams({ fecha: prefilledFecha, hora: prefilledHora });
+    fetch(`/api/canchas/${canchaId}/precio?${params}`)
       .then((r) => r.json())
       .then((data) => {
-        const c = Array.isArray(data) ? data.find((c: any) => c.id === canchaId) : null;
-        if (c) setCancha(c);
+        if (data.error) {
+          setError(data.error);
+          setStep("select");
+        } else {
+          setPrecio(data);
+          setStep("precio");
+        }
       })
-      .catch(() => {});
-  }, [canchaId]);
+      .catch(() => setError("Error al calcular precio"))
+      .finally(() => setLoading(false));
+  }, [prefilledFecha, prefilledHora, canchaId]);
 
   const calcularPrecio = async () => {
     if (!fecha || !hora) {
@@ -100,14 +124,6 @@ export default function ReservarPage() {
     }
     setLoading(false);
   };
-
-  // Auto-calcular precio si vienen fecha y hora de la búsqueda
-  useEffect(() => {
-    if (initialized && fecha && hora && step === "select") {
-      calcularPrecio();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialized]);
 
   const iniciarPago = async () => {
     if (!precio) return;
@@ -195,8 +211,8 @@ export default function ReservarPage() {
         </div>
       )}
 
-      {/* Step 1: Seleccionar fecha/hora */}
-      {step === "select" && (
+      {/* Step 1: Seleccionar fecha/hora — solo si no vienen de búsqueda */}
+      {step === "select" && !prefilledFecha && (
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
           <div>
             <label className="block text-sm font-medium text-text mb-1">Fecha</label>
@@ -234,9 +250,39 @@ export default function ReservarPage() {
         </div>
       )}
 
+      {/* Loading mientras se auto-calcula */}
+      {step === "select" && prefilledFecha && loading && (
+        <div className="rounded-2xl border border-border bg-surface p-12 text-center">
+          <p className="text-text-muted">Calculando precio...</p>
+        </div>
+      )}
+
+      {/* Error de auto-cálculo — mostrar select como fallback */}
+      {step === "select" && prefilledFecha && !loading && error && (
+        <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
+          <p className="text-sm text-red-400">{error}</p>
+          <button onClick={() => { setPrefilledFecha(null); setError(""); }}
+            className="w-full rounded-xl border border-border px-5 py-3 text-sm text-text-muted">
+            Intentar con otra fecha
+          </button>
+        </div>
+      )}
+
       {/* Step 2: Ver precio y seleccionar monto */}
       {step === "precio" && precio && (
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-4">
+          {/* Datos de la reserva */}
+          <div className="flex items-center gap-3 pb-4 border-b border-border">
+            <span className="text-2xl">⚽</span>
+            <div>
+              <p className="text-sm font-semibold text-text">
+                {prefilledFecha ? new Date(prefilledFecha + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" }) : fecha}
+              </p>
+              <p className="text-2xl font-bold text-text">
+                {prefilledHora || hora}
+              </p>
+            </div>
+          </div>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">Precio base</span>
