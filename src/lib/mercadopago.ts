@@ -146,7 +146,8 @@ export async function createCheckoutPreference(
 
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`MP Preference error: ${response.status} — ${err}`);
+    console.error("[MP] Preference error:", response.status, err);
+    throw new Error(`MP Preference: ${response.status} — ${err}`);
   }
 
   const data = await response.json();

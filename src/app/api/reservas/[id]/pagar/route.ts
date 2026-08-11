@@ -102,7 +102,7 @@ export const POST = apiHandler<CrearPagoInput>(
       } catch (prefError: any) {
         console.error("[MP] Preference también falló:", prefError);
         return NextResponse.json(
-          { error: "Error al crear el pago. Intenta de nuevo." },
+          { error: `MP Error: ${prefError.message?.slice(0, 200) || "Error desconocido"}` },
           { status: 502 }
         );
       }
