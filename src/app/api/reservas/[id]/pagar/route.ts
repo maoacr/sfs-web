@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { apiHandler } from "@/lib/api-handler";
 import { crearPagoSchema, type CrearPagoInput } from "@/lib/schemas";
-import { createSplit, isMercadoPagoConfigured } from "@/lib/mercadopago";
+import { createSplit, createCheckoutPreference, isMercadoPagoConfigured } from "@/lib/mercadopago";
 import { calcularPrecio, usarPromocion } from "@/lib/pricing";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 
@@ -88,16 +88,24 @@ export const POST = apiHandler<CrearPagoInput>(
     // ─── 4. Crear split en MP ───────────────────────────────────────────
 
     const ownerReceiverId = reserva.cancha.tenantId; // owner = tenant
-    let split: { splitId: string; checkoutUrl: string };
+    // Try split first, fallback to simple preference
+    let split: { splitId?: string; checkoutUrl: string };
+    let isSplit = true;
 
     try {
       split = await createSplit(reserva.id, monto, user.email, ownerReceiverId);
-    } catch (error: any) {
-      console.error("[MP] Error creando split:", error);
-      return NextResponse.json(
-        { error: "Error al crear el pago. Intenta de nuevo." },
-        { status: 502 }
-      );
+    } catch (splitError: any) {
+      console.warn("[MP] Split falló, usando preference:", splitError.message?.slice(0, 100));
+      try {
+        split = await createCheckoutPreference(reserva.id, monto, user.email);
+        isSplit = false;
+      } catch (prefError: any) {
+        console.error("[MP] Preference también falló:", prefError);
+        return NextResponse.json(
+          { error: "Error al crear el pago. Intenta de nuevo." },
+          { status: 502 }
+        );
+      }
     }
 
     // ─── 5. Registrar pago pendiente ────────────────────────────────────
@@ -108,7 +116,8 @@ export const POST = apiHandler<CrearPagoInput>(
         userId: user.sub,
         monto,
         estadoPago: "PENDIENTE",
-        mpSplitId: split.splitId,
+        mpSplitId: isSplit ? split.splitId : null,
+        mpPaymentId: !isSplit ? split.splitId : null, // preference usa preferenceId como reference
       },
     });
 
@@ -116,6 +125,7 @@ export const POST = apiHandler<CrearPagoInput>(
       reservaId: reserva.id,
       monto,
       checkoutUrl: split.checkoutUrl,
+      tipo: isSplit ? "split" : "preference",
     });
   },
   {

@@ -103,6 +103,60 @@ export async function createSplit(
   return { splitId, checkoutUrl };
 }
 
+// ─── Checkout Pro (fallback sin split) ──────────────────────────────────────
+
+/**
+ * Crea un preference simple de Checkout Pro (sin split).
+ * Fallback cuando el dueño no tiene cuenta MP configurada.
+ */
+export async function createCheckoutPreference(
+  reservaId: string,
+  monto: number,
+  payerEmail: string
+): Promise<{ preferenceId: string; checkoutUrl: string }> {
+  const body = {
+    items: [
+      {
+        id: reservaId,
+        title: "Reserva de cancha SFS",
+        description: `Reserva #${reservaId.slice(0, 8)}`,
+        quantity: 1,
+        unit_price: Number(monto.toFixed(2)),
+        currency_id: "COP",
+      },
+    ],
+    payer: { email: payerEmail },
+    external_reference: reservaId,
+    back_urls: {
+      success: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/player/reservas`,
+      failure: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/player/buscar`,
+      pending: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/player/reservas`,
+    },
+    auto_return: "approved",
+  };
+
+  const response = await fetch(`${MP_API}/checkout/preferences`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`MP Preference error: ${response.status} — ${err}`);
+  }
+
+  const data = await response.json();
+
+  return {
+    preferenceId: data.id,
+    checkoutUrl: data.init_point || data.sandbox_init_point,
+  };
+}
+
 // ─── Webhook Verification ────────────────────────────────────────────────────
 
 /**

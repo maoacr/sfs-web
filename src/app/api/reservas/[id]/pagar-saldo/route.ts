@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@sfs/db";
 import { apiHandler } from "@/lib/api-handler";
 import { pagarSaldoSchema, type PagarSaldoInput } from "@/lib/schemas";
-import { createSplit, isMercadoPagoConfigured } from "@/lib/mercadopago";
+import { createSplit, createCheckoutPreference, isMercadoPagoConfigured } from "@/lib/mercadopago";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 
 /**
@@ -87,16 +87,23 @@ export const POST = apiHandler<PagarSaldoInput>(
     // ─── 3. Crear split en MP ───────────────────────────────────────────
 
     const ownerReceiverId = reserva.cancha.tenantId;
-    let split: { splitId: string; checkoutUrl: string };
+    let split: { splitId?: string; checkoutUrl: string };
+    let isSplit = true;
 
     try {
       split = await createSplit(reserva.id, monto, user.email, ownerReceiverId);
-    } catch (error: any) {
-      console.error("[MP] Error creando split:", error);
-      return NextResponse.json(
-        { error: "Error al crear el pago. Intenta de nuevo." },
-        { status: 502 }
-      );
+    } catch (splitError: any) {
+      console.warn("[MP] Split falló, usando preference:", splitError.message?.slice(0, 100));
+      try {
+        split = await createCheckoutPreference(reserva.id, monto, user.email);
+        isSplit = false;
+      } catch (prefError: any) {
+        console.error("[MP] Preference también falló:", prefError);
+        return NextResponse.json(
+          { error: "Error al crear el pago. Intenta de nuevo." },
+          { status: 502 }
+        );
+      }
     }
 
     // ─── 4. Registrar pago pendiente ────────────────────────────────────
@@ -107,7 +114,8 @@ export const POST = apiHandler<PagarSaldoInput>(
         userId: user.sub,
         monto,
         estadoPago: "PENDIENTE",
-        mpSplitId: split.splitId,
+        mpSplitId: isSplit ? split.splitId : null,
+        mpPaymentId: !isSplit ? split.splitId : null,
       },
     });
 
