@@ -50,6 +50,13 @@ export default function ReservarPage() {
       .catch(() => {});
   }, []);
 
+  // Si vienen fecha y hora de la búsqueda, calcular precio automáticamente
+  useEffect(() => {
+    if (fecha && hora && step === "select") {
+      calcularPrecio();
+    }
+  }, [fecha, hora]);
+
   // Cargar info de la cancha
   useEffect(() => {
     if (!canchaId) return;
