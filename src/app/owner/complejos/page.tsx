@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatAddress } from "@/lib/address";
 
-interface Complejo { id: string; nombre: string; direccion: string; telefono: string | null; email: string | null; _count: { canchas: number }; }
+interface Complejo { id: string; nombre: string; direccion: string; telefono: string | null; email: string | null; canchas: { id: string }[]; }
 
 export default function OwnerComplejos() {
   const [complejos, setComplejos] = useState<Complejo[]>([]);
@@ -48,7 +48,7 @@ export default function OwnerComplejos() {
               {c.email && <p className="text-xs text-text-dim">{c.email}</p>}
               <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-field/40 px-3 py-1 text-xs font-medium text-grass-light">
                 <span className="h-1.5 w-1.5 rounded-full bg-grass-light" />
-                {c._count.canchas} cancha{c._count.canchas !== 1 ? "s" : ""}
+                {c.canchas.length} cancha{c.canchas.length !== 1 ? "s" : ""}
               </span>
             </Link>
           ))
