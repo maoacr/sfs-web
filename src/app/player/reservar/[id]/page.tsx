@@ -179,9 +179,9 @@ export default function ReservarPage() {
   const bloqueado = saldoPendiente > 0;
 
   return (
-    <div className="min-h-[100dvh] flex flex-col">
+    <div className="flex flex-col min-h-full">
       {/* Contenido scrolleable */}
-      <div className="flex-1 overflow-auto pb-24 px-4 pt-4 max-w-lg mx-auto w-full">
+      <div className="flex-1 px-4 pt-4 max-w-lg mx-auto w-full">
         <Link href="/player/buscar" className="text-sm text-text-dim hover:text-grass mb-4 inline-block">
           ← Volver
         </Link>
@@ -332,9 +332,9 @@ export default function ReservarPage() {
         )}
       </div>
 
-      {/* Bottom CTA — fijo */}
+      {/* Bottom CTA — sticky */}
       {step === "precio" && precio && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 pb-safe bg-surface border-t border-border z-30">
+        <div className="sticky bottom-0 p-4 pb-safe bg-surface border-t border-border mt-auto z-30">
           <div className="max-w-lg mx-auto">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-text-muted">Total a pagar</span>
