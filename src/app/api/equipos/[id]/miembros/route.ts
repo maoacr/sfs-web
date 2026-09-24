@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, equipos, equipoMiembros, usuarios } from "@sfs/db";
+import { and, eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { invitarMiembroSchema } from "@/lib/schemas";
 import { crearNotificacion } from "@/lib/notifications";
+import { toApiUsuario, USUARIO_PUBLICO } from "@/lib/db-mappers";
 
 type InvitarBody = { userId: string; rol?: "CAPITAN" | "MIEMBRO" };
+
+async function cargarEquipo(equipoId: string, userId: string) {
+  const equipo = await db.query.equipos.findFirst({
+    where: eq(equipos.id, equipoId),
+    with: { miembros: { where: eq(equipoMiembros.userId, userId), columns: { rol: true } } },
+  });
+  if (!equipo) return null;
+  return { equipo, esCapitan: equipo.creadorId === userId || equipo.miembros[0]?.rol === "CAPITAN" };
+}
 
 /**
  * POST /api/equipos/:id/miembros
@@ -13,7 +24,6 @@ type InvitarBody = { userId: string; rol?: "CAPITAN" | "MIEMBRO" };
  */
 export const POST = apiHandler<InvitarBody>(
   async (request, ctx, { body }) => {
-    const user = ctx.user!;
     const equipoId = request.url.split("/equipos/")[1]?.split("/")[0];
     if (!equipoId || !body) {
       return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
@@ -21,63 +31,42 @@ export const POST = apiHandler<InvitarBody>(
 
     const { userId, rol } = body;
 
-    // Verificar que el equipo existe y el usuario es capitán
-    const equipo = await prisma.equipo.findUnique({
-      where: { id: equipoId },
-      include: { miembros: { where: { userId: user.sub } } },
-    });
-
-    if (!equipo) {
+    const acceso = await cargarEquipo(equipoId, ctx.user!.sub);
+    if (!acceso) {
       return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
     }
-
-    const miembroActual = equipo.miembros[0];
-    if (equipo.creadorId !== user.sub && miembroActual?.rol !== "CAPITAN") {
-      return NextResponse.json(
-        { error: "Solo el capitán puede invitar miembros" },
-        { status: 403 }
-      );
+    if (!acceso.esCapitan) {
+      return NextResponse.json({ error: "Solo el capitán puede invitar miembros" }, { status: 403 });
     }
 
-    // Verificar que el usuario existe
-    const invitado = await prisma.user.findUnique({ where: { id: userId } });
+    const invitado = await db.query.usuarios.findFirst({
+      where: eq(usuarios.id, userId),
+      columns: USUARIO_PUBLICO,
+    });
     if (!invitado) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    // Verificar que no es ya miembro
-    const existe = await prisma.equipoMiembro.findUnique({
-      where: { equipoId_userId: { equipoId, userId } },
-    });
+    const [miembro] = await db
+      .insert(equipoMiembros)
+      .values({ equipoId, userId, rol: rol || "MIEMBRO" })
+      .onConflictDoNothing()
+      .returning();
 
-    if (existe) {
-      return NextResponse.json(
-        { error: "Este usuario ya es miembro del equipo" },
-        { status: 409 }
-      );
+    if (!miembro) {
+      return NextResponse.json({ error: "Este usuario ya es miembro del equipo" }, { status: 409 });
     }
 
-    // Agregar miembro
-    const miembro = await prisma.equipoMiembro.create({
-      data: {
-        equipoId,
-        userId,
-        rol: rol || "MIEMBRO",
-      },
-      include: {
-        user: { select: { id: true, primerNombre: true, apellidos: true, apodo: true } },
-      },
-    });
+    const usuario = toApiUsuario(invitado);
 
-    // Notificar al invitado
     await crearNotificacion({
       userId,
       tipo: "INVITACION_EQUIPO",
-      titulo: `Invitación a ${equipo.nombre}`,
-      mensaje: `${invitado.primerNombre}, te invitaron a ser parte de "${equipo.nombre}".`,
+      titulo: `Invitación a ${acceso.equipo.nombre}`,
+      mensaje: `${usuario.primerNombre}, te invitaron a ser parte de "${acceso.equipo.nombre}".`,
     });
 
-    return NextResponse.json(miembro, { status: 201 });
+    return NextResponse.json({ ...miembro, user: usuario }, { status: 201 });
   },
   {
     requireAuth: true,
@@ -95,38 +84,25 @@ export const DELETE = apiHandler(
   async (request, ctx, _validated) => {
     const user = ctx.user!;
     const equipoId = request.url.split("/equipos/")[1]?.split("/")[0];
-    const { searchParams } = new URL(request.url);
-    const targetUserId = searchParams.get("userId");
+    const targetUserId = new URL(request.url).searchParams.get("userId");
 
     if (!equipoId) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const equipo = await prisma.equipo.findUnique({
-      where: { id: equipoId },
-      include: { miembros: { where: { userId: user.sub } } },
-    });
-
-    if (!equipo) {
+    const acceso = await cargarEquipo(equipoId, user.sub);
+    if (!acceso) {
       return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
     }
 
-    const miembroActual = equipo.miembros[0];
-    const esCapitan = equipo.creadorId === user.sub || miembroActual?.rol === "CAPITAN";
-    const esAutoRemocion = targetUserId === user.sub || !targetUserId;
-
-    if (!esCapitan && !esAutoRemocion) {
-      return NextResponse.json(
-        { error: "No tenés permiso para remover miembros" },
-        { status: 403 }
-      );
+    const esAutoRemocion = !targetUserId || targetUserId === user.sub;
+    if (!acceso.esCapitan && !esAutoRemocion) {
+      return NextResponse.json({ error: "No tenés permiso para remover miembros" }, { status: 403 });
     }
 
-    const userIdToRemove = targetUserId || user.sub;
-
-    await prisma.equipoMiembro.deleteMany({
-      where: { equipoId, userId: userIdToRemove },
-    });
+    await db
+      .delete(equipoMiembros)
+      .where(and(eq(equipoMiembros.equipoId, equipoId), eq(equipoMiembros.userId, targetUserId || user.sub)));
 
     return NextResponse.json({ ok: true });
   },

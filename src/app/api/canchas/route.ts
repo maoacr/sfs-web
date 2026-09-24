@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { db, canchas, complejos, imagenesCanchas, slotConfigs, tarifas } from "@sfs/db";
-import { eq, and, isNull, desc, asc } from "drizzle-orm";
+import { db, canchas, complejos } from "@sfs/db";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import {
   createCanchaSchema,
   type CreateCanchaInput,
 } from "@/lib/schemas";
+import { tipoCanchaToDb, toApiCancha, toApiComplejo } from "@/lib/db-mappers";
 
 /**
  * GET /api/canchas
@@ -34,7 +35,9 @@ export const GET = apiHandler(
       orderBy: [desc(canchas.createdAt)],
     });
 
-    return NextResponse.json(canchasList);
+    return NextResponse.json(
+      canchasList.map((c) => ({ ...toApiCancha(c), complejo: toApiComplejo(c.complejo) }))
+    );
   },
   { requireAuth: true, requiredRole: "OWNER" }
 );
@@ -59,7 +62,12 @@ export const POST = apiHandler<CreateCanchaInput>(
     } = body;
 
     const complejo = await db.query.complejos.findFirst({
-      where: eq(complejos.id, complejoId),
+      where: and(
+        eq(complejos.id, complejoId),
+        eq(complejos.tenantId, ctx.user!.sub),
+        isNull(complejos.deletedAt)
+      ),
+      columns: { id: true },
     });
 
     if (!complejo) {
@@ -75,7 +83,7 @@ export const POST = apiHandler<CreateCanchaInput>(
         tenantId: ctx.user!.sub,
         complejoId,
         nombre,
-        tipo: tipo as any,
+        tipo: tipoCanchaToDb(tipo),
         capacidad,
         descripcion: descripcion || null,
         servicios: servicios || [],
@@ -83,7 +91,7 @@ export const POST = apiHandler<CreateCanchaInput>(
       })
       .returning();
 
-    return NextResponse.json(cancha, { status: 201 });
+    return NextResponse.json(toApiCancha(cancha), { status: 201 });
   },
   {
     requireAuth: true,

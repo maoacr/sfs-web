@@ -1,83 +1,83 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
+import crypto from "crypto";
+import {
+  verifyWebhookRequest,
+  estadoPagoDesdeMp,
+  isMercadoPagoConfigured,
+} from "@/lib/mercadopago";
 
-// El webhookSecret se lee a nivel módulo — mockeamos con factory
-const mockVerifySignature = vi.fn();
-const mockVerifyRequest = vi.fn();
+const SECRET = "test-secret-123";
 
-vi.mock("@/lib/mercadopago", async () => {
-  const actual = await vi.importActual("@/lib/mercadopago");
-  return {
-    ...actual,
-    // Usamos las implementaciones reales excepto donde mockeamos
-  };
+function firmar(manifest: string, secret = SECRET) {
+  return crypto.createHmac("sha256", secret).update(manifest).digest("hex");
+}
+
+describe("verifyWebhookRequest", () => {
+  const ts = "1704908010";
+  const requestId = "bb56a2f1-6aae-46ac-982e-9dcd3581d08e";
+  const dataId = "123456789";
+
+  it("acepta la firma construida con id, request-id y ts", () => {
+    const v1 = firmar(`id:${dataId};request-id:${requestId};ts:${ts};`);
+    expect(
+      verifyWebhookRequest({ dataId, requestId, signatureHeader: `ts=${ts},v1=${v1}`, secret: SECRET })
+    ).toBe(true);
+  });
+
+  it("rechaza una firma que omite el request-id", () => {
+    const v1 = firmar(`id:${dataId};ts:${ts};`);
+    expect(
+      verifyWebhookRequest({ dataId, requestId, signatureHeader: `ts=${ts},v1=${v1}`, secret: SECRET })
+    ).toBe(false);
+  });
+
+  it("omite el request-id del manifest cuando MP no lo envía", () => {
+    const v1 = firmar(`id:${dataId};ts:${ts};`);
+    expect(
+      verifyWebhookRequest({ dataId, requestId: null, signatureHeader: `ts=${ts},v1=${v1}`, secret: SECRET })
+    ).toBe(true);
+  });
+
+  it("usa el data.id en minúsculas cuando es alfanumérico", () => {
+    const v1 = firmar(`id:abc123;request-id:${requestId};ts:${ts};`);
+    expect(
+      verifyWebhookRequest({ dataId: "ABC123", requestId, signatureHeader: `ts=${ts},v1=${v1}`, secret: SECRET })
+    ).toBe(true);
+  });
+
+  it("rechaza una firma de otro largo sin lanzar excepción", () => {
+    expect(
+      verifyWebhookRequest({ dataId, requestId, signatureHeader: `ts=${ts},v1=abc`, secret: SECRET })
+    ).toBe(false);
+  });
+
+  it("rechaza header nulo o mal formado cuando hay secret", () => {
+    expect(verifyWebhookRequest({ dataId, requestId, signatureHeader: null, secret: SECRET })).toBe(false);
+    expect(verifyWebhookRequest({ dataId, requestId, signatureHeader: "garbage", secret: SECRET })).toBe(false);
+  });
+
+  it("acepta sin verificar cuando no hay secret configurado", () => {
+    expect(verifyWebhookRequest({ dataId, requestId, signatureHeader: null, secret: "" })).toBe(true);
+  });
 });
 
-import { verifyWebhookSignature, verifyWebhookRequest } from "@/lib/mercadopago";
-
-describe("MercadoPago Webhook Verification", () => {
-  it("verifica firma HMAC válida con secret definido", () => {
-    const secret = "test-secret-123";
-    const dataId = "PAY123456";
-    const ts = "1690000000";
-
-    const crypto = require("crypto");
-    const payload = `id:${dataId};ts:${ts};`;
-    const expectedSig = crypto
-      .createHmac("sha256", secret)
-      .update(payload)
-      .digest("hex");
-
-    // Leer el secret de env
-    const prev = process.env.MP_WEBHOOK_SECRET;
-    process.env.MP_WEBHOOK_SECRET = secret;
-
-    // Re-import para leer el nuevo valor... no funciona a nivel módulo
-    // Verificamos manualmente que el HMAC es correcto
-    const recreated = crypto
-      .createHmac("sha256", secret)
-      .update(payload)
-      .digest("hex");
-
-    expect(recreated).toBe(expectedSig);
-    expect(expectedSig.length).toBe(64); // SHA256 hex
-
-    process.env.MP_WEBHOOK_SECRET = prev;
+describe("estadoPagoDesdeMp", () => {
+  it.each([
+    ["approved", "APROBADO"],
+    ["rejected", "RECHAZADO"],
+    ["cancelled", "RECHAZADO"],
+    ["refunded", "REEMBOLSADO"],
+    ["charged_back", "REEMBOLSADO"],
+    ["pending", "PENDIENTE"],
+    ["in_process", "PENDIENTE"],
+    [undefined, "PENDIENTE"],
+  ])("%s → %s", (status, esperado) => {
+    expect(estadoPagoDesdeMp(status)).toBe(esperado);
   });
+});
 
-  it("HMAC verification produces consistent results", () => {
-    const secret = "my-secret";
-    const dataId = "PAY-001";
-    const ts = "1000000";
-
-    const crypto = require("crypto");
-    const payload = `id:${dataId};ts:${ts};`;
-
-    const sig1 = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-    const sig2 = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-
-    expect(sig1).toBe(sig2);
-
-    // Diferente payload = diferente firma
-    const sig3 = crypto
-      .createHmac("sha256", secret)
-      .update(`id:WRONG;ts:${ts};`)
-      .digest("hex");
-    expect(sig1).not.toBe(sig3);
-  });
-
-  it("verifyWebhookRequest rechaza header nulo", () => {
-    const result = verifyWebhookRequest("PAY123", null);
-    expect(result).toBe(false);
-  });
-
-  it("verifyWebhookRequest rechaza header mal formado", () => {
-    const result = verifyWebhookRequest("PAY123", "garbage");
-    expect(result).toBe(false);
-  });
-
-  it("isMercadoPagoConfigured funciona", async () => {
-    const { isMercadoPagoConfigured } = await import("@/lib/mercadopago");
-    const result = isMercadoPagoConfigured();
-    expect(typeof result).toBe("boolean");
+describe("isMercadoPagoConfigured", () => {
+  it("retorna un boolean", () => {
+    expect(typeof isMercadoPagoConfigured()).toBe("boolean");
   });
 });

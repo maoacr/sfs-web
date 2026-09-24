@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { db, canchas, complejos, imagenesCanchas, slotConfigs, tarifas } from "@sfs/db";
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { db, canchas } from "@sfs/db";
+import { eq, and } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { updateCanchaSchema } from "@/lib/schemas";
+import { tipoCanchaToDb, toApiCancha, toApiComplejo } from "@/lib/db-mappers";
 
 /**
  * GET /api/canchas/[id]
@@ -40,7 +42,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(cancha);
+    return NextResponse.json({ ...toApiCancha(cancha), complejo: toApiComplejo(cancha.complejo) });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
@@ -73,23 +75,19 @@ export async function PUT(
       );
     }
 
-    const body = await request.json();
-    const updateData: Partial<typeof canchas.$inferInsert> = {};
+    const parsed = updateCanchaSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Datos inválidos", details: parsed.error.issues }, { status: 400 });
+    }
 
-    if (body.nombre !== undefined) updateData.nombre = body.nombre;
-    if (body.tipo !== undefined) updateData.tipo = body.tipo;
-    if (body.capacidad !== undefined) updateData.capacidad = body.capacidad;
-    if (body.descripcion !== undefined) updateData.descripcion = body.descripcion;
-    if (body.servicios !== undefined) updateData.servicios = body.servicios;
-    if (body.duracionSlotMinutos !== undefined) updateData.duracionSlotMinutos = body.duracionSlotMinutos;
-
+    const { tipo, ...resto } = parsed.data;
     const [cancha] = await db
       .update(canchas)
-      .set(updateData)
+      .set({ ...resto, ...(tipo ? { tipo: tipoCanchaToDb(tipo) } : {}) })
       .where(eq(canchas.id, id))
       .returning();
 
-    return NextResponse.json(cancha);
+    return NextResponse.json(toApiCancha(cancha));
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

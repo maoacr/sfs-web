@@ -7,7 +7,6 @@ import {
   setRateLimitHeaders,
   RATE_LIMITS,
 } from "@/lib/rate-limit";
-import { setTenantContext } from "@/lib/tenant-middleware";
 import { validateCsrf } from "@/lib/csrf";
 import type { RateLimitConfig } from "@/lib/rate-limit";
 
@@ -51,9 +50,10 @@ export interface ApiHandlerOptions<TBody = unknown, TQuery = Record<string, stri
  * 2. CSRF validation (unsafe methods)
  * 3. Auth (si requireAuth)
  * 4. Input validation (body + query schemas)
- * 5. Tenant context
- * 6. Handler execution
- * 7. Error handling
+ * 5. Handler execution
+ * 6. Error handling
+ *
+ * Tenant isolation is explicit: each query filters by tenantId/ownership.
  */
 export function apiHandler<TBody = unknown, TQuery = Record<string, string>>(
   handler: (
@@ -151,11 +151,7 @@ export function apiHandler<TBody = unknown, TQuery = Record<string, string>>(
       throw error;
     }
 
-    // ─── 5. Tenant Context ────────────────────────────────────────────────
-
-    setTenantContext(user?.sub ?? null);
-
-    // ─── 6. Execute Handler ───────────────────────────────────────────────
+    // ─── 5. Execute Handler ───────────────────────────────────────────────
 
     try {
       const response = await handler(request, { user }, { body, query });

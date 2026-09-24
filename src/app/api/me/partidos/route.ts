@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, partidos } from "@sfs/db";
+import { desc } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
+import { toApiCancha } from "@/lib/db-mappers";
+import { partidosDelUsuario } from "@/lib/partidos";
 
 /**
  * GET /api/me/partidos
@@ -12,54 +15,51 @@ export const GET = apiHandler(
   async (_request, ctx, _validated) => {
     const user = ctx.user!;
 
-    const partidos = await prisma.partido.findMany({
-      where: {
-        OR: [
-          { creadorId: user.sub },
-          { jugadores: { some: { userId: user.sub } } },
-        ],
-      },
-      include: {
+    const lista = await db.query.partidos.findMany({
+      where: partidosDelUsuario(user.sub),
+      with: {
         reserva: {
-          select: {
+          columns: {
             id: true,
             slotInicio: true,
-            slotFin: true,
             montoTotal: true,
             montoPagado: true,
             saldoPendiente: true,
             estado: true,
+          },
+          with: {
             cancha: {
-              select: {
-                nombre: true,
-                tipo: true,
-                complejo: { select: { nombre: true } },
-              },
+              columns: { nombre: true, tipo: true },
+              with: { complejo: { columns: { nombre: true } } },
             },
           },
         },
-        equipoA: { select: { id: true, nombre: true } },
-        equipoB: { select: { id: true, nombre: true } },
-        _count: { select: { jugadores: true } },
+        equipoA: { columns: { id: true, nombre: true } },
+        equipoB: { columns: { id: true, nombre: true } },
+        jugadores: { columns: { id: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [desc(partidos.createdAt)],
     });
 
     return NextResponse.json(
-      partidos.map((p) => ({
-        id: p.id,
-        cancha: p.reserva.cancha,
-        fecha: p.reserva.slotInicio,
-        equipoA: p.equipoA,
-        equipoB: p.equipoB,
-        estado: p.reserva.estado,
-        total: Number(p.reserva.montoTotal),
-        pagado: Number(p.reserva.montoPagado),
-        pendiente: Number(p.reserva.saldoPendiente),
-        progreso: Math.round((Number(p.reserva.montoPagado) / Number(p.reserva.montoTotal)) * 100),
-        jugadores: p._count.jugadores,
-        soyCreador: p.creadorId === user.sub,
-      }))
+      lista.map((p) => {
+        const total = Number(p.reserva.montoTotal);
+        const pagado = Number(p.reserva.montoPagado);
+        return {
+          id: p.id,
+          cancha: toApiCancha(p.reserva.cancha),
+          fecha: p.reserva.slotInicio,
+          equipoA: p.equipoA,
+          equipoB: p.equipoB,
+          estado: p.reserva.estado,
+          total,
+          pagado,
+          pendiente: Number(p.reserva.saldoPendiente),
+          progreso: total > 0 ? Math.round((pagado / total) * 100) : 0,
+          jugadores: p.jugadores.length,
+          soyCreador: p.creadorId === user.sub,
+        };
+      })
     );
   },
   { requireAuth: true }

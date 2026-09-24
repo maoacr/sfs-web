@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, canchas, tarifas } from "@sfs/db";
+import { and, eq } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
+
+async function esCanchaDelDueno(canchaId: string, userId: string) {
+  const cancha = await db.query.canchas.findFirst({
+    where: and(eq(canchas.id, canchaId), eq(canchas.tenantId, userId)),
+    columns: { id: true },
+  });
+  return !!cancha;
+}
 
 /**
  * PUT /api/canchas/[id]/tarifas/[tarifaId]
@@ -13,28 +22,31 @@ export async function PUT(
     const user = await getAuthUser(request);
     const { id, tarifaId } = await params;
 
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
-    });
-    if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+    if (!(await esCanchaDelDueno(id, user.sub))) {
+      return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+    }
 
     const body = await request.json();
-    const data: Record<string, unknown> = {};
+    const data: Partial<typeof tarifas.$inferInsert> = {};
 
-    if (body.precioBase !== undefined) data.precioBase = body.precioBase;
-    if (body.factor !== undefined) data.factor = body.factor;
+    if (body.precioBase !== undefined) data.precioBase = String(body.precioBase);
+    if (body.factor !== undefined) data.factor = String(body.factor);
     if (body.diaSemana !== undefined) data.diaSemana = body.diaSemana;
-    if (body.horaInicio) data.horaInicio = new Date(`1970-01-01T${body.horaInicio}.000Z`);
-    if (body.horaFin) data.horaFin = new Date(`1970-01-01T${body.horaFin}.000Z`);
+    if (body.horaInicio) data.horaInicio = body.horaInicio;
+    if (body.horaFin) data.horaFin = body.horaFin;
 
-    const tarifa = await prisma.tarifa.update({
-      where: { id: tarifaId, canchaId: id },
-      data,
-    });
+    const [tarifa] = await db
+      .update(tarifas)
+      .set(data)
+      .where(and(eq(tarifas.id, tarifaId), eq(tarifas.canchaId, id)))
+      .returning();
+
+    if (!tarifa) return NextResponse.json({ error: "Tarifa no encontrada" }, { status: 404 });
 
     return NextResponse.json(tarifa);
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    console.error("PUT /api/canchas/[id]/tarifas/[tarifaId] error:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
@@ -50,16 +62,16 @@ export async function DELETE(
     const user = await getAuthUser(request);
     const { id, tarifaId } = await params;
 
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
-    });
-    if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+    if (!(await esCanchaDelDueno(id, user.sub))) {
+      return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+    }
 
-    await prisma.tarifa.delete({ where: { id: tarifaId, canchaId: id } });
+    await db.delete(tarifas).where(and(eq(tarifas.id, tarifaId), eq(tarifas.canchaId, id)));
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    console.error("DELETE /api/canchas/[id]/tarifas/[tarifaId] error:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

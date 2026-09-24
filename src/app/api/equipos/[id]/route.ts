@@ -1,35 +1,48 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, equipos } from "@sfs/db";
+import { eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { updateEquipoSchema } from "@/lib/schemas";
+import { toApiUsuario, USUARIO_PUBLICO } from "@/lib/db-mappers";
+
+function equipoIdDesde(url: string) {
+  return url.split("/equipos/")[1]?.split(/[/?]/)[0];
+}
+
+async function puedeEditar(equipoId: string, userId: string) {
+  const equipo = await db.query.equipos.findFirst({
+    where: eq(equipos.id, equipoId),
+    with: { miembros: { columns: { userId: true, rol: true } } },
+  });
+  if (!equipo) return null;
+  const miembro = equipo.miembros.find((m) => m.userId === userId);
+  return { equipo, esCapitan: equipo.creadorId === userId || miembro?.rol === "CAPITAN" };
+}
 
 /**
  * GET /api/equipos/:id
  */
 export const GET = apiHandler(
   async (request, _ctx, _validated) => {
-    const id = request.url.split("/equipos/")[1]?.split("?")[0];
+    const id = equipoIdDesde(request.url);
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const equipo = await prisma.equipo.findUnique({
-      where: { id },
-      include: {
-        miembros: {
-          include: {
-            user: { select: { id: true, primerNombre: true, apellidos: true, apodo: true } },
-          },
-        },
-        _count: { select: { miembros: true } },
-      },
+    const equipo = await db.query.equipos.findFirst({
+      where: eq(equipos.id, id),
+      with: { miembros: { with: { user: { columns: USUARIO_PUBLICO } } } },
     });
 
     if (!equipo) {
       return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json(equipo);
+    return NextResponse.json({
+      ...equipo,
+      miembros: equipo.miembros.map((m) => ({ ...m, user: toApiUsuario(m.user) })),
+      _count: { miembros: equipo.miembros.length },
+    });
   },
   { requireAuth: true }
 );
@@ -41,33 +54,20 @@ export const GET = apiHandler(
  */
 export const PATCH = apiHandler(
   async (request, ctx, { body }) => {
-    const user = ctx.user!;
-    const id = request.url.split("/equipos/")[1]?.split("?")[0];
+    const id = equipoIdDesde(request.url);
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const equipo = await prisma.equipo.findUnique({
-      where: { id },
-      include: { miembros: { where: { userId: user.sub } } },
-    });
-
-    if (!equipo) {
+    const acceso = await puedeEditar(id, ctx.user!.sub);
+    if (!acceso) {
       return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
     }
-
-    const miembro = equipo.miembros[0];
-    if (equipo.creadorId !== user.sub && miembro?.rol !== "CAPITAN") {
-      return NextResponse.json(
-        { error: "Solo el capitán puede editar el equipo" },
-        { status: 403 }
-      );
+    if (!acceso.esCapitan) {
+      return NextResponse.json({ error: "Solo el capitán puede editar el equipo" }, { status: 403 });
     }
 
-    const updated = await prisma.equipo.update({
-      where: { id },
-      data: body as any,
-    });
+    const [updated] = await db.update(equipos).set(body ?? {}).where(eq(equipos.id, id)).returning();
 
     return NextResponse.json(updated);
   },
@@ -84,26 +84,24 @@ export const PATCH = apiHandler(
  */
 export const DELETE = apiHandler(
   async (request, ctx, _validated) => {
-    const user = ctx.user!;
-    const id = request.url.split("/equipos/")[1]?.split("?")[0];
+    const id = equipoIdDesde(request.url);
     if (!id) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const equipo = await prisma.equipo.findUnique({ where: { id } });
+    const equipo = await db.query.equipos.findFirst({
+      where: eq(equipos.id, id),
+      columns: { creadorId: true },
+    });
 
     if (!equipo) {
       return NextResponse.json({ error: "Equipo no encontrado" }, { status: 404 });
     }
-
-    if (equipo.creadorId !== user.sub) {
-      return NextResponse.json(
-        { error: "Solo el creador puede eliminar el equipo" },
-        { status: 403 }
-      );
+    if (equipo.creadorId !== ctx.user!.sub) {
+      return NextResponse.json({ error: "Solo el creador puede eliminar el equipo" }, { status: 403 });
     }
 
-    await prisma.equipo.delete({ where: { id } });
+    await db.delete(equipos).where(eq(equipos.id, id));
 
     return NextResponse.json({ ok: true });
   },

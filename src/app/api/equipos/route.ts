@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, equipos, equipoMiembros } from "@sfs/db";
+import { desc, eq, inArray, or } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
-import {
-  crearEquipoSchema,
-  updateEquipoSchema,
-  type CrearEquipoInput,
-} from "@/lib/schemas";
+import { crearEquipoSchema, type CrearEquipoInput } from "@/lib/schemas";
 
 /**
  * GET /api/equipos
@@ -16,28 +13,28 @@ export const GET = apiHandler(
   async (_request, ctx, _validated) => {
     const user = ctx.user!;
 
-    const equipos = await prisma.equipo.findMany({
-      where: {
-        OR: [
-          { creadorId: user.sub },
-          { miembros: { some: { userId: user.sub } } },
-        ],
-      },
-      include: {
-        _count: { select: { miembros: true } },
-        miembros: {
-          where: { userId: user.sub },
-          select: { rol: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
+    const lista = await db.query.equipos.findMany({
+      where: or(
+        eq(equipos.creadorId, user.sub),
+        inArray(
+          equipos.id,
+          db
+            .select({ id: equipoMiembros.equipoId })
+            .from(equipoMiembros)
+            .where(eq(equipoMiembros.userId, user.sub))
+        )
+      ),
+      with: { miembros: { columns: { userId: true, rol: true } } },
+      orderBy: [desc(equipos.createdAt)],
     });
 
     return NextResponse.json(
-      equipos.map((e) => ({
+      lista.map(({ miembros, ...e }) => ({
         ...e,
-        miRol: e.miembros[0]?.rol || (e.creadorId === user.sub ? "CAPITAN" : null),
-        miembros: undefined,
+        _count: { miembros: miembros.length },
+        miRol:
+          miembros.find((m) => m.userId === user.sub)?.rol ||
+          (e.creadorId === user.sub ? "CAPITAN" : null),
       }))
     );
   },
@@ -57,22 +54,21 @@ export const POST = apiHandler<CrearEquipoInput>(
 
     const user = ctx.user!;
 
-    const equipo = await prisma.equipo.create({
-      data: {
-        nombre: body.nombre,
-        fotoUrl: body.fotoUrl || null,
-        descripcion: body.descripcion || null,
-        creadorId: user.sub,
-        miembros: {
-          create: { userId: user.sub, rol: "CAPITAN" },
-        },
-      },
-      include: {
-        _count: { select: { miembros: true } },
-      },
+    const equipo = await db.transaction(async (tx) => {
+      const [creado] = await tx
+        .insert(equipos)
+        .values({
+          nombre: body.nombre,
+          fotoUrl: body.fotoUrl || null,
+          descripcion: body.descripcion || null,
+          creadorId: user.sub,
+        })
+        .returning();
+      await tx.insert(equipoMiembros).values({ equipoId: creado.id, userId: user.sub, rol: "CAPITAN" });
+      return creado;
     });
 
-    return NextResponse.json(equipo, { status: 201 });
+    return NextResponse.json({ ...equipo, _count: { miembros: 1 } }, { status: 201 });
   },
   {
     requireAuth: true,

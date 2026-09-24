@@ -14,6 +14,7 @@ interface JugadorInfo {
 
 interface PartidoDetail {
   id: string;
+  reservaId: string;
   cancha: { nombre: string; tipo: string; complejo: { nombre: string; ciudad: string } };
   fecha: string;
   duracion: string;
@@ -49,7 +50,7 @@ export default function PartidoDetailPage() {
     if (!partido || partido.pendiente <= 0) return;
     setPagando(true);
 
-    const res = await fetch(`/api/reservas/${partido.id.split("-")[0]}/pagar-saldo`, {
+    const res = await fetch(`/api/reservas/${partido.reservaId}/pagar-saldo`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ monto: partido.pendiente }),

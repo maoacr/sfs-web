@@ -9,6 +9,9 @@ const PUBLIC_PATHS = [
   "/api/auth/register",
   "/api/auth/logout",
   "/api/auth/refresh",
+  // Called by MercadoPago and Vercel Cron without cookies; they verify their own signature/secret.
+  "/api/webhooks/",
+  "/api/cron/",
   "/manifest.json",
   "/sw.js",
 ];

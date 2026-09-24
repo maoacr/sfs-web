@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { db, complejos, canchas, imagenesComplejos } from "@sfs/db";
-import { eq, and, isNull, asc } from "drizzle-orm";
+import { db, complejos, canchas } from "@sfs/db";
+import { eq, and, isNull } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 import { formatAddress } from "@/lib/address";
+import { toApiCancha, toApiComplejo } from "@/lib/db-mappers";
 
 /**
  * GET /api/complejos/[id]
@@ -32,9 +33,8 @@ export async function GET(
     }
 
     return NextResponse.json({
-      ...complejo,
-      lat: complejo.latitud ? Number(complejo.latitud) : null,
-      lng: complejo.longitud ? Number(complejo.longitud) : null,
+      ...toApiComplejo(complejo),
+      canchas: complejo.canchas.map(toApiCancha),
     });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
@@ -66,13 +66,15 @@ export async function PUT(
     const updateData: Partial<typeof complejos.$inferInsert> = {};
 
     if (body.nombre !== undefined) updateData.nombre = body.nombre;
-    if (body.direccion !== undefined) {
-      updateData.direccion = body.direccion;
-    } else if (body.tipoVia || body.numeroVia) {
-      updateData.direccion = formatAddress(body);
+    if (body.tipoVia !== undefined) updateData.tipoVia = body.tipoVia;
+    if (body.numeroVia !== undefined) updateData.numeroVia = body.numeroVia;
+    if (body.numeroSec !== undefined) updateData.numeroSec = body.numeroSec;
+    if (body.complemento !== undefined) updateData.complemento = body.complemento;
+    if (body.ciudad !== undefined) updateData.ciudad = body.ciudad ?? "";
+    if (body.departamento !== undefined) updateData.departamento = body.departamento ?? "";
+    if (body.tipoVia !== undefined || body.numeroVia !== undefined) {
+      updateData.direccion = formatAddress({ ...existente, ...updateData });
     }
-    if (body.ciudad !== undefined) updateData.ciudad = body.ciudad;
-    if (body.departamento !== undefined) updateData.departamento = body.departamento;
     if (body.descripcion !== undefined) updateData.descripcion = body.descripcion;
     if (body.telefono !== undefined) updateData.telefono = body.telefono;
     if (body.email !== undefined) updateData.email = body.email;
@@ -89,7 +91,7 @@ export async function PUT(
       .where(eq(complejos.id, id))
       .returning();
 
-    return NextResponse.json(updated);
+    return NextResponse.json(toApiComplejo(updated));
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("PUT /api/complejos/[id] error:", error);

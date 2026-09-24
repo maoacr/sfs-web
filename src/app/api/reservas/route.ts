@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, reservas, canchas, tarifas, estadoReservaEnum, type Reserva } from "@sfs/db";
+import { and, eq, gt, gte, inArray, isNull, lt, lte, sum, asc, type SQL } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { createReservaSchema, type CreateReservaInput } from "@/lib/schemas";
-import { notificarCambioReserva } from "@/lib/event-listeners";
+import { notificarReserva } from "@/lib/event-listeners";
 import { liberarReservasExpiradas } from "@/lib/ttl";
 import { calcularPrecio, usarPromocion } from "@/lib/pricing";
 import { RATE_LIMITS } from "@/lib/rate-limit";
+import { toApiCancha, toApiUsuario } from "@/lib/db-mappers";
+
+const ESTADOS_ACTIVOS: Reserva["estado"][] = ["PENDIENTE_PAGO", "PAGO_PARCIAL", "CONFIRMADA"];
 
 /**
  * POST /api/reservas
@@ -18,18 +22,17 @@ export const POST = apiHandler<CreateReservaInput>(
 
     const user = ctx.user!;
     const { canchaId, slotInicio, slotFin, playerId } = body;
+    const inicio = new Date(slotInicio);
+    const fin = new Date(slotFin);
 
     // ─── 1. Bloqueo por saldo pendiente ──────────────────────────────────
 
-    const saldoPendiente = await prisma.reserva.aggregate({
-      where: {
-        playerId: user.sub,
-        estado: "PAGO_PARCIAL",
-      },
-      _sum: { saldoPendiente: true },
-    });
+    const [{ saldo }] = await db
+      .select({ saldo: sum(reservas.saldoPendiente) })
+      .from(reservas)
+      .where(and(eq(reservas.playerId, user.sub), eq(reservas.estado, "PAGO_PARCIAL")));
 
-    const totalSaldo = Number(saldoPendiente._sum.saldoPendiente || 0);
+    const totalSaldo = Number(saldo ?? 0);
     if (totalSaldo > 0) {
       return NextResponse.json(
         {
@@ -44,32 +47,31 @@ export const POST = apiHandler<CreateReservaInput>(
 
     liberarReservasExpiradas().catch(() => {});
 
-    const cancha = await prisma.cancha.findFirst({
-      where: { id: canchaId, deletedAt: null },
-      include: { complejo: true },
+    const cancha = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, canchaId), isNull(canchas.deletedAt)),
+      columns: { id: true, tenantId: true },
     });
 
     if (!cancha) {
       return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
-    // ─── 3. Verificar solapamiento ────────────────────────────────────────
-
-    let finalPlayerId = user.sub;
-    let finalTenantId = cancha.tenantId;
-
-    if (user.role === "OWNER") {
-      finalPlayerId = playerId || user.sub;
-      finalTenantId = user.sub;
+    const esOwner = user.role === "OWNER";
+    if (esOwner && cancha.tenantId !== user.sub) {
+      return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
-    const conflicto = await prisma.reserva.findFirst({
-      where: {
-        canchaId,
-        estado: { in: ["PENDIENTE_PAGO", "PAGO_PARCIAL", "CONFIRMADA"] },
-        slotInicio: { lt: new Date(slotFin) },
-        slotFin: { gt: new Date(slotInicio) },
-      },
+    const finalPlayerId = esOwner ? playerId || user.sub : user.sub;
+
+    // ─── 3. Verificar solapamiento ────────────────────────────────────────
+
+    const conflicto = await db.query.reservas.findFirst({
+      where: and(
+        eq(reservas.canchaId, canchaId),
+        inArray(reservas.estado, ESTADOS_ACTIVOS),
+        lt(reservas.slotInicio, fin),
+        gt(reservas.slotFin, inicio)
+      ),
     });
 
     if (conflicto) {
@@ -77,74 +79,48 @@ export const POST = apiHandler<CreateReservaInput>(
       if (conflicto.playerId === finalPlayerId && conflicto.estado !== "CONFIRMADA") {
         return NextResponse.json(conflicto, { status: 200 });
       }
-      return NextResponse.json(
-        { error: "El slot ya está reservado" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "El slot ya está reservado" }, { status: 409 });
     }
 
     // ─── 4. Calcular precio con el motor ─────────────────────────────────
 
-    const fecha = new Date(slotInicio).toISOString().slice(0, 10);
-    const hora = new Date(slotInicio).toISOString().slice(11, 16);
-
-    const precio = await calcularPrecio(canchaId, fecha, hora);
+    const precio = await calcularPrecio(
+      canchaId,
+      inicio.toISOString().slice(0, 10),
+      inicio.toISOString().slice(11, 16)
+    );
 
     let montoTotal = 0;
     if (precio.success) {
       montoTotal = precio.data.precioFinal;
-      // Usar promoción si se aplicó
       if (precio.data.promocionAplicada) {
         await usarPromocion(precio.data.promocionAplicada);
       }
     } else {
-      // Fallback: usar tarifa genérica
-      const tarifa = await prisma.tarifa.findFirst({
-        where: { canchaId, diaSemana: null },
+      const tarifa = await db.query.tarifas.findFirst({
+        where: and(eq(tarifas.canchaId, canchaId), isNull(tarifas.diaSemana)),
       });
-      montoTotal = tarifa
-        ? Number(tarifa.precioBase) * Number(tarifa.factor)
-        : 0;
+      montoTotal = tarifa ? Number(tarifa.precioBase) * Number(tarifa.factor) : 0;
     }
 
     // ─── 5. Crear reserva ─────────────────────────────────────────────────
 
-    const reserva = await prisma.reserva.create({
-      data: {
-        tenantId: finalTenantId,
+    const [reserva] = await db
+      .insert(reservas)
+      .values({
+        tenantId: cancha.tenantId,
         canchaId,
         playerId: finalPlayerId,
-        slotInicio: new Date(slotInicio),
-        slotFin: new Date(slotFin),
-        montoTotal,
-        montoPagado: user.role === "OWNER" ? montoTotal : 0,
-        saldoPendiente: user.role === "OWNER" ? 0 : montoTotal,
-        estado: user.role === "OWNER" ? "CONFIRMADA" : "PENDIENTE_PAGO",
-      },
-      include: {
-        cancha: { include: { complejo: true } },
-        player: {
-          select: { id: true, primerNombre: true, apellidos: true, email: true },
-        },
-        tenant: { select: { id: true, email: true } },
-      },
-    });
+        slotInicio: inicio,
+        slotFin: fin,
+        montoTotal: montoTotal.toFixed(2),
+        montoPagado: esOwner ? montoTotal.toFixed(2) : "0.00",
+        saldoPendiente: esOwner ? "0.00" : montoTotal.toFixed(2),
+        estado: esOwner ? "CONFIRMADA" : "PENDIENTE_PAGO",
+      })
+      .returning();
 
-    const eventTipo =
-      user.role === "OWNER" ? "RESERVA_CONFIRMADA" : "RESERVA_CREADA";
-    notificarCambioReserva({
-      tipo: eventTipo as any,
-      reservaId: reserva.id,
-      canchaNombre: reserva.cancha.nombre,
-      complejoNombre: reserva.cancha.complejo.nombre,
-      slotInicio: reserva.slotInicio,
-      slotFin: reserva.slotFin,
-      playerId: reserva.playerId,
-      playerNombre: `${reserva.player.primerNombre} ${reserva.player.apellidos || ""}`.trim(),
-      playerEmail: reserva.player.email,
-      tenantId: reserva.tenantId,
-      tenantEmail: reserva.tenant.email,
-    });
+    await notificarReserva(reserva.id, esOwner ? "RESERVA_CONFIRMADA" : "RESERVA_CREADA");
 
     return NextResponse.json(reserva, { status: 201 });
   },
@@ -166,47 +142,40 @@ export const GET = apiHandler(
     const fecha = searchParams.get("fecha");
     const estado = searchParams.get("estado");
 
-    const where: Record<string, unknown> = {};
-
-    if (user.role === "OWNER") {
-      where.tenantId = user.sub;
-    } else {
-      where.playerId = user.sub;
-    }
+    const condiciones: SQL[] = [
+      user.role === "OWNER" ? eq(reservas.tenantId, user.sub) : eq(reservas.playerId, user.sub),
+    ];
 
     if (fecha) {
-      const inicio = new Date(fecha + "T00:00:00.000Z");
-      const fin = new Date(fecha + "T23:59:59.999Z");
-      where.slotInicio = { gte: inicio, lte: fin };
+      condiciones.push(
+        gte(reservas.slotInicio, new Date(fecha + "T00:00:00.000Z")),
+        lte(reservas.slotInicio, new Date(fecha + "T23:59:59.999Z"))
+      );
     }
 
     if (estado) {
-      where.estado = estado;
+      const estadoValido = estadoReservaEnum.enumValues.find((e) => e === estado);
+      if (!estadoValido) {
+        return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
+      }
+      condiciones.push(eq(reservas.estado, estadoValido));
     }
 
-    const reservas = await prisma.reserva.findMany({
-      where,
-      include: {
+    const lista = await db.query.reservas.findMany({
+      where: and(...condiciones),
+      with: {
         cancha: {
-          select: {
-            nombre: true,
-            tipo: true,
-            complejo: { select: { nombre: true } },
-          },
+          columns: { nombre: true, tipo: true },
+          with: { complejo: { columns: { nombre: true } } },
         },
-        player: {
-          select: {
-            primerNombre: true,
-            apellidos: true,
-            apodo: true,
-            telefono: true,
-          },
-        },
+        player: { columns: { nombre: true, apellido: true, apodo: true, telefono: true } },
       },
-      orderBy: { slotInicio: "asc" },
+      orderBy: [asc(reservas.slotInicio)],
     });
 
-    return NextResponse.json(reservas);
+    return NextResponse.json(
+      lista.map((r) => ({ ...r, cancha: toApiCancha(r.cancha), player: toApiUsuario(r.player) }))
+    );
   },
   { requireAuth: true }
 );

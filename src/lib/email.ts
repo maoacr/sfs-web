@@ -91,7 +91,7 @@ const templates: Record<
 
   // ─── Fase 1: Nuevos templates ──────────────────────────────────────
 
-  RESERVA_PAGO_PARCIAL: (e) => ({
+  PAGO_PARCIAL_RECIBIDO: (e) => ({
     subject: `💳 Pago parcial — ${e.canchaNombre} ${fD(e.slotInicio)}`,
     html: `
       <h2>¡Pago parcial recibido!</h2>
@@ -148,7 +148,7 @@ const ownerTemplates: Record<
     `,
   }),
 
-  RESERVA_PAGO_PARCIAL: (e) => ({
+  PAGO_PARCIAL_RECIBIDO: (e) => ({
     subject: `💳 Pago parcial recibido — ${e.canchaNombre} ${fD(e.slotInicio)}`,
     html: `
       <h2>Pago parcial recibido</h2>

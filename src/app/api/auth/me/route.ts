@@ -20,6 +20,7 @@ export const GET = apiHandler(
         apellido: true,
         apodo: true,
         telefono: true,
+        codigoPais: true,
         rol: true,
         instagram: true,
         tiktok: true,
@@ -42,6 +43,7 @@ export const GET = apiHandler(
         apellidos: user.apellido,
         apodo: user.apodo,
         telefono: user.telefono,
+        codigoPais: user.codigoPais,
         role: user.rol,
         instagram: user.instagram,
         tiktok: user.tiktok,
@@ -84,6 +86,11 @@ export const PATCH = apiHandler(
     if (body?.apellidos) updateData.apellido = body.apellidos;
     if (body?.apodo !== undefined) updateData.apodo = body.apodo;
     if (body?.telefono !== undefined) updateData.telefono = body.telefono;
+    if (body?.codigoPais !== undefined) updateData.codigoPais = body.codigoPais;
+    if (body?.instagram !== undefined) updateData.instagram = body.instagram;
+    if (body?.tiktok !== undefined) updateData.tiktok = body.tiktok;
+    if (body?.twitter !== undefined) updateData.twitter = body.twitter;
+    if (body?.facebook !== undefined) updateData.facebook = body.facebook;
 
     const [updated] = await db
       .update(usuarios)

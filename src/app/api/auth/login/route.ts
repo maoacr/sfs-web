@@ -37,6 +37,13 @@ export const POST = apiHandler<LoginInput>(
       );
     }
 
+    if (user.rol === "ADMIN") {
+      return NextResponse.json(
+        { error: "Este tipo de cuenta no tiene acceso a la app" },
+        { status: 403 }
+      );
+    }
+
     const tokenPayload = {
       sub: user.id,
       email: user.email,

@@ -1,9 +1,20 @@
+import { db, reservas } from "@sfs/db";
+import { eq } from "drizzle-orm";
 import { crearNotificacion } from "./notifications";
 import { notificarPorEmail } from "./email";
+import { nombreCompleto } from "./db-mappers";
+
+export type EventoReserva =
+  | "RESERVA_CREADA"
+  | "RESERVA_CONFIRMADA"
+  | "RESERVA_CANCELADA"
+  | "RESERVA_COMPLETADA"
+  | "RESERVA_EXPIRADA"
+  | "PAGO_PARCIAL_RECIBIDO";
 
 // ─── Mensajes ──────────────────────────────────────────────────────────────
 
-const mensajes: Record<string, { player: { titulo: string; mensaje: string }; owner: { titulo: string; mensaje: string } }> = {
+const mensajes: Record<EventoReserva, { player: { titulo: string; mensaje: string }; owner: { titulo: string; mensaje: string } }> = {
   RESERVA_CREADA: {
     player: { titulo: "Reserva pendiente de pago", mensaje: "Tu reserva está pendiente. Completá el pago en los próximos 15 minutos." },
     owner:  { titulo: "", mensaje: "" }, // Owner solo se notifica cuando el pago se confirma
@@ -24,7 +35,7 @@ const mensajes: Record<string, { player: { titulo: string; mensaje: string }; ow
     player: { titulo: "Reserva expirada", mensaje: "Tu reserva expiró porque no se completó el pago a tiempo." },
     owner:  { titulo: "Reserva expirada", mensaje: "no completó el pago. El slot fue liberado." },
   },
-  RESERVA_PAGO_PARCIAL: {
+  PAGO_PARCIAL_RECIBIDO: {
     player: { titulo: "Pago parcial recibido", mensaje: "Tu pago parcial fue recibido. Completá el saldo pendiente para confirmar." },
     owner:  { titulo: "Pago parcial recibido", mensaje: "pagó parcialmente su reserva. Queda saldo pendiente." },
   },
@@ -32,8 +43,34 @@ const mensajes: Record<string, { player: { titulo: string; mensaje: string }; ow
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
+export async function notificarReserva(reservaId: string, tipo: EventoReserva) {
+  const r = await db.query.reservas.findFirst({
+    where: eq(reservas.id, reservaId),
+    with: {
+      cancha: { columns: { nombre: true }, with: { complejo: { columns: { nombre: true } } } },
+      player: { columns: { nombre: true, apellido: true, email: true } },
+      tenant: { columns: { email: true } },
+    },
+  });
+  if (!r) return;
+
+  await notificarCambioReserva({
+    tipo,
+    reservaId: r.id,
+    canchaNombre: r.cancha.nombre,
+    complejoNombre: r.cancha.complejo.nombre,
+    slotInicio: r.slotInicio,
+    slotFin: r.slotFin,
+    playerId: r.playerId,
+    playerNombre: nombreCompleto(r.player),
+    playerEmail: r.player.email,
+    tenantId: r.tenantId,
+    tenantEmail: r.tenant.email,
+  });
+}
+
 export async function notificarCambioReserva(event: {
-  tipo: string;
+  tipo: EventoReserva;
   reservaId: string;
   canchaNombre: string;
   complejoNombre: string;
@@ -46,7 +83,6 @@ export async function notificarCambioReserva(event: {
   tenantEmail: string;
 }) {
   const msgs = mensajes[event.tipo];
-  if (!msgs) return;
 
   // In-app: jugador
   await crearNotificacion({
@@ -69,5 +105,5 @@ export async function notificarCambioReserva(event: {
   }
 
   // Email
-  await notificarPorEmail(event as any);
+  await notificarPorEmail(event);
 }

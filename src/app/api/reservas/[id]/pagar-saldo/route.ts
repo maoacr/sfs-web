@@ -1,25 +1,23 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, reservas } from "@sfs/db";
+import { eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { pagarSaldoSchema, type PagarSaldoInput } from "@/lib/schemas";
-import { createSplit, createCheckoutPreference, isMercadoPagoConfigured } from "@/lib/mercadopago";
+import { isMercadoPagoConfigured } from "@/lib/mercadopago";
+import { iniciarPagoMp } from "@/lib/pagos";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 
 /**
  * POST /api/reservas/:id/pagar-saldo
  *
  * Paga el saldo pendiente de una reserva en estado PAGO_PARCIAL.
- * Cualquier jugador del partido asociado puede pagar.
+ * Puede pagar el titular de la reserva o cualquier jugador del partido asociado.
  */
 export const POST = apiHandler<PagarSaldoInput>(
   async (request, ctx, { body }) => {
     if (!isMercadoPagoConfigured()) {
-      return NextResponse.json(
-        { error: "MercadoPago no está configurado" },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: "MercadoPago no está configurado" }, { status: 503 });
     }
-
     if (!body) {
       return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
@@ -32,51 +30,27 @@ export const POST = apiHandler<PagarSaldoInput>(
       return NextResponse.json({ error: "ID de reserva requerido" }, { status: 400 });
     }
 
-    // ─── 1. Buscar reserva ─────────────────────────────────────────────
-
-    const reserva = await prisma.reserva.findFirst({
-      where: { id },
-      include: {
-        cancha: { include: { complejo: true } },
-        partido: { include: { jugadores: true } },
-      },
+    const reserva = await db.query.reservas.findFirst({
+      where: eq(reservas.id, id),
+      with: { partido: { with: { jugadores: { columns: { userId: true } } } } },
     });
 
     if (!reserva) {
       return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 });
     }
 
-    // Verificar que el usuario es el player o un jugador del partido
     const esPlayer = reserva.playerId === user.sub;
-    const esJugadorPartido = reserva.partido?.jugadores.some(
-      (j) => j.userId === user.sub
-    );
+    const esJugadorPartido = reserva.partido?.jugadores.some((j) => j.userId === user.sub) ?? false;
 
     if (!esPlayer && !esJugadorPartido) {
-      return NextResponse.json(
-        { error: "No tenés permiso para pagar esta reserva" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "No tenés permiso para pagar esta reserva" }, { status: 403 });
     }
 
     if (reserva.estado !== "PAGO_PARCIAL") {
-      return NextResponse.json(
-        { error: "Esta reserva no tiene saldo pendiente" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Esta reserva no tiene saldo pendiente" }, { status: 400 });
     }
-
-    // ─── 2. Validar monto ──────────────────────────────────────────────
 
     const saldoPendiente = Number(reserva.saldoPendiente);
-
-    if (monto <= 0) {
-      return NextResponse.json(
-        { error: "El monto debe ser mayor a 0" },
-        { status: 400 }
-      );
-    }
-
     if (monto > saldoPendiente) {
       return NextResponse.json(
         { error: `El monto excede el saldo pendiente (${saldoPendiente.toLocaleString("es-CO")} COP)` },
@@ -84,47 +58,13 @@ export const POST = apiHandler<PagarSaldoInput>(
       );
     }
 
-    // ─── 3. Crear split en MP ───────────────────────────────────────────
-
-    const ownerReceiverId = reserva.cancha.tenantId;
-    let split: { splitId?: string; checkoutUrl: string };
-    let isSplit = true;
-
     try {
-      split = await createSplit(reserva.id, monto, user.email, ownerReceiverId);
-    } catch (splitError: any) {
-      console.warn("[MP] Split falló, usando preference:", splitError.message?.slice(0, 100));
-      try {
-        split = await createCheckoutPreference(reserva.id, monto, user.email);
-        isSplit = false;
-      } catch (prefError: any) {
-        console.error("[MP] Preference también falló:", prefError);
-        return NextResponse.json(
-          { error: "Error al crear el pago. Intenta de nuevo." },
-          { status: 502 }
-        );
-      }
+      const { checkoutUrl } = await iniciarPagoMp({ reservaId: reserva.id, userId: user.sub, monto });
+      return NextResponse.json({ reservaId: reserva.id, monto, pagadoPor: user.sub, checkoutUrl });
+    } catch (error) {
+      console.error("[MP] Error creando preference:", error);
+      return NextResponse.json({ error: "Error al crear el pago. Intenta de nuevo." }, { status: 502 });
     }
-
-    // ─── 4. Registrar pago pendiente ────────────────────────────────────
-
-    await prisma.pago.create({
-      data: {
-        reservaId: reserva.id,
-        userId: user.sub,
-        monto,
-        estadoPago: "PENDIENTE",
-        mpSplitId: isSplit ? split.splitId : null,
-        mpPaymentId: !isSplit ? split.splitId : null,
-      },
-    });
-
-    return NextResponse.json({
-      reservaId: reserva.id,
-      monto,
-      pagadoPor: user.sub,
-      checkoutUrl: split.checkoutUrl,
-    });
   },
   {
     requireAuth: true,

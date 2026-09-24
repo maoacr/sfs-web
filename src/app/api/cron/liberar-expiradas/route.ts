@@ -10,10 +10,10 @@ import { liberarReservasExpiradas } from "@/lib/ttl";
 export async function GET(request: Request) {
   // ─── Verificar autorización ──────────────────────────────────────────
 
+  const secret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("Authorization");
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
 
-  if (!authHeader || authHeader !== expected) {
+  if (!secret || authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

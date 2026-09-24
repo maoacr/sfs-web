@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, complejos, canchas, imagenesComplejos } from "@sfs/db";
+import { db, complejos, canchas } from "@sfs/db";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import {
@@ -7,6 +7,7 @@ import {
   type CreateComplejoInput,
 } from "@/lib/schemas";
 import { formatAddress } from "@/lib/address";
+import { toApiCancha, toApiComplejo } from "@/lib/db-mappers";
 
 /**
  * GET /api/complejos
@@ -32,7 +33,9 @@ export const GET = apiHandler(
       orderBy: [desc(complejos.createdAt)],
     });
 
-    return NextResponse.json(list);
+    return NextResponse.json(
+      list.map((c) => ({ ...toApiComplejo(c), canchas: c.canchas.map(toApiCancha) }))
+    );
   },
   { requireAuth: true, requiredRole: "OWNER" }
 );
@@ -55,6 +58,10 @@ export const POST = apiHandler<CreateComplejoInput>(
         nombre: body.nombre,
         slug: body.nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
         direccion: direccionCompleta,
+        tipoVia: body.tipoVia,
+        numeroVia: body.numeroVia,
+        numeroSec: body.numeroSec || null,
+        complemento: body.complemento || null,
         ciudad: body.ciudad || "Bogotá",
         departamento: body.departamento || "Cundinamarca",
         descripcion: body.descripcion || null,
@@ -69,7 +76,7 @@ export const POST = apiHandler<CreateComplejoInput>(
       })
       .returning();
 
-    return NextResponse.json(created, { status: 201 });
+    return NextResponse.json(toApiComplejo(created), { status: 201 });
   },
   {
     requireAuth: true,

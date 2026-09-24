@@ -24,6 +24,7 @@ export const POST = apiHandler<RegisterInput>(
       apellidos,
       apodo,
       telefono,
+      codigoPais,
       role,
       instagram,
       tiktok,
@@ -56,7 +57,8 @@ export const POST = apiHandler<RegisterInput>(
         apellido: apellidos,
         apodo: apodo || null,
         telefono: telefono || null,
-        rol: role as "OWNER" | "PLAYER" | "ADMIN",
+        codigoPais,
+        rol: role,
         instagram: instagram || null,
         tiktok: tiktok || null,
         twitter: twitter || null,
@@ -67,7 +69,7 @@ export const POST = apiHandler<RegisterInput>(
     const tokenPayload = {
       sub: user.id,
       email: user.email,
-      role: user.rol,
+      role,
     };
 
     const accessToken = await signAccessToken(tokenPayload);

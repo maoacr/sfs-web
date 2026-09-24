@@ -52,32 +52,35 @@ export const registerSchema = z.object({
 
 export const updateProfileSchema = z.object({
   primerNombre: z.string().min(1).max(50).optional(),
-  segundoNombre: z.string().max(50).optional(),
+  segundoNombre: z.string().max(50).nullish(),
   apellidos: z.string().min(1).max(100).optional(),
   apodo: z
     .string()
     .min(3)
     .max(30)
     .regex(/^[a-zA-Z0-9]+$/)
-    .optional(),
+    .nullish(),
   codigoPais: z.string().max(5).optional(),
-  telefono: z.string().max(15).optional(),
-  instagram: z.string().max(30).optional(),
-  tiktok: z.string().max(30).optional(),
-  twitter: z.string().max(30).optional(),
-  facebook: z.string().max(50).optional(),
+  telefono: z.string().max(15).nullish(),
+  instagram: z.string().max(30).nullish(),
+  tiktok: z.string().max(30).nullish(),
+  twitter: z.string().max(30).nullish(),
+  facebook: z.string().max(50).nullish(),
 });
 
 // ─── Complejos ───────────────────────────────────────────────────────────────
 
-export const createComplejoSchema = z.object({
+// Zod 4 applies .default() values inside .partial(), so update schemas are
+// derived from default-free field sets to avoid resetting omitted fields.
+
+const complejoCampos = z.object({
   nombre: z.string().min(1, "Nombre requerido").max(100),
-  tipoVia: z.string().max(20).default("Calle"),
-  numeroVia: z.string().max(10).default(""),
+  tipoVia: z.string().max(20),
+  numeroVia: z.string().max(10),
   numeroSec: z.string().max(10).optional(),
   complemento: z.string().max(100).optional(),
-  ciudad: z.string().max(100).default(""),
-  departamento: z.string().max(100).default(""),
+  ciudad: z.string().max(100),
+  departamento: z.string().max(100),
   descripcion: z.string().max(2000).optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
@@ -89,28 +92,37 @@ export const createComplejoSchema = z.object({
   facebook: z.string().max(50).optional(),
 });
 
-export const updateComplejoSchema = createComplejoSchema.partial();
+export const createComplejoSchema = complejoCampos.extend({
+  tipoVia: complejoCampos.shape.tipoVia.default("Calle"),
+  numeroVia: complejoCampos.shape.numeroVia.default(""),
+  ciudad: complejoCampos.shape.ciudad.default(""),
+  departamento: complejoCampos.shape.departamento.default(""),
+});
+
+export const updateComplejoSchema = complejoCampos.partial();
 
 // ─── Canchas ─────────────────────────────────────────────────────────────────
 
-export const createCanchaSchema = z.object({
+const canchaCampos = z.object({
   nombre: z.string().min(1, "Nombre requerido").max(100),
   tipo: z.enum(tiposCancha, { message: "Tipo de cancha inválido" }),
   capacidad: z.number().int().min(2, "Capacidad mínima: 2").max(30),
   complejoId: z.string().uuid("ID de complejo inválido"),
   descripcion: z.string().max(2000).optional(),
-  servicios: z.array(z.string()).max(20).default([]),
+  servicios: z.array(z.string()).max(20),
   duracionSlotMinutos: z
     .number()
     .int()
     .min(30, "Mínimo 30 minutos")
-    .max(240, "Máximo 240 minutos")
-    .default(60),
+    .max(240, "Máximo 240 minutos"),
 });
 
-export const updateCanchaSchema = createCanchaSchema
-  .omit({ complejoId: true })
-  .partial();
+export const createCanchaSchema = canchaCampos.extend({
+  servicios: canchaCampos.shape.servicios.default([]),
+  duracionSlotMinutos: canchaCampos.shape.duracionSlotMinutos.default(60),
+});
+
+export const updateCanchaSchema = canchaCampos.omit({ complejoId: true }).partial();
 
 // ─── Slots ───────────────────────────────────────────────────────────────────
 
@@ -124,7 +136,7 @@ export const updateSlotSchema = createSlotSchema.partial();
 
 // ─── Tarifas ─────────────────────────────────────────────────────────────────
 
-export const createTarifaSchema = z.object({
+const tarifaCampos = z.object({
   precioBase: z.number().min(0, "El precio no puede ser negativo"),
   diaSemana: z.number().int().min(0).max(6).optional(),
   horaInicio: z
@@ -135,10 +147,14 @@ export const createTarifaSchema = z.object({
     .string()
     .regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido")
     .optional(),
-  factor: z.number().min(0.01).max(10).default(1.0),
+  factor: z.number().min(0.01).max(10),
 });
 
-export const updateTarifaSchema = createTarifaSchema.partial();
+export const createTarifaSchema = tarifaCampos.extend({
+  factor: tarifaCampos.shape.factor.default(1.0),
+});
+
+export const updateTarifaSchema = tarifaCampos.partial();
 
 // ─── Reservas ────────────────────────────────────────────────────────────────
 

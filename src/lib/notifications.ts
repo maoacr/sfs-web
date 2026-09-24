@@ -1,10 +1,10 @@
-import { db, notificaciones } from "@sfs/db";
+import { db, notificaciones, type Notificacion } from "@sfs/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 // Guarda una notificación en la base de datos para el usuario
 export async function crearNotificacion(params: {
   userId: string;
-  tipo: string;
+  tipo: Notificacion["tipo"];
   titulo: string;
   mensaje: string;
   reservaId?: string;
@@ -13,7 +13,7 @@ export async function crearNotificacion(params: {
     .insert(notificaciones)
     .values({
       userId: params.userId,
-      tipo: params.tipo as any,
+      tipo: params.tipo,
       titulo: params.titulo,
       mensaje: params.mensaje,
       reservaId: params.reservaId,

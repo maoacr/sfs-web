@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, canchas, tarifas } from "@sfs/db";
+import { and, eq } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 
 /**
@@ -13,27 +14,30 @@ export async function POST(
     const user = await getAuthUser(request);
     const { id } = await params;
 
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
+    const cancha = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
+      columns: { id: true },
     });
     if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
     const body = await request.json();
 
-    const tarifa = await prisma.tarifa.create({
-      data: {
+    const [tarifa] = await db
+      .insert(tarifas)
+      .values({
         canchaId: id,
-        precioBase: body.precioBase,
+        precioBase: String(body.precioBase),
         diaSemana: body.diaSemana ?? null,
-        horaInicio: body.horaInicio ? new Date(`1970-01-01T${body.horaInicio}.000Z`) : null,
-        horaFin: body.horaFin ? new Date(`1970-01-01T${body.horaFin}.000Z`) : null,
-        factor: body.factor ?? 1.0,
-      },
-    });
+        horaInicio: body.horaInicio || null,
+        horaFin: body.horaFin || null,
+        factor: String(body.factor ?? 1),
+      })
+      .returning();
 
     return NextResponse.json(tarifa, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    console.error("POST /api/canchas/[id]/tarifas error:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

@@ -21,7 +21,3 @@ export {
   sql,
   relations,
 } from "drizzle-orm";
-
-// Compatibility alias during Drizzle transition
-import { db } from "./src/client";
-export const prisma = db as any;

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { db, canchas, complejos, slotConfigs, tarifas, reservas, imagenesCanchas } from "@sfs/db";
+import { db, canchas, slotConfigs, reservas } from "@sfs/db";
 import { eq, and, isNull, inArray, gte, lte } from "drizzle-orm";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
 import { liberarReservasExpiradas } from "@/lib/ttl";
 import { calcularSlotsDisponibles } from "@/lib/disponibilidad";
+import { tiposCancha } from "@/lib/schemas";
+import { tipoCanchaToDb, tipoCanchaToApi, toApiComplejo } from "@/lib/db-mappers";
 
 /**
  * GET /api/disponibilidad
@@ -11,22 +12,24 @@ import { calcularSlotsDisponibles } from "@/lib/disponibilidad";
  * Busca canchas disponibles para un día y rango horario.
  * Query params:
  *   - fecha: ISO date (YYYY-MM-DD) — obligatorio
- *   - tipo: FUTBOL_5|FUTBOL_6|FUTBOL_7|FUTBOL_8|FUTBOL_9|FUTBOL_11 — opcional
+ *   - tipo: F5|F6|F7|F8|F9|F11 — opcional
  */
 export async function GET(request: Request) {
   try {
-    // Validar usuario autenticado si aplica
-    await getAuthUser(request).catch(() => null);
-
     // Limpiar reservas expiradas en background antes de consultar disponibilidad
     liberarReservasExpiradas().catch(() => {});
 
     const { searchParams } = new URL(request.url);
     const fecha = searchParams.get("fecha");
-    const tipo = searchParams.get("tipo");
+    const tipoParam = searchParams.get("tipo");
 
     if (!fecha) {
       return NextResponse.json({ error: "Parámetro 'fecha' requerido" }, { status: 400 });
+    }
+
+    const tipo = tipoParam ? tiposCancha.find((t) => t === tipoParam) : undefined;
+    if (tipoParam && !tipo) {
+      return NextResponse.json({ error: "Tipo de cancha inválido" }, { status: 400 });
     }
 
     const [yearStr, monthStr, dayStr] = fecha.split("-");
@@ -46,7 +49,7 @@ export async function GET(request: Request) {
     const canchasList = await db.query.canchas.findMany({
       where: and(
         isNull(canchas.deletedAt),
-        tipo ? eq(canchas.tipo, tipo as any) : undefined
+        tipo ? eq(canchas.tipo, tipoCanchaToDb(tipo)) : undefined
       ),
       with: {
         complejo: true,
@@ -97,21 +100,25 @@ export async function GET(request: Request) {
         return {
           id: cancha.id,
           nombre: cancha.nombre,
-          tipo: cancha.tipo,
+          tipo: tipoCanchaToApi(cancha.tipo),
           capacidad: cancha.capacidad,
           descripcion: cancha.descripcion,
           servicios: cancha.servicios,
           duracionSlotMinutos: cancha.duracionSlotMinutos,
-          complejo: {
+          complejo: toApiComplejo({
             id: cancha.complejo.id,
             nombre: cancha.complejo.nombre,
             direccion: cancha.complejo.direccion,
+            tipoVia: cancha.complejo.tipoVia,
+            numeroVia: cancha.complejo.numeroVia,
+            numeroSec: cancha.complejo.numeroSec,
+            complemento: cancha.complejo.complemento,
             ciudad: cancha.complejo.ciudad,
             departamento: cancha.complejo.departamento,
             telefono: cancha.complejo.telefono,
             latitud: cancha.complejo.latitud,
             longitud: cancha.complejo.longitud,
-          },
+          }),
           precioBase,
           imagen: cancha.imagenes[0]?.url || null,
           imagenes: cancha.imagenes.map((i) => i.url),
@@ -122,7 +129,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json(resultados);
   } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error("GET /api/disponibilidad error:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, partidos, pagos } from "@sfs/db";
+import { desc, eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
+import { nombreCompleto, toApiCancha, toApiUsuario, USUARIO_PUBLICO } from "@/lib/db-mappers";
 
 /**
  * GET /api/partidos/:id
@@ -16,42 +18,36 @@ export const GET = apiHandler(
       return NextResponse.json({ error: "ID requerido" }, { status: 400 });
     }
 
-    const partido = await prisma.partido.findUnique({
-      where: { id },
-      include: {
+    const partido = await db.query.partidos.findFirst({
+      where: eq(partidos.id, id),
+      with: {
         reserva: {
-          select: {
+          columns: {
             id: true,
+            tenantId: true,
             slotInicio: true,
             slotFin: true,
             montoTotal: true,
             montoPagado: true,
             saldoPendiente: true,
             estado: true,
+          },
+          with: {
             cancha: {
-              select: {
-                nombre: true,
-                tipo: true,
-                complejo: { select: { nombre: true, ciudad: true } },
-              },
+              columns: { nombre: true, tipo: true },
+              with: { complejo: { columns: { nombre: true, ciudad: true } } },
             },
             pagos: {
-              where: { estadoPago: "APROBADO" },
-              include: {
-                user: { select: { id: true, primerNombre: true, apellidos: true, apodo: true } },
-              },
-              orderBy: { createdAt: "desc" },
+              where: eq(pagos.estadoPago, "APROBADO"),
+              columns: { userId: true, monto: true },
+              orderBy: [desc(pagos.createdAt)],
             },
           },
         },
-        equipoA: { select: { id: true, nombre: true, fotoUrl: true } },
-        equipoB: { select: { id: true, nombre: true, fotoUrl: true } },
-        jugadores: {
-          include: {
-            user: { select: { id: true, primerNombre: true, apellidos: true, apodo: true } },
-          },
-        },
-        creador: { select: { id: true, primerNombre: true, apellidos: true, apodo: true } },
+        equipoA: { columns: { id: true, nombre: true, fotoUrl: true } },
+        equipoB: { columns: { id: true, nombre: true, fotoUrl: true } },
+        jugadores: { with: { user: { columns: USUARIO_PUBLICO } } },
+        creador: { columns: USUARIO_PUBLICO },
       },
     });
 
@@ -59,62 +55,61 @@ export const GET = apiHandler(
       return NextResponse.json({ error: "Partido no encontrado" }, { status: 404 });
     }
 
-    // Verificar acceso: creador, jugador del partido, o dueño de la reserva
+    const { reserva } = partido;
     const esCreador = partido.creadorId === user.sub;
     const esJugador = partido.jugadores.some((j) => j.userId === user.sub);
-    const esDueno = partido.reserva.cancha.complejo && user.sub === partido.creadorId; // simplificado
+    const esDueno = reserva.tenantId === user.sub;
 
     if (!esCreador && !esJugador && !esDueno) {
       return NextResponse.json({ error: "No tenés acceso a este partido" }, { status: 403 });
     }
 
-    // Calcular progreso
-    const total = Number(partido.reserva.montoTotal);
-    const pagado = Number(partido.reserva.montoPagado);
-    const pendiente = Number(partido.reserva.saldoPendiente);
+    const total = Number(reserva.montoTotal);
+    const pagado = Number(reserva.montoPagado);
+    const pendiente = Number(reserva.saldoPendiente);
     const progreso = total > 0 ? Math.round((pagado / total) * 100) : 0;
 
-    // Mapa de jugadores con su contribución
     const pagosPorUsuario = new Map<string, number>();
-    for (const pago of partido.reserva.pagos) {
-      const uid = pago.userId;
-      pagosPorUsuario.set(uid, (pagosPorUsuario.get(uid) || 0) + Number(pago.monto));
+    for (const pago of reserva.pagos) {
+      pagosPorUsuario.set(pago.userId, (pagosPorUsuario.get(pago.userId) || 0) + Number(pago.monto));
     }
 
     const jugadores = partido.jugadores.map((j) => ({
       userId: j.user.id,
-      nombre: `${j.user.primerNombre} ${j.user.apellidos || ""}`.trim(),
+      nombre: nombreCompleto(j.user),
       apodo: j.user.apodo,
       montoPagado: pagosPorUsuario.get(j.user.id) || 0,
       esCreador: j.user.id === partido.creadorId,
     }));
 
-    // Agregar al creador si no está en jugadores
     if (!jugadores.find((j) => j.userId === partido.creador.id)) {
       jugadores.push({
         userId: partido.creador.id,
-        nombre: `${partido.creador.primerNombre} ${partido.creador.apellidos || ""}`.trim(),
+        nombre: nombreCompleto(partido.creador),
         apodo: partido.creador.apodo,
         montoPagado: pagosPorUsuario.get(partido.creador.id) || 0,
         esCreador: true,
       });
     }
 
+    const hora = (d: Date) => d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+
     return NextResponse.json({
       id: partido.id,
-      cancha: partido.reserva.cancha,
-      fecha: partido.reserva.slotInicio,
-      duracion: `${new Date(partido.reserva.slotInicio).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })} – ${new Date(partido.reserva.slotFin).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}`,
+      reservaId: reserva.id,
+      cancha: toApiCancha(reserva.cancha),
+      fecha: reserva.slotInicio,
+      duracion: `${hora(reserva.slotInicio)} – ${hora(reserva.slotFin)}`,
       equipoA: partido.equipoA,
       equipoB: partido.equipoB,
-      estado: partido.reserva.estado,
+      estado: reserva.estado,
       total,
       pagado,
       pendiente,
       progreso,
       jugadores,
-      creador: partido.creador,
-      puedePagar: pendiente > 0 && partido.reserva.estado === "PAGO_PARCIAL",
+      creador: toApiUsuario(partido.creador),
+      puedePagar: pendiente > 0 && reserva.estado === "PAGO_PARCIAL",
     });
   },
   { requireAuth: true }

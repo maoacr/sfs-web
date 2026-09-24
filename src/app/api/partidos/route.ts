@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import {
+  db,
+  partidos,
+  partidoJugadores,
+  reservas,
+  canchas,
+  complejos,
+} from "@sfs/db";
+import { and, desc, eq, gte, ilike, inArray, lte, or, type SQL } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { crearPartidoSchema, type CrearPartidoInput } from "@/lib/schemas";
-import { notificarCambioReserva } from "@/lib/event-listeners";
+import { toApiCancha, toApiUsuario, USUARIO_PUBLICO } from "@/lib/db-mappers";
+import { partidosDelUsuario } from "@/lib/partidos";
 
 /**
  * GET /api/partidos?fecha=YYYY-MM-DD&ciudad=Medellin
@@ -16,49 +25,47 @@ export const GET = apiHandler(
     const fecha = searchParams.get("fecha");
     const ciudad = searchParams.get("ciudad");
 
-    // Si hay filtros públicos, no requiere auth estricto
     if (fecha || ciudad) {
-      const where: Record<string, unknown> = {};
+      const filtros: SQL[] = [];
       if (fecha) {
-        const inicio = new Date(fecha + "T00:00:00.000Z");
-        const fin = new Date(fecha + "T23:59:59.999Z");
-        where.reserva = { slotInicio: { gte: inicio, lte: fin } };
+        filtros.push(
+          gte(reservas.slotInicio, new Date(fecha + "T00:00:00.000Z")),
+          lte(reservas.slotInicio, new Date(fecha + "T23:59:59.999Z"))
+        );
       }
-      if (ciudad) {
-        where.reserva = {
-          ...(where.reserva as any || {}),
-          cancha: { complejo: { ciudad: { contains: ciudad, mode: "insensitive" } } },
-        };
-      }
+      if (ciudad) filtros.push(ilike(complejos.ciudad, `%${ciudad}%`));
 
-      const partidos = await prisma.partido.findMany({
-        where,
-        include: {
+      const reservasFiltradas = db
+        .select({ id: reservas.id })
+        .from(reservas)
+        .innerJoin(canchas, eq(canchas.id, reservas.canchaId))
+        .innerJoin(complejos, eq(complejos.id, canchas.complejoId))
+        .where(and(...filtros));
+
+      const lista = await db.query.partidos.findMany({
+        where: inArray(partidos.reservaId, reservasFiltradas),
+        with: {
           reserva: {
-            select: { slotInicio: true, slotFin: true, montoTotal: true, montoPagado: true },
+            columns: { slotInicio: true, slotFin: true, montoTotal: true, montoPagado: true },
           },
-          equipoA: { select: { id: true, nombre: true } },
-          equipoB: { select: { id: true, nombre: true } },
-          _count: { select: { jugadores: true } },
+          equipoA: { columns: { id: true, nombre: true } },
+          equipoB: { columns: { id: true, nombre: true } },
+          jugadores: { columns: { id: true } },
         },
-        orderBy: { createdAt: "desc" },
-        take: 50,
+        orderBy: [desc(partidos.createdAt)],
+        limit: 50,
       });
 
-      return NextResponse.json(partidos);
+      return NextResponse.json(
+        lista.map(({ jugadores, ...p }) => ({ ...p, _count: { jugadores: jugadores.length } }))
+      );
     }
 
-    // Partidos del usuario
-    const partidos = await prisma.partido.findMany({
-      where: {
-        OR: [
-          { creadorId: user.sub },
-          { jugadores: { some: { userId: user.sub } } },
-        ],
-      },
-      include: {
+    const lista = await db.query.partidos.findMany({
+      where: partidosDelUsuario(user.sub),
+      with: {
         reserva: {
-          select: {
+          columns: {
             id: true,
             slotInicio: true,
             slotFin: true,
@@ -66,17 +73,28 @@ export const GET = apiHandler(
             montoPagado: true,
             saldoPendiente: true,
             estado: true,
-            cancha: { select: { nombre: true, tipo: true, complejo: { select: { nombre: true } } } },
+          },
+          with: {
+            cancha: {
+              columns: { nombre: true, tipo: true },
+              with: { complejo: { columns: { nombre: true } } },
+            },
           },
         },
-        equipoA: { select: { id: true, nombre: true } },
-        equipoB: { select: { id: true, nombre: true } },
-        _count: { select: { jugadores: true } },
+        equipoA: { columns: { id: true, nombre: true } },
+        equipoB: { columns: { id: true, nombre: true } },
+        jugadores: { columns: { id: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [desc(partidos.createdAt)],
     });
 
-    return NextResponse.json(partidos);
+    return NextResponse.json(
+      lista.map(({ jugadores, reserva, ...p }) => ({
+        ...p,
+        reserva: { ...reserva, cancha: toApiCancha(reserva.cancha) },
+        _count: { jugadores: jugadores.length },
+      }))
+    );
   },
   { requireAuth: true }
 );
@@ -88,7 +106,7 @@ export const GET = apiHandler(
  * Opcionalmente asigna equipos e invita jugadores.
  */
 export const POST = apiHandler<CrearPartidoInput>(
-  async (request, ctx, { body }) => {
+  async (_request, ctx, { body }) => {
     if (!body) {
       return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
@@ -96,61 +114,67 @@ export const POST = apiHandler<CrearPartidoInput>(
     const user = ctx.user!;
     const { reservaId, equipoAId, equipoBId, jugadores } = body;
 
-    // Verificar que la reserva existe y pertenece al usuario
-    const reserva = await prisma.reserva.findFirst({
-      where: {
-        id: reservaId,
-        OR: [{ playerId: user.sub }, { tenantId: user.sub }],
-      },
+    const reserva = await db.query.reservas.findFirst({
+      where: and(
+        eq(reservas.id, reservaId),
+        or(eq(reservas.playerId, user.sub), eq(reservas.tenantId, user.sub))
+      ),
+      columns: { id: true },
     });
 
     if (!reserva) {
-      return NextResponse.json(
-        { error: "Reserva no encontrada o no tenés acceso" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Reserva no encontrada o no tenés acceso" }, { status: 404 });
     }
 
-    // Verificar que no existe ya un partido para esta reserva
-    const existente = await prisma.partido.findUnique({
-      where: { reservaId },
+    const existente = await db.query.partidos.findFirst({
+      where: eq(partidos.reservaId, reservaId),
+      columns: { id: true },
     });
 
     if (existente) {
-      return NextResponse.json(
-        { error: "Ya existe un partido para esta reserva" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "Ya existe un partido para esta reserva" }, { status: 409 });
     }
 
-    // Crear partido con jugadores
-    const partido = await prisma.partido.create({
-      data: {
-        reservaId,
-        creadorId: user.sub,
-        equipoAId: equipoAId || null,
-        equipoBId: equipoBId || null,
-        jugadores: {
-          create: (jugadores || []).map((userId) => ({ userId })),
-        },
-      },
-      include: {
+    const partidoId = await db.transaction(async (tx) => {
+      const [partido] = await tx
+        .insert(partidos)
+        .values({
+          reservaId,
+          creadorId: user.sub,
+          equipoAId: equipoAId || null,
+          equipoBId: equipoBId || null,
+        })
+        .returning({ id: partidos.id });
+
+      if (jugadores.length > 0) {
+        await tx
+          .insert(partidoJugadores)
+          .values(jugadores.map((userId) => ({ partidoId: partido.id, userId })))
+          .onConflictDoNothing();
+      }
+      return partido.id;
+    });
+
+    const partido = await db.query.partidos.findFirst({
+      where: eq(partidos.id, partidoId),
+      with: {
         reserva: {
-          select: {
-            slotInicio: true,
-            slotFin: true,
-            cancha: { select: { nombre: true, complejo: { select: { nombre: true } } } },
+          columns: { slotInicio: true, slotFin: true },
+          with: {
+            cancha: { columns: { nombre: true }, with: { complejo: { columns: { nombre: true } } } },
           },
         },
-        jugadores: {
-          include: {
-            user: { select: { id: true, primerNombre: true, apellidos: true, apodo: true } },
-          },
-        },
+        jugadores: { with: { user: { columns: USUARIO_PUBLICO } } },
       },
     });
 
-    return NextResponse.json(partido, { status: 201 });
+    return NextResponse.json(
+      {
+        ...partido!,
+        jugadores: partido!.jugadores.map((j) => ({ ...j, user: toApiUsuario(j.user) })),
+      },
+      { status: 201 }
+    );
   },
   {
     requireAuth: true,
