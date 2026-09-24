@@ -5,12 +5,7 @@ import { apiHandler } from "@/lib/api-handler";
 import { updateComplejoSchema, type UpdateComplejoInput } from "@/lib/schemas";
 import { formatAddress } from "@/lib/address";
 import { toApiCancha, toApiComplejo } from "@/lib/db-mappers";
-
-function complejoDelDueno(id: string, tenantId: string) {
-  return db.query.complejos.findFirst({
-    where: and(eq(complejos.id, id), eq(complejos.tenantId, tenantId)),
-  });
-}
+import { complejoDelDueno } from "@/lib/consultas";
 
 /**
  * GET /api/complejos/[id]

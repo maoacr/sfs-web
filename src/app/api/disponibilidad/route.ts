@@ -4,8 +4,10 @@ import { eq, and, isNull, inArray, gt, lt } from "drizzle-orm";
 import { liberarReservasExpiradas } from "@/lib/ttl";
 import { calcularSlotsDisponibles, diaSemanaDeFecha } from "@/lib/disponibilidad";
 import { ventanaDelDia } from "@/lib/zona-horaria";
-import { tiposCancha } from "@/lib/schemas";
+import { disponibilidadQuerySchema, type TipoCancha } from "@/lib/schemas";
 import { tipoCanchaToDb, tipoCanchaToApi, toApiComplejo } from "@/lib/db-mappers";
+import { apiHandler } from "@/lib/api-handler";
+import { RATE_LIMITS } from "@/lib/rate-limit";
 
 /**
  * GET /api/disponibilidad
@@ -15,27 +17,12 @@ import { tipoCanchaToDb, tipoCanchaToApi, toApiComplejo } from "@/lib/db-mappers
  *   - fecha: ISO date (YYYY-MM-DD) — obligatorio
  *   - tipo: F5|F6|F7|F8|F9|F11 — opcional
  */
-export async function GET(request: Request) {
-  try {
+export const GET = apiHandler<never, { fecha: string; tipo?: TipoCancha }>(
+  async (_request, _ctx, { query }) => {
     // Limpiar reservas expiradas en background antes de consultar disponibilidad
     liberarReservasExpiradas().catch(() => {});
 
-    const { searchParams } = new URL(request.url);
-    const fecha = searchParams.get("fecha");
-    const tipoParam = searchParams.get("tipo");
-
-    if (!fecha) {
-      return NextResponse.json({ error: "Parámetro 'fecha' requerido" }, { status: 400 });
-    }
-
-    const tipo = tipoParam ? tiposCancha.find((t) => t === tipoParam) : undefined;
-    if (tipoParam && !tipo) {
-      return NextResponse.json({ error: "Tipo de cancha inválido" }, { status: 400 });
-    }
-
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-      return NextResponse.json({ error: "Fecha inválida. Usá YYYY-MM-DD" }, { status: 400 });
-    }
+    const { fecha, tipo } = query!;
 
     // `fecha` es un día de calendario en la zona de cada cancha
     const diaSemana = diaSemanaDeFecha(fecha);
@@ -126,8 +113,10 @@ export async function GET(request: Request) {
       .filter(Boolean);
 
     return NextResponse.json(resultados);
-  } catch (error) {
-    console.error("GET /api/disponibilidad error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  },
+  {
+    requireAuth: true,
+    querySchema: disponibilidadQuerySchema,
+    rateLimit: RATE_LIMITS.DISPONIBILIDAD,
   }
-}
+);

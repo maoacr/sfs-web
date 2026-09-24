@@ -1,32 +1,25 @@
 import { NextResponse } from "next/server";
-import { db, canchas, imagenesCanchas } from "@sfs/db";
+import { db, imagenesCanchas } from "@sfs/db";
 import { and, count, eq } from "drizzle-orm";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { apiHandler } from "@/lib/api-handler";
+import { esUuid } from "@/lib/uuid";
 import { uploadImage, deleteImage } from "@/lib/storage";
+import { canchaDelDueno } from "@/lib/consultas";
 
-async function esCanchaDelDueno(canchaId: string, userId: string) {
-  const cancha = await db.query.canchas.findFirst({
-    where: and(eq(canchas.id, canchaId), eq(canchas.tenantId, userId)),
-    columns: { id: true },
-  });
-  return !!cancha;
-}
-
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    if (!(await esCanchaDelDueno(id, user.sub))) {
+/**
+ * POST /api/canchas/[id]/imagenes (multipart: file)
+ */
+export const POST = apiHandler(
+  async (request, ctx, _validated) => {
+    const { id } = ctx.params;
+    if (!(await canchaDelDueno(id, ctx.user!.sub))) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
+    const file = (await request.formData()).get("file");
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "Archivo requerido" }, { status: 400 });
+    }
 
     const url = await uploadImage(file, `canchas/${id}`, "photo");
 
@@ -41,27 +34,22 @@ export async function POST(
       .returning();
 
     return NextResponse.json(imagen, { status: 201 });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("POST /api/canchas/[id]/imagenes error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    if (!(await esCanchaDelDueno(id, user.sub))) {
+/**
+ * DELETE /api/canchas/[id]/imagenes?id=imagenId
+ */
+export const DELETE = apiHandler(
+  async (request, ctx, _validated) => {
+    const { id } = ctx.params;
+    if (!(await canchaDelDueno(id, ctx.user!.sub))) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
     const imagenId = new URL(request.url).searchParams.get("id");
-    if (!imagenId) return NextResponse.json({ error: "ID de imagen requerido" }, { status: 400 });
+    if (!esUuid(imagenId)) return NextResponse.json({ error: "ID de imagen inválido" }, { status: 400 });
 
     const imagen = await db.query.imagenesCanchas.findFirst({
       where: and(eq(imagenesCanchas.id, imagenId), eq(imagenesCanchas.canchaId, id)),
@@ -72,9 +60,6 @@ export async function DELETE(
     await db.delete(imagenesCanchas).where(eq(imagenesCanchas.id, imagenId));
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("DELETE /api/canchas/[id]/imagenes error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);

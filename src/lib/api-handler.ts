@@ -8,6 +8,7 @@ import {
   RATE_LIMITS,
 } from "@/lib/rate-limit";
 import { validateCsrf } from "@/lib/csrf";
+import { esUuid } from "@/lib/uuid";
 import type { RateLimitConfig } from "@/lib/rate-limit";
 
 // Re-export for convenience
@@ -160,6 +161,11 @@ export function apiHandler<TBody = unknown, TQuery = Record<string, string>>(
 
     try {
       const params = (await routeContext?.params) ?? {};
+      // Todos los segmentos dinámicos de la API son ids UUID: uno inválido no
+      // puede existir y, sin este corte, Postgres lo rechaza con un 500.
+      if (Object.values(params).some((valor) => !esUuid(valor))) {
+        return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+      }
       const response = await handler(request, { user, params }, { body, query });
 
       // Añadir headers de rate limit a la respuesta

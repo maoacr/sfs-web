@@ -1,45 +1,31 @@
 import { NextResponse } from "next/server";
-import { db, canchas, reservas } from "@sfs/db";
+import { db, reservas } from "@sfs/db";
 import { and, eq, gt, inArray, lt } from "drizzle-orm";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { apiHandler } from "@/lib/api-handler";
+import { syncSchema, type SyncInput } from "@/lib/schemas";
+import { canchaDelDueno } from "@/lib/consultas";
 
 /**
  * POST /api/sync
  *
  * Recibe operaciones pendientes del Sync Engine (offline → online).
- * Body: { type: "CREATE", entity: "reserva", data }
+ * Por ahora solo soporta { type: "CREATE", entity: "reserva" }.
  */
-export async function POST(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-
-    if (user.role !== "OWNER") {
-      return NextResponse.json({ error: "Solo dueños pueden sincronizar reservas" }, { status: 403 });
+export const POST = apiHandler<SyncInput>(
+  async (_request, ctx, { body }) => {
+    const user = ctx.user!;
+    if (!body) {
+      return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
-
-    const { type, entity, data } = await request.json();
-
-    if (entity !== "reserva") {
-      return NextResponse.json({ error: "Entidad no soportada para sync" }, { status: 400 });
-    }
-    if (type !== "CREATE") {
+    if (body.type !== "CREATE") {
       return NextResponse.json({ error: "Tipo de operación no soportado" }, { status: 400 });
     }
 
-    const { canchaId, slotInicio, slotFin, montoTotal } = data as {
-      canchaId: string;
-      slotInicio: string;
-      slotFin: string;
-      montoTotal: number;
-    };
-    const inicio = new Date(slotInicio);
-    const fin = new Date(slotFin);
+    const { canchaId, montoTotal } = body.data;
+    const inicio = new Date(body.data.slotInicio);
+    const fin = new Date(body.data.slotFin);
 
-    const cancha = await db.query.canchas.findFirst({
-      where: and(eq(canchas.id, canchaId), eq(canchas.tenantId, user.sub)),
-      columns: { id: true },
-    });
-    if (!cancha) {
+    if (!(await canchaDelDueno(canchaId, user.sub))) {
       return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
@@ -76,16 +62,13 @@ export async function POST(request: Request) {
         playerId: user.sub,
         slotInicio: inicio,
         slotFin: fin,
-        montoTotal: Number(montoTotal).toFixed(2),
-        montoPagado: Number(montoTotal).toFixed(2),
+        montoTotal: montoTotal.toFixed(2),
+        montoPagado: montoTotal.toFixed(2),
         estado: "CONFIRMADA",
       })
       .returning({ id: reservas.id });
 
-    return NextResponse.json({ serverId: reserva.id, localId: (data as { id: string }).id });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("Sync error:", error);
-    return NextResponse.json({ error: "Error interno de sincronización" }, { status: 500 });
-  }
-}
+    return NextResponse.json({ serverId: reserva.id, localId: body.data.id });
+  },
+  { requireAuth: true, requiredRole: "OWNER", bodySchema: syncSchema }
+);

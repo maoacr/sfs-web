@@ -1,6 +1,7 @@
 import { db, pagos, reservas, type Pago, type Reserva } from "@sfs/db";
 import { eq, sql } from "drizzle-orm";
 import { createCheckoutPreference, estadoPagoDesdeMp } from "@/lib/mercadopago";
+import { esUuid } from "@/lib/uuid";
 
 export function aplicarPago({
   montoTotal,
@@ -64,7 +65,6 @@ export type ResultadoPagoMp =
   | { tipo: "aplicado"; reservaId: string; estado: Reserva["estado"] }
   | { tipo: "reembolsar"; pagoId: string; mpPaymentId: string };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Aplica una notificación de pago de MP. Idempotente: MP envía varias
@@ -73,7 +73,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export async function registrarPagoMp(payment: PagoMp): Promise<ResultadoPagoMp> {
   const pagoId = payment.external_reference;
-  if (!pagoId || !UUID.test(pagoId) || payment.id === undefined) {
+  if (!esUuid(pagoId) || payment.id === undefined) {
     return { tipo: "ignorado", motivo: "external_reference inválido" };
   }
 

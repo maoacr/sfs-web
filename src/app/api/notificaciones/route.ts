@@ -1,52 +1,46 @@
 import { NextResponse } from "next/server";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { apiHandler } from "@/lib/api-handler";
+import { markNotificationSchema } from "@/lib/schemas";
 import { getNotificaciones, getNoLeidas, marcarLeida, marcarTodasLeidas } from "@/lib/notifications";
+
+type MarcarBody = { id?: string; todas?: boolean };
 
 /**
  * GET /api/notificaciones
  * Query: ?noLeidas=true (solo cuenta)
  */
-export async function GET(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-    const { searchParams } = new URL(request.url);
+export const GET = apiHandler(
+  async (request, ctx, _validated) => {
+    const userId = ctx.user!.sub;
 
-    if (searchParams.get("noLeidas") === "true") {
-      const count = await getNoLeidas(user.sub);
-      return NextResponse.json({ count });
+    if (new URL(request.url).searchParams.get("noLeidas") === "true") {
+      return NextResponse.json({ count: await getNoLeidas(userId) });
     }
 
-    const notificaciones = await getNotificaciones(user.sub);
-    return NextResponse.json(notificaciones);
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+    return NextResponse.json(await getNotificaciones(userId));
+  },
+  { requireAuth: true }
+);
 
 /**
  * PATCH /api/notificaciones
- * Body: { id: string } — marca una como leída
- * Body: { todas: true } — marca todas como leídas
+ * Body: { id } marca una como leída; { todas: true } marca todas.
  */
-export async function PATCH(request: Request) {
-  try {
-    const user = await getAuthUser(request);
-    const body = await request.json();
+export const PATCH = apiHandler<MarcarBody>(
+  async (_request, ctx, { body }) => {
+    const userId = ctx.user!.sub;
 
-    if (body.todas) {
-      await marcarTodasLeidas(user.sub);
+    if (body?.todas) {
+      await marcarTodasLeidas(userId);
       return NextResponse.json({ ok: true });
     }
 
-    if (body.id) {
-      await marcarLeida(body.id, user.sub);
+    if (body?.id) {
+      await marcarLeida(body.id, userId);
       return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ error: "id o todas requerido" }, { status: 400 });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, bodySchema: markNotificationSchema }
+);

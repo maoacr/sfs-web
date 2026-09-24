@@ -1,86 +1,48 @@
 import { NextResponse } from "next/server";
 import { db, canchas } from "@sfs/db";
 import { eq, and } from "drizzle-orm";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
-import { updateCanchaSchema } from "@/lib/schemas";
+import { apiHandler } from "@/lib/api-handler";
+import { updateCanchaSchema, type UpdateCanchaInput } from "@/lib/schemas";
 import { tipoCanchaToDb, toApiCancha, toApiComplejo } from "@/lib/db-mappers";
+import { canchaDelDueno } from "@/lib/consultas";
 
 /**
  * GET /api/canchas/[id]
  * Obtiene una cancha específica (solo del dueño).
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
+export const GET = apiHandler(
+  async (_request, ctx, _validated) => {
     const cancha = await db.query.canchas.findFirst({
-      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
+      where: and(eq(canchas.id, ctx.params.id), eq(canchas.tenantId, ctx.user!.sub)),
       with: {
         complejo: true,
-        imagenes: {
-          orderBy: (img, { asc }) => [asc(img.orden)],
-        },
-        slots: {
-          orderBy: (s, { asc }) => [asc(s.diaSemana)],
-        },
-        tarifas: {
-          with: {
-            promociones: true,
-          },
-        },
+        imagenes: { orderBy: (img, { asc }) => [asc(img.orden)] },
+        slots: { orderBy: (s, { asc }) => [asc(s.diaSemana)] },
+        tarifas: { with: { promociones: true } },
       },
     });
 
     if (!cancha) {
-      return NextResponse.json(
-        { error: "Cancha no encontrada" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
     return NextResponse.json({ ...toApiCancha(cancha), complejo: toApiComplejo(cancha.complejo) });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error("GET /api/canchas/[id] error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);
 
 /**
  * PUT /api/canchas/[id]
  * Actualiza una cancha existente.
  */
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    const existente = await db.query.canchas.findFirst({
-      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
-    });
-
-    if (!existente) {
-      return NextResponse.json(
-        { error: "Cancha no encontrada" },
-        { status: 404 }
-      );
+export const PUT = apiHandler<UpdateCanchaInput>(
+  async (_request, ctx, { body }) => {
+    const { id } = ctx.params;
+    if (!(await canchaDelDueno(id, ctx.user!.sub))) {
+      return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
-    const parsed = updateCanchaSchema.safeParse(await request.json());
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Datos inválidos", details: parsed.error.issues }, { status: 400 });
-    }
-
-    const { tipo, ...resto } = parsed.data;
+    const { tipo, ...resto } = body ?? {};
     const [cancha] = await db
       .update(canchas)
       .set({ ...resto, ...(tipo ? { tipo: tipoCanchaToDb(tipo) } : {}) })
@@ -88,49 +50,24 @@ export async function PUT(
       .returning();
 
     return NextResponse.json(toApiCancha(cancha));
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error("PUT /api/canchas/[id] error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER", bodySchema: updateCanchaSchema }
+);
 
 /**
  * DELETE /api/canchas/[id]
  * Soft delete de una cancha.
  */
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    const existente = await db.query.canchas.findFirst({
-      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
-    });
-
-    if (!existente) {
-      return NextResponse.json(
-        { error: "Cancha no encontrada" },
-        { status: 404 }
-      );
+export const DELETE = apiHandler(
+  async (_request, ctx, _validated) => {
+    const { id } = ctx.params;
+    if (!(await canchaDelDueno(id, ctx.user!.sub))) {
+      return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
-    await db
-      .update(canchas)
-      .set({ deletedAt: new Date() })
-      .where(eq(canchas.id, id));
+    await db.update(canchas).set({ deletedAt: new Date() }).where(eq(canchas.id, id));
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error("DELETE /api/canchas/[id] error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);

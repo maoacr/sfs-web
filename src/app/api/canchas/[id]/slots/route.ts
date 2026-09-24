@@ -1,24 +1,19 @@
 import { NextResponse } from "next/server";
-import { db, canchas, slotConfigs } from "@sfs/db";
-import { eq, and, asc } from "drizzle-orm";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { db, slotConfigs } from "@sfs/db";
+import { eq, asc } from "drizzle-orm";
+import { apiHandler } from "@/lib/api-handler";
+import { createSlotSchema, type CreateSlotInput } from "@/lib/schemas";
+import { canchaDelDueno } from "@/lib/consultas";
 
 /**
  * GET /api/canchas/[id]/slots
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    // Verificar propiedad
-    const cancha = await db.query.canchas.findFirst({
-      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
-    });
-    if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+export const GET = apiHandler(
+  async (_request, ctx, _validated) => {
+    const { id } = ctx.params;
+    if (!(await canchaDelDueno(id, ctx.user!.sub))) {
+      return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+    }
 
     const slots = await db.query.slotConfigs.findMany({
       where: eq(slotConfigs.canchaId, id),
@@ -26,43 +21,34 @@ export async function GET(
     });
 
     return NextResponse.json(slots);
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);
 
 /**
  * POST /api/canchas/[id]/slots
  */
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    const cancha = await db.query.canchas.findFirst({
-      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
-    });
-    if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
-
-    const body = await request.json();
+export const POST = apiHandler<CreateSlotInput>(
+  async (_request, ctx, { body }) => {
+    const { id } = ctx.params;
+    if (!body) {
+      return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
+    }
+    if (!(await canchaDelDueno(id, ctx.user!.sub))) {
+      return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+    }
 
     const [slot] = await db
       .insert(slotConfigs)
       .values({
         canchaId: id,
-        diaSemana: Number(body.diaSemana),
-        horaApertura: body.horaApertura || "08:00:00",
-        horaCierre: body.horaCierre || "23:00:00",
+        diaSemana: body.diaSemana,
+        horaApertura: body.horaApertura,
+        horaCierre: body.horaCierre,
       })
       .returning();
 
     return NextResponse.json(slot, { status: 201 });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER", bodySchema: createSlotSchema }
+);

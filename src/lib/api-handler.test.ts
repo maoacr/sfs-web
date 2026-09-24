@@ -21,15 +21,26 @@ describe("apiHandler", () => {
     const handler = apiHandler(async (_req, ctx) => NextResponse.json({ id: ctx.params.id }), {
       requireAuth: true,
     });
-    const res = await handler(new NextRequest("http://localhost/api/canchas/abc"), params({ id: "abc" }));
-    expect(await res.json()).toEqual({ id: "abc" });
+    const id = "3f2b8c1e-4a5d-4e6f-9a7b-1c2d3e4f5a6b";
+    const res = await handler(new NextRequest(`http://localhost/api/canchas/${id}`), params({ id }));
+    expect(await res.json()).toEqual({ id });
+  });
+
+  it("responde 404 si un id de la ruta no es un UUID, sin llegar a la base", async () => {
+    const handler = vi.fn(async () => NextResponse.json({ ok: true }));
+    const res = await apiHandler(handler, { requireAuth: true })(
+      new NextRequest("http://localhost/api/canchas/abc"),
+      params({ id: "abc" })
+    );
+    expect(res.status).toBe(404);
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it("rechaza escrituras sin token CSRF", async () => {
     const handler = apiHandler(async () => NextResponse.json({ ok: true }), { requireAuth: true });
     const res = await handler(
       new NextRequest("http://localhost/api/canchas/abc", { method: "PUT" }),
-      params({ id: "abc" })
+      params({ id: "3f2b8c1e-4a5d-4e6f-9a7b-1c2d3e4f5a6b" })
     );
     expect(res.status).toBe(403);
   });
@@ -40,7 +51,7 @@ describe("apiHandler", () => {
       method: "PUT",
       headers: { cookie: "csrf_token=tok", "X-CSRF-Token": "tok" },
     });
-    const res = await handler(req, params({ id: "abc" }));
+    const res = await handler(req, params({ id: "3f2b8c1e-4a5d-4e6f-9a7b-1c2d3e4f5a6b" }));
     expect(res.status).toBe(200);
   });
 
@@ -49,7 +60,7 @@ describe("apiHandler", () => {
       requireAuth: true,
       requiredRole: "OWNER",
     });
-    const res = await handler(new NextRequest("http://localhost/api/canchas/abc"), params({ id: "abc" }));
+    const res = await handler(new NextRequest("http://localhost/api/canchas/abc"), params({ id: "3f2b8c1e-4a5d-4e6f-9a7b-1c2d3e4f5a6b" }));
     expect(res.status).toBe(403);
   });
 });

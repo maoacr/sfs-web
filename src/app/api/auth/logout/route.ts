@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function POST() {
-  const response = NextResponse.redirect(new URL("/auth/login", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
-
-  response.cookies.delete("sfs_token");
-  response.cookies.delete("sfs_refresh");
-
-  return response;
-}
+/**
+ * POST /api/auth/logout
+ * Sin CSRF: con la sesión vencida no hay token que obtener y el usuario
+ * igual tiene que poder salir. Cerrar sesión no es una acción peligrosa.
+ */
+export const POST = apiHandler(
+  async (request, _ctx, _validated) => {
+    const response = NextResponse.redirect(new URL("/auth/login", request.url));
+    response.cookies.delete("sfs_token");
+    response.cookies.delete("sfs_refresh");
+    response.cookies.delete("csrf_token");
+    return response;
+  },
+  { requireCsrf: false }
+);

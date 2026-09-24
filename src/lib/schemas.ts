@@ -8,14 +8,6 @@ export type TipoCancha = (typeof tiposCancha)[number];
 
 // ─── Estados ─────────────────────────────────────────────────────────────────
 
-export const estadosReserva = [
-  "PENDIENTE_PAGO",
-  "CONFIRMADA",
-  "COMPLETADA",
-  "CANCELADA",
-] as const;
-export type EstadoReserva = (typeof estadosReserva)[number];
-
 export const estadosPago = ["PENDIENTE", "APROBADO", "RECHAZADO", "REEMBOLSADO"] as const;
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -180,9 +172,24 @@ export const createReservaSchema = z.object({
   playerNombre: z.string().optional(),
 });
 
-export const updateReservaSchema = z.object({
-  estado: z.enum(estadosReserva).optional(),
+export const cambiarEstadoReservaSchema = z.object({
+  estado: z.enum(["CANCELADA", "COMPLETADA"], { message: "Estado inválido" }),
 });
+
+// Operación de la cola offline (Dexie); `data` es la reserva local serializada.
+export const syncSchema = z.object({
+  type: z.enum(["CREATE", "UPDATE", "DELETE"]),
+  entity: z.literal("reserva", { message: "Entidad no soportada para sync" }),
+  data: z.object({
+    id: z.string().optional(),
+    canchaId: z.string().uuid("ID de cancha inválido"),
+    slotInicio: z.string().datetime(),
+    slotFin: z.string().datetime(),
+    montoTotal: z.number().min(0),
+  }),
+});
+
+export type SyncInput = z.infer<typeof syncSchema>;
 
 // ─── Notificaciones ──────────────────────────────────────────────────────────
 
@@ -258,7 +265,9 @@ export type CreateCanchaInput = z.infer<typeof createCanchaSchema>;
 export type UpdateCanchaInput = z.infer<typeof updateCanchaSchema>;
 export type CreateComplejoInput = z.infer<typeof createComplejoSchema>;
 export type CreateSlotInput = z.infer<typeof createSlotSchema>;
+export type UpdateSlotInput = z.infer<typeof updateSlotSchema>;
 export type CreateTarifaInput = z.infer<typeof createTarifaSchema>;
+export type UpdateTarifaInput = z.infer<typeof updateTarifaSchema>;
 export type CreateReservaInput = z.infer<typeof createReservaSchema>;
 export type CrearPagoInput = z.infer<typeof crearPagoSchema>;
 export type PagarSaldoInput = z.infer<typeof pagarSaldoSchema>;
