@@ -25,10 +25,7 @@ export const POST = apiHandler<CrearPagoInput>(
     const user = ctx.user!;
     const { monto } = body;
 
-    const id = request.url.split("/reservas/")[1]?.split("/")[0];
-    if (!id) {
-      return NextResponse.json({ error: "ID de reserva requerido" }, { status: 400 });
-    }
+    const { id } = ctx.params;
 
     const reserva = await db.query.reservas.findFirst({
       where: and(eq(reservas.id, id), eq(reservas.playerId, user.sub)),

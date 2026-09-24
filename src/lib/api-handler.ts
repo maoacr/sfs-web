@@ -22,6 +22,8 @@ export interface ApiContext {
     email: string;
     role: "OWNER" | "PLAYER";
   };
+  /** Segmentos dinámicos de la ruta, p. ej. `{ id }` en `/api/canchas/[id]`. */
+  params: Record<string, string>;
 }
 
 /**
@@ -63,7 +65,10 @@ export function apiHandler<TBody = unknown, TQuery = Record<string, string>>(
   ) => Promise<NextResponse>,
   options: ApiHandlerOptions<TBody, TQuery> = {}
 ) {
-  return async (request: NextRequest): Promise<NextResponse> => {
+  return async (
+    request: NextRequest,
+    routeContext?: { params: Promise<Record<string, string>> }
+  ): Promise<NextResponse> => {
     // ─── 1. Rate Limiting ─────────────────────────────────────────────────
 
     const rateKey = getRateLimitKey(request);
@@ -154,7 +159,8 @@ export function apiHandler<TBody = unknown, TQuery = Record<string, string>>(
     // ─── 5. Execute Handler ───────────────────────────────────────────────
 
     try {
-      const response = await handler(request, { user }, { body, query });
+      const params = (await routeContext?.params) ?? {};
+      const response = await handler(request, { user, params }, { body, query });
 
       // Añadir headers de rate limit a la respuesta
       return setRateLimitHeaders(

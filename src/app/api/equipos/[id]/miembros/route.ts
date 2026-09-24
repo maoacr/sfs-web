@@ -23,9 +23,9 @@ async function cargarEquipo(equipoId: string, userId: string) {
  * Invita a un usuario al equipo. Solo el capitán/creador puede invitar.
  */
 export const POST = apiHandler<InvitarBody>(
-  async (request, ctx, { body }) => {
-    const equipoId = request.url.split("/equipos/")[1]?.split("/")[0];
-    if (!equipoId || !body) {
+  async (_request, ctx, { body }) => {
+    const { id: equipoId } = ctx.params;
+    if (!body) {
       return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
 
@@ -83,12 +83,8 @@ export const POST = apiHandler<InvitarBody>(
 export const DELETE = apiHandler(
   async (request, ctx, _validated) => {
     const user = ctx.user!;
-    const equipoId = request.url.split("/equipos/")[1]?.split("/")[0];
+    const { id: equipoId } = ctx.params;
     const targetUserId = new URL(request.url).searchParams.get("userId");
-
-    if (!equipoId) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
 
     const acceso = await cargarEquipo(equipoId, user.sub);
     if (!acceso) {

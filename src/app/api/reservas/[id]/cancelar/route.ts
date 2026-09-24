@@ -12,10 +12,7 @@ type CancelarBody = { motivo?: string };
  */
 export const PATCH = apiHandler<CancelarBody>(
   async (request, ctx, { body }) => {
-    const id = request.url.split("/reservas/")[1]?.split("/")[0];
-    if (!id) {
-      return NextResponse.json({ error: "ID de reserva requerido" }, { status: 400 });
-    }
+    const { id } = ctx.params;
 
     const resultado = await cancelarReserva({ reservaId: id, user: ctx.user!, motivo: body?.motivo });
     if ("error" in resultado) {

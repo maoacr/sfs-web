@@ -14,10 +14,7 @@ import { formatearHora } from "@/lib/zona-horaria";
 export const GET = apiHandler(
   async (request, ctx, _validated) => {
     const user = ctx.user!;
-    const id = request.url.split("/partidos/")[1]?.split("?")[0];
-    if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
+    const { id } = ctx.params;
 
     const partido = await db.query.partidos.findFirst({
       where: eq(partidos.id, id),

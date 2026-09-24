@@ -17,18 +17,8 @@ const precioQuerySchema = z.object({
  * Acepta código de promoción opcional.
  */
 export const GET = apiHandler<never, { fecha: string; hora: string; codigo?: string }>(
-  async (request, _ctx, { query }) => {
-    // Extraer canchaId de la URL
-    const urlParts = request.url.split("/");
-    const idIndex = urlParts.indexOf("canchas") + 1;
-    const id = urlParts[idIndex];
-
-    if (!id) {
-      return NextResponse.json(
-        { error: "ID de cancha requerido" },
-        { status: 400 }
-      );
-    }
+  async (_request, ctx, { query }) => {
+    const { id } = ctx.params;
 
     if (!query) {
       return NextResponse.json(
@@ -54,6 +44,7 @@ export const GET = apiHandler<never, { fecha: string; hora: string; codigo?: str
     });
   },
   {
+    requireAuth: true,
     querySchema: precioQuerySchema,
     rateLimit: RATE_LIMITS.DISPONIBILIDAD,
   }

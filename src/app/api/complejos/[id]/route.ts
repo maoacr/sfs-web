@@ -1,31 +1,31 @@
 import { NextResponse } from "next/server";
 import { db, complejos, canchas } from "@sfs/db";
 import { eq, and, isNull } from "drizzle-orm";
-import { getAuthUser, AuthError } from "@/lib/auth-api";
+import { apiHandler } from "@/lib/api-handler";
+import { updateComplejoSchema, type UpdateComplejoInput } from "@/lib/schemas";
 import { formatAddress } from "@/lib/address";
 import { toApiCancha, toApiComplejo } from "@/lib/db-mappers";
-import { esZonaHorariaValida } from "@/lib/zona-horaria";
+
+function complejoDelDueno(id: string, tenantId: string) {
+  return db.query.complejos.findFirst({
+    where: and(eq(complejos.id, id), eq(complejos.tenantId, tenantId)),
+  });
+}
 
 /**
  * GET /api/complejos/[id]
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
+export const GET = apiHandler(
+  async (_request, ctx, _validated) => {
     const complejo = await db.query.complejos.findFirst({
-      where: and(eq(complejos.id, id), eq(complejos.tenantId, user.sub), isNull(complejos.deletedAt)),
+      where: and(
+        eq(complejos.id, ctx.params.id),
+        eq(complejos.tenantId, ctx.user!.sub),
+        isNull(complejos.deletedAt)
+      ),
       with: {
-        imagenes: {
-          orderBy: (img, { asc }) => [asc(img.orden)],
-        },
-        canchas: {
-          where: isNull(canchas.deletedAt),
-        },
+        imagenes: { orderBy: (img, { asc }) => [asc(img.orden)] },
+        canchas: { where: isNull(canchas.deletedAt) },
       },
     });
 
@@ -33,107 +33,66 @@ export async function GET(
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      ...toApiComplejo(complejo),
-      canchas: complejo.canchas.map(toApiCancha),
-    });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("GET /api/complejos/[id] error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+    return NextResponse.json({ ...toApiComplejo(complejo), canchas: complejo.canchas.map(toApiCancha) });
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);
 
 /**
  * PUT /api/complejos/[id]
  */
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    const existente = await db.query.complejos.findFirst({
-      where: and(eq(complejos.id, id), eq(complejos.tenantId, user.sub)),
-    });
-
+export const PUT = apiHandler<UpdateComplejoInput>(
+  async (_request, ctx, { body }) => {
+    const { id } = ctx.params;
+    const existente = await complejoDelDueno(id, ctx.user!.sub);
     if (!existente) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
-    const body = await request.json();
+    const b = body ?? {};
     const updateData: Partial<typeof complejos.$inferInsert> = {};
 
-    if (body.nombre !== undefined) updateData.nombre = body.nombre;
-    if (body.tipoVia !== undefined) updateData.tipoVia = body.tipoVia;
-    if (body.numeroVia !== undefined) updateData.numeroVia = body.numeroVia;
-    if (body.numeroSec !== undefined) updateData.numeroSec = body.numeroSec;
-    if (body.complemento !== undefined) updateData.complemento = body.complemento;
-    if (body.ciudad !== undefined) updateData.ciudad = body.ciudad ?? "";
-    if (body.departamento !== undefined) updateData.departamento = body.departamento ?? "";
-    if (body.tipoVia !== undefined || body.numeroVia !== undefined) {
+    if (b.nombre !== undefined) updateData.nombre = b.nombre;
+    if (b.tipoVia !== undefined) updateData.tipoVia = b.tipoVia;
+    if (b.numeroVia !== undefined) updateData.numeroVia = b.numeroVia;
+    if (b.numeroSec !== undefined) updateData.numeroSec = b.numeroSec;
+    if (b.complemento !== undefined) updateData.complemento = b.complemento;
+    if (b.ciudad !== undefined) updateData.ciudad = b.ciudad ?? "";
+    if (b.departamento !== undefined) updateData.departamento = b.departamento ?? "";
+    if (b.tipoVia !== undefined || b.numeroVia !== undefined) {
       updateData.direccion = formatAddress({ ...existente, ...updateData });
     }
-    if (body.descripcion !== undefined) updateData.descripcion = body.descripcion;
-    if (body.telefono !== undefined) updateData.telefono = body.telefono;
-    if (body.email !== undefined) updateData.email = body.email;
-    if (body.instagram !== undefined) updateData.instagram = body.instagram;
-    if (body.tiktok !== undefined) updateData.tiktok = body.tiktok;
-    if (body.twitter !== undefined) updateData.twitter = body.twitter;
-    if (body.facebook !== undefined) updateData.facebook = body.facebook;
-    if (body.zonaHoraria !== undefined) {
-      if (typeof body.zonaHoraria !== "string" || !esZonaHorariaValida(body.zonaHoraria)) {
-        return NextResponse.json({ error: "Zona horaria inválida" }, { status: 400 });
-      }
-      updateData.zonaHoraria = body.zonaHoraria;
-    }
-    if (body.lat !== undefined) updateData.latitud = body.lat !== null ? String(body.lat) : null;
-    if (body.lng !== undefined) updateData.longitud = body.lng !== null ? String(body.lng) : null;
+    if (b.descripcion !== undefined) updateData.descripcion = b.descripcion;
+    if (b.telefono !== undefined) updateData.telefono = b.telefono;
+    if (b.email !== undefined) updateData.email = b.email || null;
+    if (b.instagram !== undefined) updateData.instagram = b.instagram;
+    if (b.tiktok !== undefined) updateData.tiktok = b.tiktok;
+    if (b.twitter !== undefined) updateData.twitter = b.twitter;
+    if (b.facebook !== undefined) updateData.facebook = b.facebook;
+    if (b.zonaHoraria !== undefined) updateData.zonaHoraria = b.zonaHoraria;
+    if (b.lat !== undefined) updateData.latitud = b.lat === null ? null : String(b.lat);
+    if (b.lng !== undefined) updateData.longitud = b.lng === null ? null : String(b.lng);
 
-    const [updated] = await db
-      .update(complejos)
-      .set(updateData)
-      .where(eq(complejos.id, id))
-      .returning();
+    const [updated] = await db.update(complejos).set(updateData).where(eq(complejos.id, id)).returning();
 
     return NextResponse.json(toApiComplejo(updated));
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("PUT /api/complejos/[id] error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER", bodySchema: updateComplejoSchema }
+);
 
 /**
  * DELETE /api/complejos/[id]
  */
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getAuthUser(request);
-    const { id } = await params;
-
-    const existente = await db.query.complejos.findFirst({
-      where: and(eq(complejos.id, id), eq(complejos.tenantId, user.sub)),
-    });
-
-    if (!existente) {
+export const DELETE = apiHandler(
+  async (_request, ctx, _validated) => {
+    const { id } = ctx.params;
+    if (!(await complejoDelDueno(id, ctx.user!.sub))) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
-    await db
-      .update(complejos)
-      .set({ deletedAt: new Date() })
-      .where(eq(complejos.id, id));
+    await db.update(complejos).set({ deletedAt: new Date() }).where(eq(complejos.id, id));
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("DELETE /api/complejos/[id] error:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-}
+  },
+  { requireAuth: true, requiredRole: "OWNER" }
+);

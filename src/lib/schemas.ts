@@ -74,24 +74,25 @@ export const updateProfileSchema = z.object({
 // Zod 4 applies .default() values inside .partial(), so update schemas are
 // derived from default-free field sets to avoid resetting omitted fields.
 
+// Los formularios envían null para "campo vacío", por eso los opcionales son nullish.
 const complejoCampos = z.object({
   nombre: z.string().min(1, "Nombre requerido").max(100),
   tipoVia: z.string().max(20),
   numeroVia: z.string().max(10),
-  numeroSec: z.string().max(10).optional(),
-  complemento: z.string().max(100).optional(),
+  numeroSec: z.string().max(10).nullish(),
+  complemento: z.string().max(100).nullish(),
   ciudad: z.string().max(100),
   departamento: z.string().max(100),
-  descripcion: z.string().max(2000).optional(),
-  lat: z.number().min(-90).max(90).optional(),
-  lng: z.number().min(-180).max(180).optional(),
+  descripcion: z.string().max(2000).nullish(),
+  lat: z.number().min(-90).max(90).nullish(),
+  lng: z.number().min(-180).max(180).nullish(),
   zonaHoraria: z.string().refine(esZonaHorariaValida, "Zona horaria inválida").optional(),
-  telefono: z.string().max(20).optional(),
-  email: z.string().email("Email inválido").max(255).optional().or(z.literal("")),
-  instagram: z.string().max(30).optional(),
-  tiktok: z.string().max(30).optional(),
-  twitter: z.string().max(30).optional(),
-  facebook: z.string().max(50).optional(),
+  telefono: z.string().max(20).nullish(),
+  email: z.string().email("Email inválido").max(255).or(z.literal("")).nullish(),
+  instagram: z.string().max(30).nullish(),
+  tiktok: z.string().max(30).nullish(),
+  twitter: z.string().max(30).nullish(),
+  facebook: z.string().max(50).nullish(),
 });
 
 export const createComplejoSchema = complejoCampos.extend({
@@ -101,7 +102,14 @@ export const createComplejoSchema = complejoCampos.extend({
   departamento: complejoCampos.shape.departamento.default(""),
 });
 
-export const updateComplejoSchema = complejoCampos.partial();
+export const updateComplejoSchema = complejoCampos
+  .extend({
+    ciudad: complejoCampos.shape.ciudad.nullish(),
+    departamento: complejoCampos.shape.departamento.nullish(),
+  })
+  .partial();
+
+export type UpdateComplejoInput = z.infer<typeof updateComplejoSchema>;
 
 // ─── Canchas ─────────────────────────────────────────────────────────────────
 
@@ -110,7 +118,7 @@ const canchaCampos = z.object({
   tipo: z.enum(tiposCancha, { message: "Tipo de cancha inválido" }),
   capacidad: z.number().int().min(2, "Capacidad mínima: 2").max(30),
   complejoId: z.string().uuid("ID de complejo inválido"),
-  descripcion: z.string().max(2000).optional(),
+  descripcion: z.string().max(2000).nullish(),
   servicios: z.array(z.string()).max(20),
   duracionSlotMinutos: z
     .number()
@@ -128,10 +136,12 @@ export const updateCanchaSchema = canchaCampos.omit({ complejoId: true }).partia
 
 // ─── Slots ───────────────────────────────────────────────────────────────────
 
+const HORA = /^\d{2}:\d{2}(:\d{2})?$/;
+
 export const createSlotSchema = z.object({
   diaSemana: z.number().int().min(0).max(6, "Día inválido (0=Domingo, 6=Sábado)"),
-  horaApertura: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido"),
-  horaCierre: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido"),
+  horaApertura: z.string().regex(HORA, "Formato HH:MM requerido"),
+  horaCierre: z.string().regex(HORA, "Formato HH:MM requerido"),
 });
 
 export const updateSlotSchema = createSlotSchema.partial();

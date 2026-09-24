@@ -5,10 +5,6 @@ import { apiHandler } from "@/lib/api-handler";
 import { updateEquipoSchema } from "@/lib/schemas";
 import { toApiUsuario, USUARIO_PUBLICO } from "@/lib/db-mappers";
 
-function equipoIdDesde(url: string) {
-  return url.split("/equipos/")[1]?.split(/[/?]/)[0];
-}
-
 async function puedeEditar(equipoId: string, userId: string) {
   const equipo = await db.query.equipos.findFirst({
     where: eq(equipos.id, equipoId),
@@ -23,11 +19,8 @@ async function puedeEditar(equipoId: string, userId: string) {
  * GET /api/equipos/:id
  */
 export const GET = apiHandler(
-  async (request, _ctx, _validated) => {
-    const id = equipoIdDesde(request.url);
-    if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
+  async (_request, ctx, _validated) => {
+    const { id } = ctx.params;
 
     const equipo = await db.query.equipos.findFirst({
       where: eq(equipos.id, id),
@@ -53,11 +46,8 @@ export const GET = apiHandler(
  * Actualiza nombre, foto o descripción. Solo el capitán/creador.
  */
 export const PATCH = apiHandler(
-  async (request, ctx, { body }) => {
-    const id = equipoIdDesde(request.url);
-    if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
+  async (_request, ctx, { body }) => {
+    const { id } = ctx.params;
 
     const acceso = await puedeEditar(id, ctx.user!.sub);
     if (!acceso) {
@@ -83,11 +73,8 @@ export const PATCH = apiHandler(
  * Elimina el equipo. Solo el creador.
  */
 export const DELETE = apiHandler(
-  async (request, ctx, _validated) => {
-    const id = equipoIdDesde(request.url);
-    if (!id) {
-      return NextResponse.json({ error: "ID requerido" }, { status: 400 });
-    }
+  async (_request, ctx, _validated) => {
+    const { id } = ctx.params;
 
     const equipo = await db.query.equipos.findFirst({
       where: eq(equipos.id, id),

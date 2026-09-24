@@ -7,7 +7,57 @@ import {
   createReservaSchema,
   createSlotSchema,
   createTarifaSchema,
+  updateCanchaSchema,
+  updateComplejoSchema,
+  updateSlotSchema,
 } from "@/lib/schemas";
+
+// Payloads tal como los envían los formularios de la UI.
+describe("Schemas vs. payloads reales de la UI", () => {
+  it("editar cancha acepta descripción vacía como null", () => {
+    const result = updateCanchaSchema.safeParse({
+      nombre: "Cancha 1",
+      tipo: "F5",
+      capacidad: 10,
+      descripcion: null,
+      servicios: ["Parqueadero"],
+      duracionSlotMinutos: 60,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("los horarios aceptan HH:MM y HH:MM:SS", () => {
+    expect(createSlotSchema.safeParse({ diaSemana: 1, horaApertura: "08:00:00", horaCierre: "23:00:00" }).success).toBe(true);
+    expect(updateSlotSchema.safeParse({ horaCierre: "22:00" }).success).toBe(true);
+    expect(updateSlotSchema.safeParse({ horaCierre: "22h" }).success).toBe(false);
+  });
+
+  it("editar complejo acepta campos vacíos como null", () => {
+    const result = updateComplejoSchema.safeParse({
+      nombre: "El Campín",
+      tipoVia: "Calle",
+      numeroVia: "53",
+      numeroSec: null,
+      complemento: null,
+      ciudad: null,
+      departamento: null,
+      descripcion: null,
+      telefono: null,
+      email: null,
+      instagram: null,
+      tiktok: null,
+      twitter: null,
+      facebook: null,
+      lat: null,
+      lng: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("editar complejo sigue validando rangos", () => {
+    expect(updateComplejoSchema.safeParse({ lat: 200 }).success).toBe(false);
+  });
+});
 
 describe("Auth Schemas", () => {
   it("loginSchema valida email y password requeridos", () => {
