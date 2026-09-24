@@ -11,6 +11,7 @@ export const usuarios = pgTable(
     apellido: varchar("apellido", { length: 100 }).notNull(),
     apodo: varchar("apodo", { length: 50 }),
     telefono: varchar("telefono", { length: 20 }),
+    codigoPais: varchar("codigo_pais", { length: 5 }).default("+57").notNull(),
     rol: rolUsuarioEnum("rol").default("PLAYER").notNull(),
     avatarUrl: varchar("avatar_url", { length: 500 }),
     instagram: varchar("instagram", { length: 100 }),
