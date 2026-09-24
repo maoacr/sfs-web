@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { db, reservas, canchas, tarifas, estadoReservaEnum, type Reserva } from "@sfs/db";
-import { and, eq, gt, gte, inArray, isNull, lt, lte, sum, asc, type SQL } from "drizzle-orm";
+import { db, reservas, canchas, tarifas, slotConfigs, estadoReservaEnum, type Reserva } from "@sfs/db";
+import { and, eq, gt, inArray, isNull, lt, sum, asc, type SQL } from "drizzle-orm";
+import { aInstante } from "@/lib/zona-horaria";
+import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
+import { reservasDelDiaLocal } from "@/lib/consultas";
 import { apiHandler } from "@/lib/api-handler";
 import { createReservaSchema, type CreateReservaInput } from "@/lib/schemas";
 import { notificarReserva } from "@/lib/event-listeners";
@@ -21,9 +24,7 @@ export const POST = apiHandler<CreateReservaInput>(
     }
 
     const user = ctx.user!;
-    const { canchaId, slotInicio, slotFin, playerId } = body;
-    const inicio = new Date(slotInicio);
-    const fin = new Date(slotFin);
+    const { canchaId, fecha, hora, playerId } = body;
 
     // ─── 1. Bloqueo por saldo pendiente ──────────────────────────────────
 
@@ -49,7 +50,11 @@ export const POST = apiHandler<CreateReservaInput>(
 
     const cancha = await db.query.canchas.findFirst({
       where: and(eq(canchas.id, canchaId), isNull(canchas.deletedAt)),
-      columns: { id: true, tenantId: true },
+      columns: { id: true, tenantId: true, duracionSlotMinutos: true },
+      with: {
+        complejo: { columns: { zonaHoraria: true } },
+        slots: { where: eq(slotConfigs.diaSemana, diaSemanaDeFecha(fecha)) },
+      },
     });
 
     if (!cancha) {
@@ -59,6 +64,23 @@ export const POST = apiHandler<CreateReservaInput>(
     const esOwner = user.role === "OWNER";
     if (esOwner && cancha.tenantId !== user.sub) {
       return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
+    }
+
+    if (
+      !turnoDentroDeHorario({
+        slotConfig: cancha.slots[0],
+        hora,
+        duracionMinutos: cancha.duracionSlotMinutos,
+      })
+    ) {
+      return NextResponse.json({ error: "La cancha no está abierta en ese horario" }, { status: 400 });
+    }
+
+    const inicio = aInstante(fecha, hora, cancha.complejo.zonaHoraria);
+    const fin = new Date(inicio.getTime() + cancha.duracionSlotMinutos * 60 * 1000);
+
+    if (!esOwner && inicio.getTime() <= Date.now()) {
+      return NextResponse.json({ error: "Ese horario ya pasó" }, { status: 400 });
     }
 
     const finalPlayerId = esOwner ? playerId || user.sub : user.sub;
@@ -84,11 +106,7 @@ export const POST = apiHandler<CreateReservaInput>(
 
     // ─── 4. Calcular precio con el motor ─────────────────────────────────
 
-    const precio = await calcularPrecio(
-      canchaId,
-      inicio.toISOString().slice(0, 10),
-      inicio.toISOString().slice(11, 16)
-    );
+    const precio = await calcularPrecio(canchaId, fecha, hora);
 
     let montoTotal = 0;
     if (precio.success) {
@@ -147,10 +165,10 @@ export const GET = apiHandler(
     ];
 
     if (fecha) {
-      condiciones.push(
-        gte(reservas.slotInicio, new Date(fecha + "T00:00:00.000Z")),
-        lte(reservas.slotInicio, new Date(fecha + "T23:59:59.999Z"))
-      );
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        return NextResponse.json({ error: "Fecha inválida. Usá YYYY-MM-DD" }, { status: 400 });
+      }
+      condiciones.push(inArray(reservas.id, reservasDelDiaLocal(fecha)));
     }
 
     if (estado) {
@@ -166,7 +184,7 @@ export const GET = apiHandler(
       with: {
         cancha: {
           columns: { nombre: true, tipo: true },
-          with: { complejo: { columns: { nombre: true } } },
+          with: { complejo: { columns: { nombre: true, zonaHoraria: true } } },
         },
         player: { columns: { nombre: true, apellido: true, apodo: true, telefono: true } },
       },

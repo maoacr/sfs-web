@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatAddress } from "@/lib/address";
+import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 
 interface Complejo { id: string; nombre: string; direccion: string; canchas: { id: string; nombre: string; tipo: string }[]; }
 
@@ -20,7 +21,7 @@ export default function OwnerDashboard() {
     const load = () => {
       Promise.all([
         fetch("/api/complejos").then(r => r.json()),
-        fetch(`/api/reservas?fecha=${new Date().toISOString().slice(0, 10)}&estado=CONFIRMADA`).then(r => r.json()),
+        fetch(`/api/reservas?fecha=&estado=CONFIRMADA`).then(r => r.json()),
       ]).then(([complejosData, reservasData]) => {
         setComplejos(Array.isArray(complejosData) ? complejosData : []);
         setReservasHoy(Array.isArray(reservasData) ? reservasData.length : 0);
@@ -76,7 +77,7 @@ export default function OwnerDashboard() {
                   <p className="text-sm font-semibold text-text">{r.cancha.nombre}</p>
                   <p className="text-xs text-text-dim">{r.cancha.complejo.nombre}</p>
                   <p className="text-sm font-medium text-grass-light mt-2">
-                    {new Date(r.slotInicio).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })} – {new Date(r.slotFin).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                    {formatearHora(r.slotInicio, r.cancha.complejo.zonaHoraria)} – {formatearHora(r.slotFin, r.cancha.complejo.zonaHoraria)}
                   </p>
                   <p className="text-xs text-text-dim mt-0.5">
                     {r.player.primerNombre} {r.player.apellidos}

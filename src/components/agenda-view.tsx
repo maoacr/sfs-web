@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { fechaDeCalendario } from "@/lib/zona-horaria";
 
 interface ReservaInfo { id: string; estado: string; player: string; apodo: string | null; telefono: string | null }
-interface Slot { inicio: string; fin: string; disponible: boolean; reserva?: ReservaInfo }
+interface Slot { inicio: string; fin: string; horaInicio: string; horaFin: string; disponible: boolean; reserva?: ReservaInfo }
 interface CanchaAgenda { id: string; nombre: string; tipo: string; duracionSlotMinutos: number; complejo: { nombre: string; direccion: string } }
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -68,7 +69,7 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
 
   function cargarSlots(fecha: Date) {
     setLoading(true);
-    const day = fecha.toISOString().slice(0, 10);
+    const day = fechaDeCalendario(fecha);
     fetch(`/api/disponibilidad?fecha=${day}`)
       .then(r => r.json())
       .then(data => {
@@ -110,8 +111,7 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
     finally { setCancelling(false); }
   }
 
-  const fH = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
-  const fF = (d: Date) => d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
+  const fF =(d: Date) => d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 
   const mesActual = MESES[semanaLunes.getMonth()];
   const añoActual = semanaLunes.getFullYear();
@@ -195,7 +195,7 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
                   }`}>
                   <div className="flex items-center gap-3">
                     <span className={`h-2.5 w-2.5 rounded-full ${slot.disponible ? "bg-grass" : "bg-error"}`} />
-                    <span className="text-sm font-medium text-text">{fH(slot.inicio)} – {fH(slot.fin)}</span>
+                    <span className="text-sm font-medium text-text">{slot.horaInicio} – {slot.horaFin}</span>
                   </div>
                   <span className={`text-xs font-medium ${slot.disponible ? "text-grass-light" : "text-error"}`}>
                     {slot.disponible ? "Libre" : slot.reserva?.player || "Reservado"}
@@ -214,7 +214,7 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-lg font-bold text-text">Reserva</h3>
-                <p className="text-sm text-text-muted mt-0.5">{fH(selectedSlot.inicio)} – {fH(selectedSlot.fin)}</p>
+                <p className="text-sm text-text-muted mt-0.5">{selectedSlot.horaInicio} – {selectedSlot.horaFin}</p>
               </div>
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 selectedSlot.reserva.estado === "CONFIRMADA" ? "bg-grass/20 text-grass-light" : "bg-warning/20 text-warning"

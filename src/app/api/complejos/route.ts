@@ -71,6 +71,7 @@ export const POST = apiHandler<CreateComplejoInput>(
         tiktok: body.tiktok || null,
         twitter: body.twitter || null,
         facebook: body.facebook || null,
+        zonaHoraria: body.zonaHoraria,
         latitud: body.lat !== undefined ? String(body.lat) : null,
         longitud: body.lng !== undefined ? String(body.lng) : null,
       })

@@ -7,10 +7,11 @@ import { Pagination } from "swiper/modules";
 import { useRouter } from "next/navigation";
 import { sileo } from "sileo";
 import { formatAddress } from "@/lib/address";
+import { fechaHoy } from "@/lib/zona-horaria";
 import "swiper/css";
 import "swiper/css/pagination";
 
-interface Slot { inicio: string; fin: string; disponible: boolean }
+interface Slot { inicio: string; fin: string; horaInicio: string; horaFin: string; disponible: boolean }
 interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; imagenes: string[]; slots: Slot[] }
 interface ComplejoSlot { id: string; nombre: string; direccion: string; telefono: string | null; lat: number | null; lng: number | null; canchas: CanchaSlot[] }
 
@@ -18,7 +19,7 @@ const TIPOS = ["F5", "F6", "F7", "F8", "F9", "F11"];
 
 export default function PlayerBuscar() {
   const router = useRouter();
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => fechaHoy());
   const [tipo, setTipo] = useState("");
   const [complejos, setComplejos] = useState<ComplejoSlot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,13 +61,11 @@ export default function PlayerBuscar() {
   async function reservar(canchaId: string, slot: Slot) {
     setBooking(slot.inicio);
     try {
-      // Redirigir al checkout con fecha y hora preseleccionadas
-      const hora = new Date(slot.inicio).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: false });
-      router.push(`/player/reservar/${canchaId}?fecha=${fecha}&hora=${hora}`);
+      // fecha y hora son locales de la cancha, tal como las calculó el servidor
+      router.push(`/player/reservar/${canchaId}?fecha=${fecha}&hora=${slot.horaInicio}`);
     } finally { setBooking(null); }
   }
 
-  const fH = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
   const fP = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
   const fechaLarga = (f: string) => new Date(f + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
 
@@ -137,7 +136,7 @@ export default function PlayerBuscar() {
           cancha={selectedCancha} complejoNombre={selectedCancha.complejoNombre}
           complejoDireccion={selectedCancha.complejoDireccion}
           complejoLat={selectedCancha.complejoLat} complejoLng={selectedCancha.complejoLng}
-          fH={fH} fP={fP} booking={booking}
+          fP={fP} booking={booking}
           onReservar={reservar} onClose={() => setSelectedCancha(null)}
         />
       )}
@@ -278,10 +277,10 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
    Cancha Detail Sheet
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, fH, fP, booking, onReservar, onClose }: {
+function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, fP, booking, onReservar, onClose }: {
   cancha: CanchaSlot; complejoNombre: string; complejoDireccion: string;
   complejoLat: number | null; complejoLng: number | null;
-  fH: (iso: string) => string; fP: (n: number) => string;
+  fP: (n: number) => string;
   booking: string | null; onReservar: (canchaId: string, slot: Slot) => void; onClose: () => void;
 }) {
   const slotsLibres = cancha.slots.filter(s => s.disponible);
@@ -310,7 +309,7 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
           </div>
           <DetailImage cancha={cancha} fP={fP} onClose={onClose} />
           <DetailContent cancha={cancha} complejoNombre={complejoNombre} complejoDireccion={complejoDireccion}
-            complejoLat={complejoLat} complejoLng={complejoLng} fH={fH} slotsLibres={slotsLibres}
+            complejoLat={complejoLat} complejoLng={complejoLng} slotsLibres={slotsLibres}
             booking={booking} onReservar={onReservar} />
         </div>
 
@@ -364,7 +363,7 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
                   <button key={slot.inicio} disabled={booking === slot.inicio}
                     onClick={() => onReservar(cancha.id, slot)}
                     className={`rounded-xl border border-grass/30 bg-white/5 backdrop-blur-sm px-3 py-2.5 text-sm font-medium text-grass-light hover:bg-grass/10 hover:border-grass active:scale-[0.97] transition-all ${booking === slot.inicio ? "opacity-40" : ""}`}>
-                    {fH(slot.inicio)} – {fH(slot.fin)}
+                    {slot.horaInicio} – {slot.horaFin}
                   </button>
                 ))}
               </div>
@@ -397,10 +396,10 @@ function DetailImage({ cancha, fP, onClose, className = "" }: {
   );
 }
 
-function DetailContent({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, fH, slotsLibres, booking, onReservar }: {
+function DetailContent({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, slotsLibres, booking, onReservar }: {
   cancha: CanchaSlot; complejoNombre: string; complejoDireccion: string;
   complejoLat: number | null; complejoLng: number | null;
-  fH: (iso: string) => string; slotsLibres: Slot[]; booking: string | null;
+  slotsLibres: Slot[]; booking: string | null;
   onReservar: (canchaId: string, slot: Slot) => void;
 }) {
   return (
@@ -445,7 +444,7 @@ function DetailContent({ cancha, complejoNombre, complejoDireccion, complejoLat,
               <button key={slot.inicio} disabled={booking === slot.inicio}
                 onClick={() => onReservar(cancha.id, slot)}
                 className={`rounded-xl border border-grass/40 px-4 py-3 text-sm font-medium text-grass-light hover:bg-field hover:border-grass active:scale-[0.97] transition-all ${booking === slot.inicio ? "opacity-60" : ""}`}>
-                {fH(slot.inicio)} – {fH(slot.fin)}
+                {slot.horaInicio} – {slot.horaFin}
               </button>
             ))}
           </div>

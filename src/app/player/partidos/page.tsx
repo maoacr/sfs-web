@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 
 interface PartidoPublico {
   id: string;
-  reserva: { slotInicio: string; slotFin: string; montoTotal: number; montoPagado: number };
+  reserva: { slotInicio: string; slotFin: string; montoTotal: number; montoPagado: number; zonaHoraria: string };
   equipoA: { id: string; nombre: string } | null;
   equipoB: { id: string; nombre: string } | null;
   _count: { jugadores: number };
@@ -14,7 +15,7 @@ interface PartidoPublico {
 export default function CalendarioPage() {
   const [partidos, setPartidos] = useState<PartidoPublico[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => fechaHoy());
   const [ciudad, setCiudad] = useState("Medellin");
 
   useEffect(() => {
@@ -54,9 +55,7 @@ export default function CalendarioPage() {
       ) : (
         <div className="space-y-3">
           {partidos.map((p) => {
-            const hora = new Date(p.reserva.slotInicio).toLocaleTimeString("es-CO", {
-              hour: "2-digit", minute: "2-digit",
-            });
+            const hora = formatearHora(p.reserva.slotInicio, p.reserva.zonaHoraria);
             const progreso = Math.round((p.reserva.montoPagado / p.reserva.montoTotal) * 100) || 0;
 
             return (

@@ -24,6 +24,7 @@ export const complejos = pgTable(
     tiktok: varchar("tiktok", { length: 100 }),
     twitter: varchar("twitter", { length: 100 }),
     facebook: varchar("facebook", { length: 100 }),
+    zonaHoraria: varchar("zona_horaria", { length: 64 }).default("America/Bogota").notNull(),
     latitud: decimal("latitud", { precision: 10, scale: 7 }),
     longitud: decimal("longitud", { precision: 10, scale: 7 }),
     politicaCancelacionHoras: decimal("politica_cancelacion_horas", { precision: 5, scale: 2 }).default("24.00"),

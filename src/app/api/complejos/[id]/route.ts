@@ -4,6 +4,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 import { formatAddress } from "@/lib/address";
 import { toApiCancha, toApiComplejo } from "@/lib/db-mappers";
+import { esZonaHorariaValida } from "@/lib/zona-horaria";
 
 /**
  * GET /api/complejos/[id]
@@ -82,6 +83,12 @@ export async function PUT(
     if (body.tiktok !== undefined) updateData.tiktok = body.tiktok;
     if (body.twitter !== undefined) updateData.twitter = body.twitter;
     if (body.facebook !== undefined) updateData.facebook = body.facebook;
+    if (body.zonaHoraria !== undefined) {
+      if (typeof body.zonaHoraria !== "string" || !esZonaHorariaValida(body.zonaHoraria)) {
+        return NextResponse.json({ error: "Zona horaria inválida" }, { status: 400 });
+      }
+      updateData.zonaHoraria = body.zonaHoraria;
+    }
     if (body.lat !== undefined) updateData.latitud = body.lat !== null ? String(body.lat) : null;
     if (body.lng !== undefined) updateData.longitud = body.lng !== null ? String(body.lng) : null;
 

@@ -5,6 +5,7 @@ import {
   parseHoraToMinutes,
   formatMinutesToHora,
   calcularPrecioSlot,
+  turnoDentroDeHorario,
 } from "../lib/disponibilidad";
 
 describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
@@ -72,6 +73,24 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
     });
   });
 
+  describe("turnoDentroDeHorario", () => {
+    const slotConfig = { diaSemana: 1, horaApertura: "07:00:00", horaCierre: "23:00:00" };
+
+    it("acepta turnos que empiezan y terminan dentro del horario", () => {
+      expect(turnoDentroDeHorario({ slotConfig, hora: "07:00", duracionMinutos: 60 })).toBe(true);
+      expect(turnoDentroDeHorario({ slotConfig, hora: "22:00", duracionMinutos: 60 })).toBe(true);
+    });
+
+    it("rechaza turnos antes de abrir o que terminan después de cerrar", () => {
+      expect(turnoDentroDeHorario({ slotConfig, hora: "03:00", duracionMinutos: 60 })).toBe(false);
+      expect(turnoDentroDeHorario({ slotConfig, hora: "22:30", duracionMinutos: 60 })).toBe(false);
+    });
+
+    it("rechaza cuando la cancha no abre ese día", () => {
+      expect(turnoDentroDeHorario({ slotConfig: undefined, hora: "10:00", duracionMinutos: 60 })).toBe(false);
+    });
+  });
+
   describe("Generación de Slots de Jornada Completa", () => {
     const slotConfig = {
       diaSemana: 1, // Lunes
@@ -87,6 +106,7 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
         reservas: [],
         tarifas: [{ id: "t1", precioBase: 100000, factor: 1 }],
         nowTimestamp: new Date("2026-10-01T00:00:00Z").getTime(),
+        zonaHoraria: "America/Bogota",
       });
 
       expect(slots.length).toBe(16);
@@ -97,12 +117,27 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
       expect(slots.every((s) => s.disponible)).toBe(true);
     });
 
+    it("genera los instantes en la zona horaria de la cancha", () => {
+      const slots = calcularSlotsDisponibles({
+        fechaIso: "2026-10-05",
+        slotConfig,
+        duracionSlotMinutos: 60,
+        reservas: [],
+        tarifas: [{ id: "t1", precioBase: 100000, factor: 1 }],
+        nowTimestamp: new Date("2026-10-01T00:00:00Z").getTime(),
+        zonaHoraria: "America/Bogota",
+      });
+
+      expect(slots[0].inicio).toBe("2026-10-05T12:00:00.000Z"); // 07:00 Bogotá
+      expect(slots[slots.length - 1].fin).toBe("2026-10-06T04:00:00.000Z"); // 23:00 Bogotá
+    });
+
     it("bloquea el slot correspondiente cuando existe una reserva confirmada", () => {
       const reservas = [
         {
           id: "res-1",
-          slotInicio: "2026-10-05T10:00:00.000Z",
-          slotFin: "2026-10-05T11:00:00.000Z",
+          slotInicio: "2026-10-05T15:00:00.000Z",
+          slotFin: "2026-10-05T16:00:00.000Z",
           estado: "CONFIRMADA",
           player: { nombre: "Carlos", apellido: "Valderrama", apodo: "Pibe" },
         },
@@ -115,6 +150,7 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
         reservas,
         tarifas: [{ id: "t1", precioBase: 100000, factor: 1 }],
         nowTimestamp: new Date("2026-10-01T00:00:00Z").getTime(),
+        zonaHoraria: "America/Bogota",
       });
 
       const slot10 = slots.find((s) => s.horaInicio === "10:00");
@@ -131,8 +167,8 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
       const reservas = [
         {
           id: "res-partido-largo",
-          slotInicio: "2026-10-05T14:00:00.000Z",
-          slotFin: "2026-10-05T15:30:00.000Z", // 90 minutos
+          slotInicio: "2026-10-05T19:00:00.000Z",
+          slotFin: "2026-10-05T20:30:00.000Z", // 90 minutos
           estado: "CONFIRMADA",
         },
       ];
@@ -144,6 +180,7 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
         reservas,
         tarifas: [{ id: "t1", precioBase: 100000, factor: 1 }],
         nowTimestamp: new Date("2026-10-01T00:00:00Z").getTime(),
+        zonaHoraria: "America/Bogota",
       });
 
       const slot14 = slots.find((s) => s.horaInicio === "14:00");
@@ -156,8 +193,8 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
     });
 
     it("marca como no disponibles los slots pasados para el día actual", () => {
-      // Supongamos que son las 11:30 del mismo día
-      const nowTimestamp = new Date("2026-10-05T11:30:00.000Z").getTime();
+      // Son las 11:30 en Bogotá (16:30 UTC)
+      const nowTimestamp = new Date("2026-10-05T16:30:00.000Z").getTime();
 
       const slots = calcularSlotsDisponibles({
         fechaIso: "2026-10-05",
@@ -166,6 +203,7 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
         reservas: [],
         tarifas: [{ id: "t1", precioBase: 100000, factor: 1 }],
         nowTimestamp,
+        zonaHoraria: "America/Bogota",
       });
 
       const slot07 = slots.find((s) => s.horaInicio === "07:00");

@@ -7,7 +7,8 @@ import {
   canchas,
   complejos,
 } from "@sfs/db";
-import { and, desc, eq, gte, ilike, inArray, lte, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { empiezaElDiaLocal } from "@/lib/consultas";
 import { apiHandler } from "@/lib/api-handler";
 import { crearPartidoSchema, type CrearPartidoInput } from "@/lib/schemas";
 import { toApiCancha, toApiUsuario, USUARIO_PUBLICO } from "@/lib/db-mappers";
@@ -28,10 +29,10 @@ export const GET = apiHandler(
     if (fecha || ciudad) {
       const filtros: SQL[] = [];
       if (fecha) {
-        filtros.push(
-          gte(reservas.slotInicio, new Date(fecha + "T00:00:00.000Z")),
-          lte(reservas.slotInicio, new Date(fecha + "T23:59:59.999Z"))
-        );
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+          return NextResponse.json({ error: "Fecha inválida. Usá YYYY-MM-DD" }, { status: 400 });
+        }
+        filtros.push(empiezaElDiaLocal(fecha));
       }
       if (ciudad) filtros.push(ilike(complejos.ciudad, `%${ciudad}%`));
 
@@ -47,6 +48,9 @@ export const GET = apiHandler(
         with: {
           reserva: {
             columns: { slotInicio: true, slotFin: true, montoTotal: true, montoPagado: true },
+            with: {
+              cancha: { columns: {}, with: { complejo: { columns: { zonaHoraria: true } } } },
+            },
           },
           equipoA: { columns: { id: true, nombre: true } },
           equipoB: { columns: { id: true, nombre: true } },
@@ -57,7 +61,11 @@ export const GET = apiHandler(
       });
 
       return NextResponse.json(
-        lista.map(({ jugadores, ...p }) => ({ ...p, _count: { jugadores: jugadores.length } }))
+        lista.map(({ jugadores, reserva: { cancha, ...reserva }, ...p }) => ({
+          ...p,
+          reserva: { ...reserva, zonaHoraria: cancha.complejo.zonaHoraria },
+          _count: { jugadores: jugadores.length },
+        }))
       );
     }
 
@@ -77,7 +85,7 @@ export const GET = apiHandler(
           with: {
             cancha: {
               columns: { nombre: true, tipo: true },
-              with: { complejo: { columns: { nombre: true } } },
+              with: { complejo: { columns: { nombre: true, zonaHoraria: true } } },
             },
           },
         },

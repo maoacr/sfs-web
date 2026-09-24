@@ -47,7 +47,10 @@ export async function notificarReserva(reservaId: string, tipo: EventoReserva) {
   const r = await db.query.reservas.findFirst({
     where: eq(reservas.id, reservaId),
     with: {
-      cancha: { columns: { nombre: true }, with: { complejo: { columns: { nombre: true } } } },
+      cancha: {
+        columns: { nombre: true },
+        with: { complejo: { columns: { nombre: true, zonaHoraria: true } } },
+      },
       player: { columns: { nombre: true, apellido: true, email: true } },
       tenant: { columns: { email: true } },
     },
@@ -61,6 +64,7 @@ export async function notificarReserva(reservaId: string, tipo: EventoReserva) {
     complejoNombre: r.cancha.complejo.nombre,
     slotInicio: r.slotInicio,
     slotFin: r.slotFin,
+    zonaHoraria: r.cancha.complejo.zonaHoraria,
     playerId: r.playerId,
     playerNombre: nombreCompleto(r.player),
     playerEmail: r.player.email,
@@ -76,6 +80,7 @@ export async function notificarCambioReserva(event: {
   complejoNombre: string;
   slotInicio: Date;
   slotFin: Date;
+  zonaHoraria: string;
   playerId: string;
   playerNombre: string;
   playerEmail: string;

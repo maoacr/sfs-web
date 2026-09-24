@@ -1,3 +1,11 @@
+import { aInstante } from "@/lib/zona-horaria";
+
+/** Día de la semana (0=Domingo) de una fecha de calendario, independiente de la zona. */
+export function diaSemanaDeFecha(fechaIso: string): number {
+  const [year, month, day] = fechaIso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
 export interface SlotConfigItem {
   diaSemana: number;
   horaApertura: string | Date;
@@ -136,15 +144,30 @@ export function calcularPrecioSlot(
   return { precio: Math.round(base * factor), tarifaId: tarifaFallback.id };
 }
 
+export function turnoDentroDeHorario(params: {
+  slotConfig: SlotConfigItem | undefined;
+  hora: string;
+  duracionMinutos: number;
+}): boolean {
+  const { slotConfig, hora, duracionMinutos } = params;
+  if (!slotConfig) return false;
+  const inicio = parseHoraToMinutes(hora);
+  return (
+    inicio >= parseHoraToMinutes(slotConfig.horaApertura) &&
+    inicio + duracionMinutos <= parseHoraToMinutes(slotConfig.horaCierre)
+  );
+}
+
 /**
  * Calcula todos los slots disponibles de una cancha para una fecha específica.
  */
 export function calcularSlotsDisponibles(params: {
-  fechaIso: string; // "YYYY-MM-DD"
+  fechaIso: string; // "YYYY-MM-DD" en la zona de la cancha
   slotConfig: SlotConfigItem;
   duracionSlotMinutos: number;
   reservas: ReservaItem[];
   tarifas: TarifaItem[];
+  zonaHoraria: string;
   nowTimestamp?: number; // Para tests deterministas
 }): SlotCalculado[] {
   const {
@@ -153,6 +176,7 @@ export function calcularSlotsDisponibles(params: {
     duracionSlotMinutos,
     reservas,
     tarifas,
+    zonaHoraria,
     nowTimestamp = Date.now(),
   } = params;
 
@@ -163,10 +187,7 @@ export function calcularSlotsDisponibles(params: {
     return [];
   }
 
-  // Extraer día de la semana (0=Domingo, 6=Sábado) en UTC
-  const [year, month, day] = fechaIso.split("-").map(Number);
-  const fechaBase = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-  const diaSemana = fechaBase.getUTCDay();
+  const diaSemana = diaSemanaDeFecha(fechaIso);
 
   const slots: SlotCalculado[] = [];
   let cursorMin = aperturaMin;
@@ -174,8 +195,8 @@ export function calcularSlotsDisponibles(params: {
   while (cursorMin + duracionSlotMinutos <= cierreMin) {
     const finMin = cursorMin + duracionSlotMinutos;
 
-    const slotInicioDate = new Date(fechaBase.getTime() + cursorMin * 60 * 1000);
-    const slotFinDate = new Date(fechaBase.getTime() + finMin * 60 * 1000);
+    const slotInicioDate = aInstante(fechaIso, formatMinutesToHora(cursorMin), zonaHoraria);
+    const slotFinDate = aInstante(fechaIso, formatMinutesToHora(finMin), zonaHoraria);
 
     // Si el turno ya pasó hoy, se puede omitir o marcar no disponible
     const esPasado = slotInicioDate.getTime() < nowTimestamp;

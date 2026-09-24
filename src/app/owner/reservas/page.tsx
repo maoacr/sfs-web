@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 
 interface Reserva {
-  id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string } };
+  id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
   player: { primerNombre: string; apellidos: string; apodo: string | null; telefono: string | null };
   slotInicio: string; slotFin: string; montoTotal: number; estado: string;
 }
@@ -20,11 +21,12 @@ interface ComplejoOpt { id: string; nombre: string; canchas: { id: string; nombr
 
 export default function OwnerReservas() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => fechaHoy());
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [complejos, setComplejos] = useState<ComplejoOpt[]>([]);
   const [filter, setFilter] = useState<Filter>({ complejoId: "", canchaId: "" });
+  const [recargas, setRecargas] = useState(0);
 
   useEffect(() => {
     fetch("/api/complejos").then(r => r.json()).then(data => setComplejos(Array.isArray(data) ? data : []));
@@ -36,7 +38,7 @@ export default function OwnerReservas() {
       .then(r => r.json()).then(data => setReservas(Array.isArray(data) ? data : []))
       .catch(() => setReservas([]))
       .finally(() => setLoading(false));
-  }, [fecha]);
+  }, [fecha, recargas]);
 
   async function cambiarEstado(id: string, estado: string) {
     await fetch(`/api/reservas/${id}`, {
@@ -51,8 +53,7 @@ export default function OwnerReservas() {
     return true;
   });
 
-  const fH = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
-  const fP = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
+  const fP =(n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
   const s = "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
 
   return (
@@ -94,8 +95,8 @@ export default function OwnerReservas() {
             <div key={r.id} className="rounded-lg border border-border bg-surface p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <div className="text-center min-w-[55px]">
-                  <p className="text-base font-bold text-text">{fH(r.slotInicio)}</p>
-                  <p className="text-[10px] text-text-dim">{fH(r.slotFin)}</p>
+                  <p className="text-base font-bold text-text">{formatearHora(r.slotInicio, r.cancha.complejo.zonaHoraria)}</p>
+                  <p className="text-[10px] text-text-dim">{formatearHora(r.slotFin, r.cancha.complejo.zonaHoraria)}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text">{r.cancha.nombre} <span className="text-xs text-text-dim font-normal">({r.cancha.tipo})</span></p>
@@ -123,7 +124,7 @@ export default function OwnerReservas() {
         )}
       </div>
 
-      {showNew && <NewReservaModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); setFecha(fecha); }} />}
+      {showNew && <NewReservaModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); setRecargas(n => n + 1); }} />}
     </div>
   );
 }
@@ -131,7 +132,7 @@ export default function OwnerReservas() {
 function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [canchas, setCanchas] = useState<any[]>([]);
   const [canchaId, setCanchaId] = useState("");
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => fechaHoy());
   const [hora, setHora] = useState("18:00");
   const [playerNombre, setPlayerNombre] = useState("");
   const [loading, setLoading] = useState(false);
@@ -141,13 +142,10 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setLoading(true); setError("");
-    const cancha = canchas.find(c => c.id === canchaId);
-    const dur = cancha?.duracionSlotMinutos || 60;
-    const inicio = new Date(fecha + "T" + hora + ":00");
-    const fin = new Date(inicio.getTime() + dur * 60000);
     try {
+      // fecha y hora son locales de la cancha; el servidor calcula el instante y la duración
       const res = await fetch("/api/reservas", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canchaId, slotInicio: inicio.toISOString(), slotFin: fin.toISOString(), playerNombre }) });
+        body: JSON.stringify({ canchaId, fecha, hora, playerNombre }) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       onCreated();
     } catch (err) { setError(err instanceof Error ? err.message : "Error"); }

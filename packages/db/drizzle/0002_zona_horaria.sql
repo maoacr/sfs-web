@@ -1,0 +1,1 @@
+ALTER TABLE "complejos" ADD COLUMN "zona_horaria" varchar(64) DEFAULT 'America/Bogota' NOT NULL;

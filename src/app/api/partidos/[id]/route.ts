@@ -3,6 +3,7 @@ import { db, partidos, pagos } from "@sfs/db";
 import { desc, eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { nombreCompleto, toApiCancha, toApiUsuario, USUARIO_PUBLICO } from "@/lib/db-mappers";
+import { formatearHora } from "@/lib/zona-horaria";
 
 /**
  * GET /api/partidos/:id
@@ -35,7 +36,7 @@ export const GET = apiHandler(
           with: {
             cancha: {
               columns: { nombre: true, tipo: true },
-              with: { complejo: { columns: { nombre: true, ciudad: true } } },
+              with: { complejo: { columns: { nombre: true, ciudad: true, zonaHoraria: true } } },
             },
             pagos: {
               where: eq(pagos.estadoPago, "APROBADO"),
@@ -92,14 +93,15 @@ export const GET = apiHandler(
       });
     }
 
-    const hora = (d: Date) => d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+    const { zonaHoraria } = reserva.cancha.complejo;
 
     return NextResponse.json({
       id: partido.id,
       reservaId: reserva.id,
       cancha: toApiCancha(reserva.cancha),
       fecha: reserva.slotInicio,
-      duracion: `${hora(reserva.slotInicio)} – ${hora(reserva.slotFin)}`,
+      zonaHoraria,
+      duracion: `${formatearHora(reserva.slotInicio, zonaHoraria)} – ${formatearHora(reserva.slotFin, zonaHoraria)}`,
       equipoA: partido.equipoA,
       equipoB: partido.equipoB,
       estado: reserva.estado,

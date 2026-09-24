@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db, canchas, slotConfigs, reservas } from "@sfs/db";
-import { eq, and, isNull, inArray, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, inArray, gt, lt } from "drizzle-orm";
 import { liberarReservasExpiradas } from "@/lib/ttl";
-import { calcularSlotsDisponibles } from "@/lib/disponibilidad";
+import { calcularSlotsDisponibles, diaSemanaDeFecha } from "@/lib/disponibilidad";
+import { ventanaDelDia } from "@/lib/zona-horaria";
 import { tiposCancha } from "@/lib/schemas";
 import { tipoCanchaToDb, tipoCanchaToApi, toApiComplejo } from "@/lib/db-mappers";
 
@@ -32,18 +33,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Tipo de cancha inválido" }, { status: 400 });
     }
 
-    const [yearStr, monthStr, dayStr] = fecha.split("-");
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10);
-    const day = parseInt(dayStr, 10);
-
-    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
       return NextResponse.json({ error: "Fecha inválida. Usá YYYY-MM-DD" }, { status: 400 });
     }
 
-    const fechaInicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-    const fechaFin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-    const diaSemana = fechaInicio.getUTCDay(); // 0=Domingo, 6=Sábado
+    // `fecha` es un día de calendario en la zona de cada cancha
+    const diaSemana = diaSemanaDeFecha(fecha);
+    const { desde, hasta } = ventanaDelDia(fecha);
 
     // Traer canchas con sus relaciones vía Drizzle
     const canchasList = await db.query.canchas.findMany({
@@ -63,8 +59,8 @@ export async function GET(request: Request) {
         reservas: {
           where: and(
             inArray(reservas.estado, ["PENDIENTE_PAGO", "PAGO_PARCIAL", "CONFIRMADA"]),
-            gte(reservas.slotInicio, fechaInicio),
-            lte(reservas.slotFin, fechaFin)
+            lt(reservas.slotInicio, hasta),
+            gt(reservas.slotFin, desde)
           ),
           with: {
             player: {
@@ -93,6 +89,7 @@ export async function GET(request: Request) {
           duracionSlotMinutos: cancha.duracionSlotMinutos,
           reservas: cancha.reservas,
           tarifas: cancha.tarifas,
+          zonaHoraria: cancha.complejo.zonaHoraria,
         });
 
         const precioBase = cancha.tarifas[0]?.precioBase ? Number(cancha.tarifas[0].precioBase) : null;
@@ -116,6 +113,7 @@ export async function GET(request: Request) {
             ciudad: cancha.complejo.ciudad,
             departamento: cancha.complejo.departamento,
             telefono: cancha.complejo.telefono,
+            zonaHoraria: cancha.complejo.zonaHoraria,
             latitud: cancha.complejo.latitud,
             longitud: cancha.complejo.longitud,
           }),

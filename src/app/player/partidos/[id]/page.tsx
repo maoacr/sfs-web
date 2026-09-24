@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { formatearFecha } from "@/lib/zona-horaria";
 
 interface JugadorInfo {
   userId: string;
@@ -15,6 +16,7 @@ interface JugadorInfo {
 interface PartidoDetail {
   id: string;
   reservaId: string;
+  zonaHoraria: string;
   cancha: { nombre: string; tipo: string; complejo: { nombre: string; ciudad: string } };
   fecha: string;
   duracion: string;
@@ -104,7 +106,7 @@ export default function PartidoDetailPage() {
         </div>
 
         <div className="flex gap-4 text-sm text-text-dim mb-4">
-          <span>📅 {new Date(partido.fecha).toLocaleDateString("es-CO")}</span>
+          <span>📅 {formatearFecha(partido.fecha, partido.zonaHoraria)}</span>
           <span>🕐 {partido.duracion}</span>
         </div>
 

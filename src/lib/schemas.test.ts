@@ -90,22 +90,31 @@ describe("Complejo Schemas", () => {
 });
 
 describe("Reserva Schemas", () => {
-  it("createReservaSchema rechaza fechas inválidas", () => {
+  it("createReservaSchema rechaza fecha y hora mal formadas", () => {
     const result = createReservaSchema.safeParse({
       canchaId: "123e4567-e89b-12d3-a456-426614174000",
-      slotInicio: "no es fecha",
-      slotFin: "tampoco",
+      fecha: "10/08/2026",
+      hora: "6pm",
     });
     expect(result.success).toBe(false);
   });
 
-  it("createReservaSchema acepta datos válidos", () => {
+  it("createReservaSchema acepta fecha y hora locales de la cancha", () => {
+    const result = createReservaSchema.safeParse({
+      canchaId: "123e4567-e89b-12d3-a456-426614174000",
+      fecha: "2026-08-10",
+      hora: "18:00",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("createReservaSchema ya no acepta instantes calculados por el cliente", () => {
     const result = createReservaSchema.safeParse({
       canchaId: "123e4567-e89b-12d3-a456-426614174000",
       slotInicio: "2026-08-10T18:00:00Z",
       slotFin: "2026-08-10T19:00:00Z",
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 });
 

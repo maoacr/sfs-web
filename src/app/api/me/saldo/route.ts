@@ -18,7 +18,7 @@ export const GET = apiHandler(
       with: {
         cancha: {
           columns: { nombre: true, tipo: true },
-          with: { complejo: { columns: { nombre: true } } },
+          with: { complejo: { columns: { nombre: true, zonaHoraria: true } } },
         },
       },
       orderBy: [asc(reservas.slotInicio)],
@@ -38,6 +38,7 @@ export const GET = apiHandler(
           complejo: r.cancha.complejo.nombre,
           tipo: tipoCanchaToApi(r.cancha.tipo),
           fecha: r.slotInicio,
+          zonaHoraria: r.cancha.complejo.zonaHoraria,
           montoTotal,
           montoPagado,
           saldoPendiente: Number(r.saldoPendiente),

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
 
 interface Reserva {
-  id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string } };
+  id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
   slotInicio: string; slotFin: string; montoTotal: number; estado: string;
 }
 
@@ -28,8 +29,7 @@ export default function PlayerReservas() {
     setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "CANCELADA" } : r));
   }
 
-  const fFecha = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
-  const fHora = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+
   const fPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
 
   const activas = reservas.filter(r => r.estado === "PENDIENTE_PAGO" || r.estado === "CONFIRMADA");
@@ -55,7 +55,7 @@ export default function PlayerReservas() {
             <section>
               <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">Próximas</h2>
               <div className="space-y-3">
-                {activas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} fFecha={fFecha} fHora={fHora} fPrecio={fPrecio} />)}
+                {activas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} fPrecio={fPrecio} />)}
               </div>
             </section>
           )}
@@ -63,7 +63,7 @@ export default function PlayerReservas() {
             <section>
               <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">Historial</h2>
               <div className="space-y-3">
-                {pasadas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} fFecha={fFecha} fHora={fHora} fPrecio={fPrecio} />)}
+                {pasadas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} fPrecio={fPrecio} />)}
               </div>
             </section>
           )}
@@ -73,9 +73,9 @@ export default function PlayerReservas() {
   );
 }
 
-function ReservaCard({ r, cancelar, fFecha, fHora, fPrecio }: {
+function ReservaCard({ r, cancelar, fPrecio }: {
   r: Reserva; cancelar: (id: string) => void;
-  fFecha: (iso: string) => string; fHora: (iso: string) => string; fPrecio: (n: number) => string;
+  fPrecio: (n: number) => string;
 }) {
   const s = ESTADOS[r.estado];
   return (
@@ -87,7 +87,7 @@ function ReservaCard({ r, cancelar, fFecha, fHora, fPrecio }: {
             <p className="font-semibold text-text">{r.cancha.nombre}</p>
             <p className="text-sm text-text-muted">{r.cancha.complejo.nombre} — {r.cancha.tipo}</p>
             <p className="text-sm text-text-muted mt-1">
-              {fFecha(r.slotInicio)} · {fHora(r.slotInicio)} – {fHora(r.slotFin)}
+              {formatearFecha(r.slotInicio, r.cancha.complejo.zonaHoraria, { weekday: "long", day: "numeric", month: "long" })} · {formatearHora(r.slotInicio, r.cancha.complejo.zonaHoraria)} – {formatearHora(r.slotFin, r.cancha.complejo.zonaHoraria)}
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { esZonaHorariaValida } from "@/lib/zona-horaria";
 
 // ─── Tipos de Cancha ─────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ const complejoCampos = z.object({
   descripcion: z.string().max(2000).optional(),
   lat: z.number().min(-90).max(90).optional(),
   lng: z.number().min(-180).max(180).optional(),
+  zonaHoraria: z.string().refine(esZonaHorariaValida, "Zona horaria inválida").optional(),
   telefono: z.string().max(20).optional(),
   email: z.string().email("Email inválido").max(255).optional().or(z.literal("")),
   instagram: z.string().max(30).optional(),
@@ -158,10 +160,12 @@ export const updateTarifaSchema = tarifaCampos.partial();
 
 // ─── Reservas ────────────────────────────────────────────────────────────────
 
+// fecha y hora son locales de la cancha; el servidor calcula el instante con
+// la zona horaria del complejo y la duración del turno.
 export const createReservaSchema = z.object({
   canchaId: z.string().min(1, "ID de cancha requerido"),
-  slotInicio: z.string().datetime("Fecha de inicio inválida (ISO 8601)"),
-  slotFin: z.string().datetime("Fecha de fin inválida (ISO 8601)"),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD requerido"),
+  hora: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido"),
   playerId: z.string().min(1).optional(),
   playerNombre: z.string().optional(),
 });

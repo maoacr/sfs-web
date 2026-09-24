@@ -30,7 +30,7 @@ export const GET = apiHandler(
           with: {
             cancha: {
               columns: { nombre: true, tipo: true },
-              with: { complejo: { columns: { nombre: true } } },
+              with: { complejo: { columns: { nombre: true, zonaHoraria: true } } },
             },
           },
         },

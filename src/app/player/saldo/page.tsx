@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatearFecha } from "@/lib/zona-horaria";
 
 interface SaldoData {
   saldoPendiente: number;
@@ -12,6 +13,7 @@ interface SaldoData {
     complejo: string;
     tipo: string;
     fecha: string;
+    zonaHoraria: string;
     montoTotal: number;
     montoPagado: number;
     saldoPendiente: number;
@@ -21,7 +23,7 @@ interface SaldoData {
 
 interface PartidoResumen {
   id: string;
-  cancha: { nombre: string; tipo: string; complejo: { nombre: string } };
+  cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
   fecha: string;
   total: number;
   pagado: number;
@@ -90,7 +92,7 @@ export default function PerfilPagosPage() {
                     <p className="text-xs text-text-dim">{r.complejo} · {r.tipo}</p>
                   </div>
                   <span className="text-xs text-text-dim">
-                    {new Date(r.fecha).toLocaleDateString("es-CO")}
+                    {formatearFecha(r.fecha, r.zonaHoraria)}
                   </span>
                 </div>
 
@@ -133,7 +135,7 @@ export default function PerfilPagosPage() {
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-semibold text-text">{p.cancha.nombre}</p>
                   <span className="text-xs text-text-dim">
-                    {new Date(p.fecha).toLocaleDateString("es-CO")}
+                    {formatearFecha(p.fecha, p.cancha.complejo.zonaHoraria)}
                   </span>
                 </div>
                 <p className="text-xs text-text-dim mb-2">{p.cancha.complejo.nombre}</p>

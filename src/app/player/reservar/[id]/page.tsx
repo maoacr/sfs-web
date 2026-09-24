@@ -144,13 +144,11 @@ export default function ReservarPage() {
     setSubmitting(true);
     setError("");
 
-    const slotInicio = new Date(`${prefilledFecha || fecha}T${prefilledHora || hora}:00`).toISOString();
-    const slotFin = new Date(new Date(`${prefilledFecha || fecha}T${prefilledHora || hora}:00`).getTime() + 60 * 60 * 1000).toISOString();
-
+    // fecha y hora son locales de la cancha; el servidor calcula el instante y la duración
     const resReserva = await fetch("/api/reservas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ canchaId, slotInicio, slotFin }),
+      body: JSON.stringify({ canchaId, fecha: prefilledFecha || fecha, hora: prefilledHora || hora }),
     });
     const reservaData = await resReserva.json();
 
