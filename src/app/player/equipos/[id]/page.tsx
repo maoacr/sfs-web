@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api-client";
 
 interface MiembroInfo {
   id: string;
@@ -43,7 +44,7 @@ export default function EquipoDetailPage() {
   const invitar = async () => {
     if (!userId.trim()) return;
     setInvitando(true);
-    await fetch(`/api/equipos/${id}/miembros`, {
+    await apiFetch(`/api/equipos/${id}/miembros`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: userId.trim() }),
@@ -54,7 +55,7 @@ export default function EquipoDetailPage() {
   };
 
   const remover = async (userId: string) => {
-    await fetch(`/api/equipos/${id}/miembros?userId=${userId}`, { method: "DELETE" });
+    await apiFetch(`/api/equipos/${id}/miembros?userId=${userId}`, { method: "DELETE" });
     load();
   };
 

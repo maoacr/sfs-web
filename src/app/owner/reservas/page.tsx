@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
+import { apiFetch } from "@/lib/api-client";
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
@@ -41,7 +42,7 @@ export default function OwnerReservas() {
   }, [fecha, recargas]);
 
   async function cambiarEstado(id: string, estado: string) {
-    await fetch(`/api/reservas/${id}`, {
+    await apiFetch(`/api/reservas/${id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado }),
     });
     setReservas(prev => prev.map(r => r.id === id ? { ...r, estado } : r));
@@ -53,7 +54,7 @@ export default function OwnerReservas() {
     return true;
   });
 
-  const fP =(n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
+  const fP = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
   const s = "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
 
   return (
@@ -144,7 +145,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
     e.preventDefault(); setLoading(true); setError("");
     try {
       // fecha y hora son locales de la cancha; el servidor calcula el instante y la duración
-      const res = await fetch("/api/reservas", { method: "POST", headers: { "Content-Type": "application/json" },
+      const res = await apiFetch("/api/reservas", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canchaId, fecha, hora, playerNombre }) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       onCreated();

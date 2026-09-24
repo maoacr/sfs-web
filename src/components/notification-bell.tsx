@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 interface Notif {
   id: string;
@@ -51,7 +52,7 @@ export function NotificationBell() {
   }
 
   async function marcarLeida(notif: Notif) {
-    await fetch("/api/notificaciones", {
+    await apiFetch("/api/notificaciones", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: notif.id }),
     });
@@ -65,7 +66,7 @@ export function NotificationBell() {
   }
 
   async function marcarTodas() {
-    await fetch("/api/notificaciones", {
+    await apiFetch("/api/notificaciones", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ todas: true }),
     });

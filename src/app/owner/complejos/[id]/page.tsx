@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ImageUploadZone } from "@/components/image-upload-zone";
 import { MapPicker } from "@/components/map-picker";
+import { apiFetch } from "@/lib/api-client";
 
 interface CanchaInfo { id: string; nombre: string; tipo: string; capacidad: number; _count: { reservas: number } }
 interface ImagenInfo { id: string; url: string; orden: number; principal: boolean }
@@ -60,7 +61,7 @@ export default function EditarComplejo() {
     e.preventDefault();
     setSaving(true); setError("");
     try {
-      const res = await fetch(`/api/complejos/${id}`, {
+      const res = await apiFetch(`/api/complejos/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre, tipoVia, numeroVia, numeroSec: numeroSec || null, complemento: complemento || null, ciudad: ciudad || null, departamento: departamento || null, descripcion: descripcion || null, telefono: telefono || null, email: email || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null, lat, lng }),
       });
@@ -75,7 +76,7 @@ export default function EditarComplejo() {
   async function handleDelete() {
     setDeleting(true);
     try {
-      await fetch(`/api/complejos/${id}`, { method: "DELETE" });
+      await apiFetch(`/api/complejos/${id}`, { method: "DELETE" });
       router.push("/owner/complejos"); router.refresh();
     } catch {
       setError("Error al eliminar");

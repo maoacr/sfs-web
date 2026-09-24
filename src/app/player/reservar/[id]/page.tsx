@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { apiFetch } from "@/lib/api-client";
 
 function getQueryParam(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -145,7 +146,7 @@ export default function ReservarPage() {
     setError("");
 
     // fecha y hora son locales de la cancha; el servidor calcula el instante y la duración
-    const resReserva = await fetch("/api/reservas", {
+    const resReserva = await apiFetch("/api/reservas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ canchaId, fecha: prefilledFecha || fecha, hora: prefilledHora || hora }),
@@ -158,7 +159,7 @@ export default function ReservarPage() {
       return;
     }
 
-    const resPago = await fetch(`/api/reservas/${reservaData.id}/pagar`, {
+    const resPago = await apiFetch(`/api/reservas/${reservaData.id}/pagar`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reservaId: reservaData.id, monto }),

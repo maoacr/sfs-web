@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface ImagenInfo {
   id: string;
@@ -35,7 +36,7 @@ export function ImageUploadZone({ imagenes, uploadUrl, onRefresh }: Props) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(uploadUrl, { method: "POST", body: formData });
+      const res = await apiFetch(uploadUrl, { method: "POST", body: formData });
       if (!res.ok) throw new Error("Error al subir");
       onRefresh();
     } catch {
@@ -66,7 +67,7 @@ export function ImageUploadZone({ imagenes, uploadUrl, onRefresh }: Props) {
   async function handleDelete(imagenId: string) {
     setDeleting(imagenId); setError("");
     try {
-      const res = await fetch(`${uploadUrl}?id=${imagenId}`, { method: "DELETE" });
+      const res = await apiFetch(`${uploadUrl}?id=${imagenId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Error al eliminar");
       onRefresh();
     } catch {

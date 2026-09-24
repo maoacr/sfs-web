@@ -146,7 +146,6 @@ export const POST = apiHandler<CreateReservaInput>(
     requireAuth: true,
     bodySchema: createReservaSchema,
     rateLimit: RATE_LIMITS.STRICT,
-    requireCsrf: false,
   }
 );
 

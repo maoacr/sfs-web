@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 interface EquipoInfo {
   id: string;
@@ -35,7 +36,7 @@ export default function EquiposPage() {
   const crearEquipo = async () => {
     if (!nombre.trim()) return;
     setCreando(true);
-    const res = await fetch("/api/equipos", {
+    const res = await apiFetch("/api/equipos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nombre: nombre.trim(), descripcion: descripcion.trim() || undefined }),

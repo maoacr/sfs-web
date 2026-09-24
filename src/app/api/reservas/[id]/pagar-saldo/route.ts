@@ -68,7 +68,6 @@ export const POST = apiHandler<PagarSaldoInput>(
   },
   {
     requireAuth: true,
-    requireCsrf: false,
     bodySchema: pagarSaldoSchema,
     rateLimit: RATE_LIMITS.STRICT,
   }

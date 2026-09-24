@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { fechaDeCalendario } from "@/lib/zona-horaria";
+import { apiFetch } from "@/lib/api-client";
 
 interface ReservaInfo { id: string; estado: string; player: string; apodo: string | null; telefono: string | null }
 interface Slot { inicio: string; fin: string; horaInicio: string; horaFin: string; disponible: boolean; reserva?: ReservaInfo }
@@ -99,7 +100,7 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
   async function cancelarReserva(reservaId: string) {
     setCancelling(true);
     try {
-      await fetch(`/api/reservas/${reservaId}`, {
+      await apiFetch(`/api/reservas/${reservaId}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ estado: "CANCELADA" }),
       });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
+import { apiFetch } from "@/lib/api-client";
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
@@ -25,7 +26,7 @@ export default function PlayerReservas() {
   }, []);
 
   async function cancelar(id: string) {
-    await fetch(`/api/reservas/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "CANCELADA" }) });
+    await apiFetch(`/api/reservas/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "CANCELADA" }) });
     setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "CANCELADA" } : r));
   }
 

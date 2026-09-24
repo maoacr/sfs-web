@@ -3,14 +3,14 @@ import { db, usuarios } from "@sfs/db";
 import { eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { updateProfileSchema } from "@/lib/schemas";
-import { generateCsrfToken } from "@/lib/csrf";
+import { setCsrfCookie } from "@/lib/csrf";
 
 /**
  * GET /api/auth/me
  * Obtiene el perfil del usuario autenticado.
  */
 export const GET = apiHandler(
-  async (_request, ctx, _validated) => {
+  async (request, ctx, _validated) => {
     const user = await db.query.usuarios.findFirst({
       where: eq(usuarios.id, ctx.user!.sub),
       columns: {
@@ -53,16 +53,7 @@ export const GET = apiHandler(
       },
     });
 
-    // Incluir CSRF token para que el frontend lo cachee
-    const csrfToken = generateCsrfToken();
-    response.cookies.set("csrf_token", csrfToken, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 60 * 60 * 24,
-    });
-    response.headers.set("X-CSRF-Token", csrfToken);
+    setCsrfCookie(response, request.cookies.get("csrf_token")?.value);
 
     return response;
   },

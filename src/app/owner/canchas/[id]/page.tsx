@@ -5,6 +5,7 @@ import { AgendaView } from "@/components/agenda-view";
 import { ImageUploadZone } from "@/components/image-upload-zone";
 import { formatAddress } from "@/lib/address";
 import { useRouter, useParams } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 const TIPOS = [
   { value: "F5", label: "Fútbol 5", jugadores: 10 },
@@ -60,7 +61,7 @@ export default function GestionarCancha() {
   async function handleSave() {
     setSaving(true); setError("");
     try {
-      const res = await fetch(`/api/canchas/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+      const res = await apiFetch(`/api/canchas/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre, tipo, capacidad, descripcion: descripcion || null, servicios, duracionSlotMinutos: duracionSlot }) });
       if (!res.ok) throw new Error("Error al guardar");
       router.refresh();
@@ -219,14 +220,14 @@ function SlotsTab({ canchaId, slots: initialSlots, onUpdate }: { canchaId: strin
     if (existe) {
       // Optimistic: eliminar localmente
       setSlots(prev => prev.filter(s => s.id !== existe.id));
-      await fetch(`/api/canchas/${canchaId}/slots/${existe.id}`, { method: "DELETE" });
+      await apiFetch(`/api/canchas/${canchaId}/slots/${existe.id}`, { method: "DELETE" });
     } else {
       // Optimistic: agregar temporalmente
       const tempId = "temp-" + Date.now();
       const tempSlot: Slot = { id: tempId, diaSemana, horaApertura: "1970-01-01T08:00:00.000Z", horaCierre: "1970-01-01T23:00:00.000Z" };
       setSlots(prev => [...prev, tempSlot]);
 
-      const res = await fetch(`/api/canchas/${canchaId}/slots`, {
+      const res = await apiFetch(`/api/canchas/${canchaId}/slots`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ diaSemana, horaApertura: "08:00:00", horaCierre: "23:00:00" }),
       });
@@ -242,7 +243,7 @@ function SlotsTab({ canchaId, slots: initialSlots, onUpdate }: { canchaId: strin
   async function actualizarSlot(slotId: string, field: string, value: string) {
     setTimes(prev => ({ ...prev, [slotId]: { ...prev[slotId], [field === "horaApertura" ? "apertura" : "cierre"]: value } }));
     // Guardar en servidor sin recargar (la UI ya está actualizada)
-    fetch(`/api/canchas/${canchaId}/slots/${slotId}`, {
+    apiFetch(`/api/canchas/${canchaId}/slots/${slotId}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: value + ":00" }),
     }).catch(console.error);
@@ -288,9 +289,9 @@ function TarifasTab({ canchaId, tarifas, onUpdate }: { canchaId: string; tarifas
   async function guardar() {
     setSaving(true);
     if (tarifaBase) {
-      await fetch(`/api/canchas/${canchaId}/tarifas/${tarifaBase.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ precioBase }) });
+      await apiFetch(`/api/canchas/${canchaId}/tarifas/${tarifaBase.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ precioBase }) });
     } else {
-      await fetch(`/api/canchas/${canchaId}/tarifas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ precioBase, factor: 1.0 }) });
+      await apiFetch(`/api/canchas/${canchaId}/tarifas`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ precioBase, factor: 1.0 }) });
     }
     setSaving(false); onUpdate();
   }

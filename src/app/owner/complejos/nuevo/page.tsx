@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 export default function NuevoComplejo() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function NuevoComplejo() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const res = await fetch("/api/complejos", {
+      const res = await apiFetch("/api/complejos", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre, tipoVia, numeroVia, numeroSec: numeroSec || undefined, complemento: complemento || undefined, ciudad: ciudad || undefined, departamento: departamento || undefined, descripcion: descripcion || undefined, telefono: telefono || undefined, email: email || undefined, instagram: instagram || undefined, tiktok: tiktok || undefined, twitter: twitter || undefined, facebook: facebook || undefined }),
       });

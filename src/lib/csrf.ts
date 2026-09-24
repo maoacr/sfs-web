@@ -16,8 +16,13 @@ export function generateCsrfToken(): string {
   return nanoid(32);
 }
 
-export function setCsrfCookie(response: NextResponse): void {
-  const token = generateCsrfToken();
+/**
+ * Emite la cookie CSRF. Si ya existe un token se reusa (solo se renueva la
+ * expiración): rotarlo en cada request rompería escrituras en curso que ya
+ * leyeron el valor anterior.
+ */
+export function setCsrfCookie(response: NextResponse, existente?: string): void {
+  const token = existente || generateCsrfToken();
   response.cookies.set(CSRF_COOKIE, token, {
     httpOnly: false, // debe ser leíble por JS para enviarlo como header
     secure: process.env.NODE_ENV === "production",

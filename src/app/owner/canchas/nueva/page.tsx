@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatAddress } from "@/lib/address";
 import { sileo } from "sileo";
+import { apiFetch } from "@/lib/api-client";
 
 const TIPOS = [
   { value: "F5", label: "Fútbol 5", jugadores: 10 },
@@ -55,7 +56,7 @@ function NuevaCanchaForm() {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const res = await fetch("/api/canchas", {
+      const res = await apiFetch("/api/canchas", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ complejoId, nombre, tipo, capacidad, descripcion: descripcion || undefined, servicios, duracionSlotMinutos: duracionSlot }),
       });

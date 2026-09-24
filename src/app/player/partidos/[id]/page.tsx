@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatearFecha } from "@/lib/zona-horaria";
+import { apiFetch } from "@/lib/api-client";
 
 interface JugadorInfo {
   userId: string;
@@ -52,7 +53,7 @@ export default function PartidoDetailPage() {
     if (!partido || partido.pendiente <= 0) return;
     setPagando(true);
 
-    const res = await fetch(`/api/reservas/${partido.reservaId}/pagar-saldo`, {
+    const res = await apiFetch(`/api/reservas/${partido.reservaId}/pagar-saldo`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ monto: partido.pendiente }),

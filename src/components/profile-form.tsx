@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 interface UserData {
   id: string; email: string; primerNombre: string; segundoNombre: string | null;
@@ -10,9 +11,12 @@ interface UserData {
   instagram: string | null; tiktok: string | null; twitter: string | null; facebook: string | null;
 }
 
+type Estadisticas = { canchas: number; clientes: number } | { reservas: number; partidos: number };
+
 export function ProfileForm() {
   const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
+  const [stats, setStats] = useState<Estadisticas | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -45,13 +49,18 @@ export function ProfileForm() {
       setTwitter(u.twitter || "");
       setFacebook(u.facebook || "");
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
+
+    fetch("/api/me/estadisticas")
+      .then(r => (r.ok ? r.json() : null))
+      .then((s: Estadisticas | null) => setStats(s))
+      .catch(() => setStats(null));
   }, []);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError(""); setSaved(false);
     try {
-      const res = await fetch("/api/auth/me", {
+      const res = await apiFetch("/api/auth/me", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ primerNombre, segundoNombre: segundoNombre || null, apellidos, apodo: apodo || null, codigoPais, telefono: telefono || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null }),
       });
@@ -79,6 +88,11 @@ export function ProfileForm() {
   const nombreCompleto = [primerNombre, segundoNombre, apellidos].filter(Boolean).join(" ");
   const iniciales = `${primerNombre?.[0] || ""}${apellidos?.[0] || ""}`.toUpperCase() || "?";
   const isOwner = user?.role === "OWNER";
+  const [statA, statB] = !stats
+    ? ["—", "—"]
+    : "canchas" in stats
+      ? [stats.canchas, stats.clientes]
+      : [stats.reservas, stats.partidos];
 
   return (
     <div className="p-6 pb-44 lg:p-10">
@@ -130,11 +144,11 @@ export function ProfileForm() {
           {/* Stats */}
           <div className="w-full grid grid-cols-2 gap-3 pt-6 border-t border-border">
             <div className="bg-bg/50 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-text">0</p>
+              <p className="text-lg font-bold text-text">{statA}</p>
               <p className="text-[11px] text-text-dim mt-0.5">{isOwner ? "Canchas" : "Reservas"}</p>
             </div>
             <div className="bg-bg/50 rounded-xl p-3 text-center">
-              <p className="text-lg font-bold text-text">0</p>
+              <p className="text-lg font-bold text-text">{statB}</p>
               <p className="text-[11px] text-text-dim mt-0.5">{isOwner ? "Clientes" : "Partidos"}</p>
             </div>
           </div>

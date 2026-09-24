@@ -3,6 +3,7 @@ import {
   eliminarDeColaSync,
   marcarSincronizada,
 } from "./db-local";
+import { apiFetch } from "@/lib/api-client";
 
 /**
  * Sync Engine: procesa la cola de operaciones pendientes
@@ -18,7 +19,7 @@ export async function sincronizarPendientes() {
 
   for (const op of cola) {
     try {
-      const res = await fetch("/api/sync", {
+      const res = await apiFetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(op),

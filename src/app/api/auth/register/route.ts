@@ -6,6 +6,7 @@ import { signAccessToken, signRefreshToken } from "@/lib/jwt";
 import { apiHandler } from "@/lib/api-handler";
 import { registerSchema, type RegisterInput } from "@/lib/schemas";
 import { RATE_LIMITS } from "@/lib/rate-limit";
+import { setCsrfCookie } from "@/lib/csrf";
 
 /**
  * POST /api/auth/register
@@ -103,6 +104,7 @@ export const POST = apiHandler<RegisterInput>(
       path: "/",
       maxAge: 7 * 24 * 60 * 60,
     });
+    setCsrfCookie(response);
 
     return response;
   },

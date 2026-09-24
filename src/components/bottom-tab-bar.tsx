@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 interface TabItem {
   label: string;
@@ -94,7 +95,7 @@ export function BottomTabBar({ tabs, overflow, role }: {
 
                 {/* Logout */}
                 <button onClick={async () => {
-                  await fetch("/api/auth/logout", { method: "POST" });
+                  await apiFetch("/api/auth/logout", { method: "POST" });
                   window.location.href = "/auth/login";
                 }}
                   className="w-full flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium text-error hover:bg-error-bg transition-colors">
