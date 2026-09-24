@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 interface UserData {
   id: string; email: string; primerNombre: string; segundoNombre: string | null;
   apellidos: string; apodo: string | null; telefono: string | null;
-  codigoPais: string; role: string;
+  codigoPais: string; role: "OWNER" | "PLAYER";
+  instagram: string | null; tiktok: string | null; twitter: string | null; facebook: string | null;
 }
 
 export function ProfileForm() {
@@ -30,18 +31,19 @@ export function ProfileForm() {
   const [facebook, setFacebook] = useState("");
 
   useEffect(() => {
-    fetch("/api/auth/me").then(r => r.json()).then(data => {
-      setUser(data);
-      setPrimerNombre(data.primerNombre || "");
-      setSegundoNombre(data.segundoNombre || "");
-      setApellidos(data.apellidos || "");
-      setApodo(data.apodo || "");
-      setCodigoPais(data.codigoPais || "+57");
-      setTelefono(data.telefono || "");
-      setInstagram(data.instagram || "");
-      setTiktok(data.tiktok || "");
-      setTwitter(data.twitter || "");
-      setFacebook(data.facebook || "");
+    fetch("/api/auth/me").then(r => r.json()).then(({ user: u }: { user?: UserData }) => {
+      if (!u) throw new Error("Sin sesión");
+      setUser(u);
+      setPrimerNombre(u.primerNombre || "");
+      setSegundoNombre(u.segundoNombre || "");
+      setApellidos(u.apellidos || "");
+      setApodo(u.apodo || "");
+      setCodigoPais(u.codigoPais || "+57");
+      setTelefono(u.telefono || "");
+      setInstagram(u.instagram || "");
+      setTiktok(u.tiktok || "");
+      setTwitter(u.twitter || "");
+      setFacebook(u.facebook || "");
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
   }, []);
 
