@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, canchas, complejos, imagenesCanchas, slotConfigs, tarifas } from "@sfs/db";
+import { eq, and, isNull, desc, asc } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import {
   createCanchaSchema,
@@ -15,22 +16,25 @@ export const GET = apiHandler(
     const { searchParams } = new URL(request.url);
     const activas = searchParams.get("activas") === "true";
 
-    const canchas = await prisma.cancha.findMany({
-      where: {
-        tenantId: user.sub,
-        ...(activas ? { deletedAt: null } : {}),
-      },
-      include: {
+    const canchasList = await db.query.canchas.findMany({
+      where: and(
+        eq(canchas.tenantId, user.sub),
+        activas ? isNull(canchas.deletedAt) : undefined
+      ),
+      with: {
         complejo: true,
-        imagenes: { orderBy: { orden: "asc" } },
-        slots: { orderBy: { diaSemana: "asc" } },
+        imagenes: {
+          orderBy: (img, { asc }) => [asc(img.orden)],
+        },
+        slots: {
+          orderBy: (s, { asc }) => [asc(s.diaSemana)],
+        },
         tarifas: true,
-        _count: { select: { reservas: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [desc(canchas.createdAt)],
     });
 
-    return NextResponse.json(canchas);
+    return NextResponse.json(canchasList);
   },
   { requireAuth: true, requiredRole: "OWNER" }
 );
@@ -39,7 +43,7 @@ export const GET = apiHandler(
  * POST /api/canchas
  */
 export const POST = apiHandler<CreateCanchaInput>(
-  async (_request, _ctx, { body }) => {
+  async (_request, ctx, { body }) => {
     if (!body) {
       return NextResponse.json({ error: "Datos requeridos" }, { status: 400 });
     }
@@ -54,8 +58,8 @@ export const POST = apiHandler<CreateCanchaInput>(
       duracionSlotMinutos,
     } = body;
 
-    const complejo = await prisma.complejo.findFirst({
-      where: { id: complejoId },
+    const complejo = await db.query.complejos.findFirst({
+      where: eq(complejos.id, complejoId),
     });
 
     if (!complejo) {
@@ -65,23 +69,19 @@ export const POST = apiHandler<CreateCanchaInput>(
       );
     }
 
-    const cancha = await prisma.cancha.create({
-      data: {
+    const [cancha] = await db
+      .insert(canchas)
+      .values({
+        tenantId: ctx.user!.sub,
         complejoId,
         nombre,
-        tipo,
+        tipo: tipo as any,
         capacidad,
         descripcion: descripcion || null,
         servicios: servicios || [],
         duracionSlotMinutos: duracionSlotMinutos ?? 60,
-      } as any, // tenantId injected by middleware
-      include: {
-        complejo: true,
-        imagenes: true,
-        slots: true,
-        tarifas: true,
-      },
-    });
+      })
+      .returning();
 
     return NextResponse.json(cancha, { status: 201 });
   },

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, canchas, complejos, imagenesCanchas, slotConfigs, tarifas } from "@sfs/db";
+import { eq, and, isNull, asc } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 
 /**
@@ -14,13 +15,21 @@ export async function GET(
     const user = await getAuthUser(request);
     const { id } = await params;
 
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
-      include: {
+    const cancha = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
+      with: {
         complejo: true,
-        imagenes: { orderBy: { orden: "asc" } },
-        slots: { orderBy: { diaSemana: "asc" } },
-        tarifas: { include: { promociones: true } },
+        imagenes: {
+          orderBy: (img, { asc }) => [asc(img.orden)],
+        },
+        slots: {
+          orderBy: (s, { asc }) => [asc(s.diaSemana)],
+        },
+        tarifas: {
+          with: {
+            promociones: true,
+          },
+        },
       },
     });
 
@@ -53,9 +62,8 @@ export async function PUT(
     const user = await getAuthUser(request);
     const { id } = await params;
 
-    // Verificar propiedad
-    const existente = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
+    const existente = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
     });
 
     if (!existente) {
@@ -66,25 +74,20 @@ export async function PUT(
     }
 
     const body = await request.json();
+    const updateData: Partial<typeof canchas.$inferInsert> = {};
 
-    const cancha = await prisma.cancha.update({
-      where: { id },
-      data: {
-        ...(body.nombre !== undefined && { nombre: body.nombre }),
-        ...(body.tipo !== undefined && { tipo: body.tipo }),
-        ...(body.capacidad !== undefined && { capacidad: body.capacidad }),
-        ...(body.descripcion !== undefined && { descripcion: body.descripcion }),
-        ...(body.servicios !== undefined && { servicios: body.servicios }),
-        ...(body.duracionSlotMinutos !== undefined && {
-          duracionSlotMinutos: body.duracionSlotMinutos,
-        }),
-      },
-      include: {
-        imagenes: true,
-        slots: true,
-        tarifas: true,
-      },
-    });
+    if (body.nombre !== undefined) updateData.nombre = body.nombre;
+    if (body.tipo !== undefined) updateData.tipo = body.tipo;
+    if (body.capacidad !== undefined) updateData.capacidad = body.capacidad;
+    if (body.descripcion !== undefined) updateData.descripcion = body.descripcion;
+    if (body.servicios !== undefined) updateData.servicios = body.servicios;
+    if (body.duracionSlotMinutos !== undefined) updateData.duracionSlotMinutos = body.duracionSlotMinutos;
+
+    const [cancha] = await db
+      .update(canchas)
+      .set(updateData)
+      .where(eq(canchas.id, id))
+      .returning();
 
     return NextResponse.json(cancha);
   } catch (error) {
@@ -108,8 +111,8 @@ export async function DELETE(
     const user = await getAuthUser(request);
     const { id } = await params;
 
-    const existente = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
+    const existente = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
     });
 
     if (!existente) {
@@ -119,10 +122,10 @@ export async function DELETE(
       );
     }
 
-    await prisma.cancha.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    await db
+      .update(canchas)
+      .set({ deletedAt: new Date() })
+      .where(eq(canchas.id, id));
 
     return NextResponse.json({ ok: true });
   } catch (error) {

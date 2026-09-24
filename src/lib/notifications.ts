@@ -1,4 +1,5 @@
-import { prisma } from "@sfs/db";
+import { db, notificaciones } from "@sfs/db";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 // Guarda una notificación en la base de datos para el usuario
 export async function crearNotificacion(params: {
@@ -8,45 +9,49 @@ export async function crearNotificacion(params: {
   mensaje: string;
   reservaId?: string;
 }) {
-  return prisma.notificacion.create({
-    data: {
+  const [created] = await db
+    .insert(notificaciones)
+    .values({
       userId: params.userId,
       tipo: params.tipo as any,
       titulo: params.titulo,
       mensaje: params.mensaje,
       reservaId: params.reservaId,
-    },
-  });
+    })
+    .returning();
+  return created;
 }
 
 // Obtiene notificaciones del usuario, más recientes primero
 export async function getNotificaciones(userId: string, limit = 50) {
-  return prisma.notificacion.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    take: limit,
+  return db.query.notificaciones.findMany({
+    where: eq(notificaciones.userId, userId),
+    orderBy: [desc(notificaciones.createdAt)],
+    limit,
   });
 }
 
 // Cuenta notificaciones no leídas (para el badge)
-export async function getNoLeidas(userId: string) {
-  return prisma.notificacion.count({
-    where: { userId, leida: false },
-  });
+export async function getNoLeidas(userId: string): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(notificaciones)
+    .where(and(eq(notificaciones.userId, userId), eq(notificaciones.leida, false)));
+  return Number(result[0]?.count || 0);
 }
 
 // Marca una notificación como leída
 export async function marcarLeida(id: string, userId: string) {
-  return prisma.notificacion.updateMany({
-    where: { id, userId },
-    data: { leida: true },
-  });
+  return db
+    .update(notificaciones)
+    .set({ leida: true })
+    .where(and(eq(notificaciones.id, id), eq(notificaciones.userId, userId)));
 }
 
 // Marca TODAS como leídas
 export async function marcarTodasLeidas(userId: string) {
-  return prisma.notificacion.updateMany({
-    where: { userId, leida: false },
-    data: { leida: true },
-  });
+  return db
+    .update(notificaciones)
+    .set({ leida: true })
+    .where(and(eq(notificaciones.userId, userId), eq(notificaciones.leida, false)));
 }

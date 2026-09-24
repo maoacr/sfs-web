@@ -1,15 +1,27 @@
-import { PrismaClient } from "@prisma/client";
-import { tenantExtension } from "@/lib/tenant-middleware";
+export * from "./src/client";
+export * from "./src/schema";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+// Re-export common Drizzle operators for consumers of @sfs/db
+export {
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  lte,
+  and,
+  or,
+  not,
+  inArray,
+  notInArray,
+  isNull,
+  isNotNull,
+  asc,
+  desc,
+  sql,
+  relations,
+} from "drizzle-orm";
 
-function createPrismaClient() {
-  const client = new PrismaClient();
-  return client.$extends(tenantExtension) as unknown as PrismaClient;
-}
-
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Compatibility alias during Drizzle transition
+import { db } from "./src/client";
+export const prisma = db as any;

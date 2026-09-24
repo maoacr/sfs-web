@@ -4,21 +4,31 @@
   "private": true,
   "main": "./index.ts",
   "types": "./index.ts",
-  "scripts": {
-    "generate": "prisma generate",
-    "migrate": "prisma migrate dev",
-    "studio": "prisma studio",
-    "seed": "tsx prisma/seed.ts"
+  "exports": {
+    ".": "./index.ts",
+    "./schema": "./src/schema/index.ts"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate.ts",
+    "push": "tsx src/migrate.ts",
+    "studio": "drizzle-kit studio",
+    "seed": "tsx src/seed.ts",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0",
-    "pg": "^8.22.0"
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.23.0",
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
-    "prisma": "^6.0.0",
-    "tsx": "^4.23.8"
+    "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "^0.31.9",
+    "tsx": "^4.23.8",
+    "typescript": "^5.0.0"
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, canchas, slotConfigs } from "@sfs/db";
+import { eq, and, asc } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 
 /**
@@ -14,14 +15,14 @@ export async function GET(
     const { id } = await params;
 
     // Verificar propiedad
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
+    const cancha = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
     });
     if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
-    const slots = await prisma.slotConfig.findMany({
-      where: { canchaId: id },
-      orderBy: { diaSemana: "asc" },
+    const slots = await db.query.slotConfigs.findMany({
+      where: eq(slotConfigs.canchaId, id),
+      orderBy: [asc(slotConfigs.diaSemana)],
     });
 
     return NextResponse.json(slots);
@@ -42,21 +43,22 @@ export async function POST(
     const user = await getAuthUser(request);
     const { id } = await params;
 
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
+    const cancha = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
     });
     if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
     const body = await request.json();
 
-    const slot = await prisma.slotConfig.create({
-      data: {
+    const [slot] = await db
+      .insert(slotConfigs)
+      .values({
         canchaId: id,
-        diaSemana: body.diaSemana,
-        horaApertura: new Date(`1970-01-01T${body.horaApertura || "08:00:00"}.000Z`),
-        horaCierre: new Date(`1970-01-01T${body.horaCierre || "23:00:00"}.000Z`),
-      },
-    });
+        diaSemana: Number(body.diaSemana),
+        horaApertura: body.horaApertura || "08:00:00",
+        horaCierre: body.horaCierre || "23:00:00",
+      })
+      .returning();
 
     return NextResponse.json(slot, { status: 201 });
   } catch (error) {

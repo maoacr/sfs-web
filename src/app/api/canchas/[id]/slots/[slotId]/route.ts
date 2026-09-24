@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, canchas, slotConfigs } from "@sfs/db";
+import { eq, and } from "drizzle-orm";
 import { getAuthUser, AuthError } from "@/lib/auth-api";
 
 /**
@@ -14,22 +15,23 @@ export async function PUT(
     const { id, slotId } = await params;
 
     // Verificar que la cancha pertenece al dueño
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
+    const cancha = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
     });
     if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
     const body = await request.json();
-    const data: Record<string, unknown> = {};
+    const updateData: Partial<typeof slotConfigs.$inferInsert> = {};
 
-    if (body.horaApertura) data.horaApertura = new Date(`1970-01-01T${body.horaApertura}.000Z`);
-    if (body.horaCierre) data.horaCierre = new Date(`1970-01-01T${body.horaCierre}.000Z`);
-    if (body.diaSemana !== undefined) data.diaSemana = body.diaSemana;
+    if (body.horaApertura) updateData.horaApertura = body.horaApertura;
+    if (body.horaCierre) updateData.horaCierre = body.horaCierre;
+    if (body.diaSemana !== undefined) updateData.diaSemana = Number(body.diaSemana);
 
-    const slot = await prisma.slotConfig.update({
-      where: { id: slotId, canchaId: id },
-      data,
-    });
+    const [slot] = await db
+      .update(slotConfigs)
+      .set(updateData)
+      .where(and(eq(slotConfigs.id, slotId), eq(slotConfigs.canchaId, id)))
+      .returning();
 
     return NextResponse.json(slot);
   } catch (error) {
@@ -49,12 +51,14 @@ export async function DELETE(
     const user = await getAuthUser(request);
     const { id, slotId } = await params;
 
-    const cancha = await prisma.cancha.findFirst({
-      where: { id, tenantId: user.sub },
+    const cancha = await db.query.canchas.findFirst({
+      where: and(eq(canchas.id, id), eq(canchas.tenantId, user.sub)),
     });
     if (!cancha) return NextResponse.json({ error: "No encontrada" }, { status: 404 });
 
-    await prisma.slotConfig.delete({ where: { id: slotId, canchaId: id } });
+    await db
+      .delete(slotConfigs)
+      .where(and(eq(slotConfigs.id, slotId), eq(slotConfigs.canchaId, id)));
 
     return NextResponse.json({ ok: true });
   } catch (error) {

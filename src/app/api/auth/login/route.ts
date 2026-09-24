@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, usuarios } from "@sfs/db";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { signAccessToken, signRefreshToken } from "@/lib/jwt";
 import { apiHandler } from "@/lib/api-handler";
@@ -17,7 +18,10 @@ export const POST = apiHandler<LoginInput>(
 
     const { email, password } = body;
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await db.query.usuarios.findFirst({
+      where: eq(usuarios.email, email.toLowerCase().trim()),
+    });
+
     if (!user || !user.passwordHash) {
       return NextResponse.json(
         { error: "Email o contraseña incorrectos" },
@@ -36,7 +40,7 @@ export const POST = apiHandler<LoginInput>(
     const tokenPayload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
+      role: user.rol,
     };
 
     const accessToken = await signAccessToken(tokenPayload);
@@ -46,9 +50,9 @@ export const POST = apiHandler<LoginInput>(
       user: {
         id: user.id,
         email: user.email,
-        nombre: `${user.primerNombre} ${user.segundoNombre ?? ""} ${user.apellidos}`.trim(),
+        nombre: `${user.nombre} ${user.apellido}`.trim(),
         apodo: user.apodo,
-        role: user.role,
+        role: user.rol,
       },
     });
 

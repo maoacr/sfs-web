@@ -1,11 +1,8 @@
-import { prisma } from "@sfs/db";
-import type { Prisma } from "@prisma/client";
+import { db, tarifas, promociones } from "@sfs/db";
+import { eq, sql } from "drizzle-orm";
 
 /**
- * Motor de precios dinámicos para canchas.
- *
- * Combina tarifas base + factores horarios + promociones
- * para calcular el precio final de una reserva.
+ * Motor de precios dinámicos para canchas con Drizzle ORM.
  */
 
 export interface PrecioBreakdown {
@@ -28,88 +25,70 @@ export interface PrecioError {
   error: string;
 }
 
-/**
- * Calcula el precio para una cancha en una fecha y hora específicas.
- *
- * @param canchaId - UUID de la cancha
- * @param fecha - Fecha en formato ISO (YYYY-MM-DD)
- * @param hora - Hora en formato HH:MM (24h)
- * @param codigoPromocion - Código de promoción opcional
- */
 export async function calcularPrecio(
   canchaId: string,
   fecha: string,
   hora: string,
   codigoPromocion?: string
 ): Promise<PrecioResult | PrecioError> {
-  // ─── 1. Determinar día de la semana ────────────────────────────────────
-
-  const date = new Date(fecha + "T12:00:00");
+  const [yearStr, monthStr, dayStr] = fecha.split("-");
+  const date = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr), 12, 0, 0));
   if (isNaN(date.getTime())) {
     return { success: false, error: "Fecha inválida" };
   }
-  const diaSemana = date.getDay(); // 0=Domingo, 6=Sábado
+  const diaSemana = date.getUTCDay(); // 0=Domingo, 6=Sábado
 
-  const [horaNum] = hora.split(":").map(Number);
-  if (isNaN(horaNum) || horaNum < 0 || horaNum > 23) {
-    return { success: false, error: "Hora inválida" };
-  }
+  const [hStr, mStr] = hora.split(":");
+  const horaNum = parseInt(hStr, 10);
+  const minNum = parseInt(mStr || "0", 10);
+  const minutoInicio = horaNum * 60 + minNum;
 
-  // ─── 2. Buscar todas las tarifas de la cancha ──────────────────────────
-
-  const tarifas = await prisma.tarifa.findMany({
-    where: { canchaId },
-    include: { promociones: true },
+  const tarifasList = await db.query.tarifas.findMany({
+    where: eq(tarifas.canchaId, canchaId),
+    with: {
+      promociones: true,
+    },
   });
 
-  if (tarifas.length === 0) {
+  if (tarifasList.length === 0) {
     return { success: false, error: "Esta cancha no tiene tarifas configuradas" };
   }
 
-  // ─── 3. Encontrar la tarifa más específica ─────────────────────────────
-
-  let tarifaSeleccionada: (typeof tarifas)[0] | undefined;
-
-  // 3a: Match exacto de día + rango horario
-  tarifaSeleccionada = tarifas.find((t) => {
-    if (t.diaSemana !== diaSemana) return false;
+  // 1. Tarifa por día y rango horario
+  let tarifaSeleccionada = tarifasList.find((t) => {
+    if (t.diaSemana !== null && t.diaSemana !== undefined && t.diaSemana !== diaSemana) return false;
     if (t.horaInicio && t.horaFin) {
-      const hInicio = new Date(t.horaInicio).getUTCHours();
-      const hFin = new Date(t.horaFin).getUTCHours();
-      return horaNum >= hInicio && horaNum < hFin;
+      const [ih, im] = String(t.horaInicio).split(":").map(Number);
+      const [fh, fm] = String(t.horaFin).split(":").map(Number);
+      const startMin = ih * 60 + (im || 0);
+      const endMin = fh * 60 + (fm || 0);
+      return minutoInicio >= startMin && minutoInicio < endMin;
     }
-    return true; // sin rango horario = todo el día
+    return false;
   });
 
-  // 3b: Match solo por día (sin rango horario definido)
+  // 2. Tarifa específica por día sin rango
   if (!tarifaSeleccionada) {
-    tarifaSeleccionada = tarifas.find(
-      (t) => t.diaSemana === diaSemana && !t.horaInicio
+    tarifaSeleccionada = tarifasList.find(
+      (t) => t.diaSemana !== null && t.diaSemana !== undefined && t.diaSemana === diaSemana && !t.horaInicio
     );
   }
 
-  // 3c: Fallback — tarifa genérica (sin día ni hora)
+  // 3. Fallback: tarifa base
   if (!tarifaSeleccionada) {
-    tarifaSeleccionada = tarifas.find((t) => t.diaSemana === null);
+    tarifaSeleccionada = tarifasList.find((t) => t.diaSemana === null || t.diaSemana === undefined);
   }
 
   if (!tarifaSeleccionada) {
-    return {
-      success: false,
-      error: "No hay tarifa disponible para este día y horario",
-    };
+    tarifaSeleccionada = tarifasList[0];
   }
-
-  // ─── 4. Calcular precio base × factor ──────────────────────────────────
 
   const precioBase = Number(tarifaSeleccionada.precioBase);
-  const factor = Number(tarifaSeleccionada.factor);
-  let precioFinal = precioBase * factor;
+  const factor = Number(tarifaSeleccionada.factor || 1);
+  let precioFinal = Math.round(precioBase * factor);
   let descuento = 0;
   let descuentoTipo: "porcentaje" | "monto_fijo" | null = null;
   let promocionAplicada: string | null = null;
-
-  // ─── 5. Aplicar promoción si existe ────────────────────────────────────
 
   if (codigoPromocion) {
     const promo = tarifaSeleccionada.promociones.find(
@@ -121,7 +100,7 @@ export async function calcularPrecio(
     }
 
     const now = new Date();
-    if (now < promo.validoDesde || now > promo.validoHasta) {
+    if (now < new Date(promo.validoDesde) || now > new Date(promo.validoHasta)) {
       return { success: false, error: "Esta promoción no está vigente" };
     }
 
@@ -130,12 +109,11 @@ export async function calcularPrecio(
     }
 
     const valor = Number(promo.valor);
-
     if (promo.tipoDescuento === "PORCENTAJE") {
       descuento = Math.round(precioFinal * (valor / 100));
       descuentoTipo = "porcentaje";
     } else {
-      descuento = Math.min(valor, precioFinal); // no puede superar el precio
+      descuento = Math.min(valor, precioFinal);
       descuentoTipo = "monto_fijo";
     }
 
@@ -157,12 +135,9 @@ export async function calcularPrecio(
   };
 }
 
-/**
- * Incrementa el contador de usos de una promoción.
- */
 export async function usarPromocion(codigo: string): Promise<void> {
-  await prisma.promocion.updateMany({
-    where: { codigo: codigo.toUpperCase() },
-    data: { usosActuales: { increment: 1 } },
-  });
+  await db
+    .update(promociones)
+    .set({ usosActuales: sql`${promociones.usosActuales} + 1` })
+    .where(eq(promociones.codigo, codigo.toUpperCase()));
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
+import { db, usuarios } from "@sfs/db";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { signAccessToken, signRefreshToken } from "@/lib/jwt";
 import { apiHandler } from "@/lib/api-handler";
@@ -22,7 +23,6 @@ export const POST = apiHandler<RegisterInput>(
       segundoNombre,
       apellidos,
       apodo,
-      codigoPais,
       telefono,
       role,
       instagram,
@@ -31,7 +31,12 @@ export const POST = apiHandler<RegisterInput>(
       facebook,
     } = body;
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const emailClean = email.toLowerCase().trim();
+
+    const existing = await db.query.usuarios.findFirst({
+      where: eq(usuarios.email, emailClean),
+    });
+
     if (existing) {
       return NextResponse.json(
         { error: "El email ya está registrado" },
@@ -40,29 +45,29 @@ export const POST = apiHandler<RegisterInput>(
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const nombreCompleto = segundoNombre ? `${primerNombre} ${segundoNombre}` : primerNombre;
 
-    const user = await prisma.user.create({
-      data: {
-        email,
+    const [user] = await db
+      .insert(usuarios)
+      .values({
+        email: emailClean,
         passwordHash,
-        primerNombre,
-        segundoNombre: segundoNombre || null,
-        apellidos,
+        nombre: nombreCompleto,
+        apellido: apellidos,
         apodo: apodo || null,
-        codigoPais: codigoPais || "+57",
         telefono: telefono || null,
-        role,
+        rol: role as "OWNER" | "PLAYER" | "ADMIN",
         instagram: instagram || null,
         tiktok: tiktok || null,
         twitter: twitter || null,
         facebook: facebook || null,
-      },
-    });
+      })
+      .returning();
 
     const tokenPayload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
+      role: user.rol,
     };
 
     const accessToken = await signAccessToken(tokenPayload);
@@ -73,9 +78,9 @@ export const POST = apiHandler<RegisterInput>(
         user: {
           id: user.id,
           email: user.email,
-          nombre: `${user.primerNombre} ${user.segundoNombre ?? ""} ${user.apellidos}`.trim(),
+          nombre: `${user.nombre} ${user.apellido}`.trim(),
           apodo: user.apodo,
-          role: user.role,
+          role: user.rol,
         },
       },
       { status: 201 }

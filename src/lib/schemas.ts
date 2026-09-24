@@ -143,10 +143,10 @@ export const updateTarifaSchema = createTarifaSchema.partial();
 // ─── Reservas ────────────────────────────────────────────────────────────────
 
 export const createReservaSchema = z.object({
-  canchaId: z.string().uuid("ID de cancha inválido"),
+  canchaId: z.string().min(1, "ID de cancha requerido"),
   slotInicio: z.string().datetime("Fecha de inicio inválida (ISO 8601)"),
   slotFin: z.string().datetime("Fecha de fin inválida (ISO 8601)"),
-  playerId: z.string().uuid("ID de jugador inválido").optional(),
+  playerId: z.string().min(1).optional(),
   playerNombre: z.string().optional(),
 });
 

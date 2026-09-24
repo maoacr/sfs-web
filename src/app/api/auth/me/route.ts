@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@sfs/db";
-import bcrypt from "bcryptjs";
+import { db, usuarios } from "@sfs/db";
+import { eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { updateProfileSchema } from "@/lib/schemas";
 import { generateCsrfToken } from "@/lib/csrf";
@@ -11,18 +11,16 @@ import { generateCsrfToken } from "@/lib/csrf";
  */
 export const GET = apiHandler(
   async (_request, ctx, _validated) => {
-    const user = await prisma.user.findUnique({
-      where: { id: ctx.user!.sub },
-      select: {
+    const user = await db.query.usuarios.findFirst({
+      where: eq(usuarios.id, ctx.user!.sub),
+      columns: {
         id: true,
         email: true,
-        primerNombre: true,
-        segundoNombre: true,
-        apellidos: true,
+        nombre: true,
+        apellido: true,
         apodo: true,
-        codigoPais: true,
         telefono: true,
-        role: true,
+        rol: true,
         instagram: true,
         tiktok: true,
         twitter: true,
@@ -35,7 +33,23 @@ export const GET = apiHandler(
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }
 
-    const response = NextResponse.json({ user });
+    const response = NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        primerNombre: user.nombre.split(" ")[0] || user.nombre,
+        segundoNombre: user.nombre.split(" ").slice(1).join(" ") || null,
+        apellidos: user.apellido,
+        apodo: user.apodo,
+        telefono: user.telefono,
+        role: user.rol,
+        instagram: user.instagram,
+        tiktok: user.tiktok,
+        twitter: user.twitter,
+        facebook: user.facebook,
+        createdAt: user.createdAt,
+      },
+    });
 
     // Incluir CSRF token para que el frontend lo cachee
     const csrfToken = generateCsrfToken();
@@ -60,24 +74,35 @@ export const GET = apiHandler(
 export const PATCH = apiHandler(
   async (_request, ctx, { body }) => {
     const userId = ctx.user!.sub;
+    const updateData: Partial<typeof usuarios.$inferInsert> = {};
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: body!,
-      select: {
-        id: true,
-        email: true,
-        primerNombre: true,
-        segundoNombre: true,
-        apellidos: true,
-        apodo: true,
-        codigoPais: true,
-        telefono: true,
-        role: true,
+    if (body?.primerNombre || body?.segundoNombre) {
+      const p = body.primerNombre || "";
+      const s = body.segundoNombre || "";
+      updateData.nombre = `${p} ${s}`.trim();
+    }
+    if (body?.apellidos) updateData.apellido = body.apellidos;
+    if (body?.apodo !== undefined) updateData.apodo = body.apodo;
+    if (body?.telefono !== undefined) updateData.telefono = body.telefono;
+
+    const [updated] = await db
+      .update(usuarios)
+      .set(updateData)
+      .where(eq(usuarios.id, userId))
+      .returning();
+
+    return NextResponse.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        primerNombre: updated.nombre.split(" ")[0] || updated.nombre,
+        segundoNombre: updated.nombre.split(" ").slice(1).join(" ") || null,
+        apellidos: updated.apellido,
+        apodo: updated.apodo,
+        telefono: updated.telefono,
+        role: updated.rol,
       },
     });
-
-    return NextResponse.json({ user: updated });
   },
   {
     requireAuth: true,

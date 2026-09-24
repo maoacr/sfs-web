@@ -19,11 +19,13 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 /**
  * Crea un Checkout Pro preference y retorna la URL de pago.
+ * No se envía payer.email — MP checkout le pide al comprador que se loguee.
+ * En sandbox, enviar un email que no es de un test user causa rechazo.
  */
 export async function createCheckoutPreference(
   reservaId: string,
   monto: number,
-  payerEmail: string
+  _payerEmail: string
 ): Promise<{ preferenceId: string; checkoutUrl: string }> {
   if (!accessToken) {
     throw new Error("MP_ACCESS_TOKEN no configurado en .env");
@@ -44,7 +46,6 @@ export async function createCheckoutPreference(
           currency_id: "COP",
         },
       ],
-      payer: { email: payerEmail },
       external_reference: reservaId,
       back_urls: {
         success: `${APP_URL}/player/reservas`,
@@ -57,7 +58,9 @@ export async function createCheckoutPreference(
 
   return {
     preferenceId: result.id!,
-    checkoutUrl: result.init_point!,
+    checkoutUrl: process.env.NODE_ENV === "production" 
+      ? result.init_point! 
+      : result.sandbox_init_point!,
   };
 }
 

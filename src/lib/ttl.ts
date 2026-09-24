@@ -1,4 +1,5 @@
-import { prisma } from "@sfs/db";
+import { db, reservas, pagos } from "@sfs/db";
+import { and, inArray, lt, eq } from "drizzle-orm";
 import { notificarCambioReserva } from "./event-listeners";
 import { refundPayment, isMercadoPagoConfigured } from "./mercadopago";
 
@@ -12,17 +13,21 @@ const TTL_MINUTOS = 15;
 export async function liberarReservasExpiradas() {
   const limite = new Date(Date.now() - TTL_MINUTOS * 60 * 1000);
 
-  const expiradas = await prisma.reserva.findMany({
-    where: {
-      estado: { in: ["PENDIENTE_PAGO", "PAGO_PARCIAL"] },
-      createdAt: { lt: limite },
-    },
-    include: {
-      cancha: { include: { complejo: true } },
-      player: { select: { id: true, primerNombre: true, apellidos: true, email: true } },
-      tenant: { select: { id: true, email: true } },
+  const expiradas = await db.query.reservas.findMany({
+    where: and(
+      inArray(reservas.estado, ["PENDIENTE_PAGO", "PAGO_PARCIAL"]),
+      lt(reservas.createdAt, limite)
+    ),
+    with: {
+      cancha: {
+        with: {
+          complejo: true,
+        },
+      },
+      player: true,
+      tenant: true,
       pagos: {
-        where: { estadoPago: "APROBADO", mpPaymentId: { not: null } },
+        where: eq(pagos.estadoPago, "APROBADO"),
       },
     },
   });
@@ -30,38 +35,32 @@ export async function liberarReservasExpiradas() {
   if (expiradas.length === 0) return [];
 
   // ─── Reembolsar pagos MP ─────────────────────────────────────────────
-
   if (isMercadoPagoConfigured()) {
     for (const r of expiradas) {
       for (const pago of r.pagos) {
         if (pago.mpPaymentId) {
           try {
             await refundPayment(pago.mpPaymentId);
-            await prisma.pago.update({
-              where: { id: pago.id },
-              data: { estadoPago: "REEMBOLSADO" },
-            });
+            await db
+              .update(pagos)
+              .set({ estadoPago: "REEMBOLSADO" })
+              .where(eq(pagos.id, pago.id));
           } catch (err) {
-            console.error(
-              `[TTL] Error reembolsando pago ${pago.id}:`,
-              err
-            );
+            console.error(`[TTL] Error reembolsando pago ${pago.id}:`, err);
           }
         }
       }
     }
   }
 
-  // ─── Cancelar todas en una transacción ───────────────────────────────
-
+  // ─── Cancelar todas las reservas expiradas ───────────────────────────
   const ids = expiradas.map((r) => r.id);
-  await prisma.reserva.updateMany({
-    where: { id: { in: ids } },
-    data: { estado: "CANCELADA", saldoPendiente: 0 },
-  });
+  await db
+    .update(reservas)
+    .set({ estado: "CANCELADA", saldoPendiente: "0.00" })
+    .where(inArray(reservas.id, ids));
 
   // ─── Notificar a cada jugador y dueño ────────────────────────────────
-
   for (const r of expiradas) {
     await notificarCambioReserva({
       tipo: "RESERVA_EXPIRADA",
@@ -71,7 +70,7 @@ export async function liberarReservasExpiradas() {
       slotInicio: r.slotInicio,
       slotFin: r.slotFin,
       playerId: r.playerId,
-      playerNombre: `${r.player.primerNombre} ${r.player.apellidos || ""}`.trim(),
+      playerNombre: `${r.player.nombre} ${r.player.apellido || ""}`.trim(),
       playerEmail: r.player.email,
       tenantId: r.tenantId,
       tenantEmail: r.tenant.email,
