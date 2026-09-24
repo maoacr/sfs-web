@@ -1,7 +1,9 @@
 import { getSupabaseAdmin } from "./supabase";
 import sharp from "sharp";
 
-const BUCKET = "imagenes";
+// Bucket público: solo fotos de canchas y complejos. Las fotos de personas y
+// equipos van al bucket privado "sfs" con URLs firmadas (ver docs de Storage).
+const BUCKET = "canchas";
 
 type ImageType = "profile" | "photo";
 
