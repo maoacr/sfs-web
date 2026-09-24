@@ -1,5 +1,8 @@
-import { db, reservas, canchas, complejos } from "@sfs/db";
+import { db, reservas, canchas, complejos, type Reserva } from "@sfs/db";
 import { eq, sql } from "drizzle-orm";
+
+/** Reservas que se concretaron: se pagó al menos el mínimo o ya se jugaron. */
+export const ESTADOS_EFECTIVOS: Reserva["estado"][] = ["PAGO_PARCIAL", "CONFIRMADA", "COMPLETADA"];
 
 /** La reserva empieza el día `fecha` en la zona horaria de su complejo. */
 export function empiezaElDiaLocal(fecha: string) {
