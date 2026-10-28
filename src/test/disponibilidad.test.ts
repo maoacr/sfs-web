@@ -7,6 +7,7 @@ import {
   calcularPrecioSlot,
   turnoDentroDeHorario,
 } from "../lib/disponibilidad";
+import type { ReservaItem } from "../lib/disponibilidad";
 
 describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
   describe("Utilidades de Tiempo y Parsing", () => {
@@ -213,6 +214,81 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
       expect(slot07?.disponible).toBe(false); // Ya pasó
       expect(slot11?.disponible).toBe(false); // Empezó a las 11:00 y son 11:30
       expect(slot12?.disponible).toBe(true);  // Futuro
+    });
+  });
+
+  describe("Expiración de reservas sin pagar", () => {
+    const slotConfig = {
+      diaSemana: 1, // Lunes
+      horaApertura: "07:00",
+      horaCierre: "23:00",
+    };
+
+    /** 2026-10-01 12:00 UTC: cuatro días antes del día reservado. */
+    const ahora = new Date("2026-10-01T12:00:00.000Z").getTime();
+
+    function slotsCon(reserva: Partial<ReservaItem> & { estado: string }) {
+      return calcularSlotsDisponibles({
+        fechaIso: "2026-10-05",
+        slotConfig,
+        duracionSlotMinutos: 60,
+        reservas: [
+          {
+            id: "res-1",
+            slotInicio: "2026-10-05T15:00:00.000Z", // 10:00 Bogotá
+            slotFin: "2026-10-05T16:00:00.000Z",
+            ...reserva,
+          } as ReservaItem,
+        ],
+        tarifas: [{ id: "t1", precioBase: 100000, factor: 1 }],
+        nowTimestamp: ahora,
+        zonaHoraria: "America/Bogota",
+      });
+    }
+
+    const slot10 = (slots: ReturnType<typeof calcularSlotsDisponibles>) =>
+      slots.find((s) => s.horaInicio === "10:00");
+
+    it("mantiene bloqueado un PENDIENTE_PAGO dentro del TTL", () => {
+      const hace5Min = new Date(ahora - 5 * 60 * 1000);
+      const slots = slotsCon({ estado: "PENDIENTE_PAGO", createdAt: hace5Min });
+
+      expect(slot10(slots)?.disponible).toBe(false);
+    });
+
+    it("libera el slot de un PENDIENTE_PAGO que superó el TTL", () => {
+      const hace20Min = new Date(ahora - 20 * 60 * 1000);
+      const slots = slotsCon({ estado: "PENDIENTE_PAGO", createdAt: hace20Min });
+
+      expect(slot10(slots)?.disponible).toBe(true);
+      expect(slot10(slots)?.reserva).toBeUndefined();
+    });
+
+    it("no expira un PAGO_PARCIAL por viejo que sea: ya pagó el mínimo", () => {
+      const haceUnDia = new Date(ahora - 24 * 60 * 60 * 1000);
+      const slots = slotsCon({ estado: "PAGO_PARCIAL", createdAt: haceUnDia });
+
+      expect(slot10(slots)?.disponible).toBe(false);
+    });
+
+    it("no expira una CONFIRMADA por viejo que sea", () => {
+      const haceUnDia = new Date(ahora - 24 * 60 * 60 * 1000);
+      const slots = slotsCon({ estado: "CONFIRMADA", createdAt: haceUnDia });
+
+      expect(slot10(slots)?.disponible).toBe(false);
+    });
+
+    it("bloquea cuando no se conoce createdAt: sin edad no se asume vencida", () => {
+      const slots = slotsCon({ estado: "PENDIENTE_PAGO" });
+
+      expect(slot10(slots)?.disponible).toBe(false);
+    });
+
+    it("acepta createdAt serializado como string ISO", () => {
+      const hace20Min = new Date(ahora - 20 * 60 * 1000).toISOString();
+      const slots = slotsCon({ estado: "PENDIENTE_PAGO", createdAt: hace20Min });
+
+      expect(slot10(slots)?.disponible).toBe(true);
     });
   });
 });

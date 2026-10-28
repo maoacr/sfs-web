@@ -26,12 +26,48 @@ export interface ReservaItem {
   slotInicio: Date | string;
   slotFin: Date | string;
   estado: string;
+  createdAt?: Date | string | null;
   player?: {
     nombre?: string | null;
     apellido?: string | null;
     apodo?: string | null;
     telefono?: string | null;
   } | null;
+}
+
+/** Minutos que una reserva aguanta en PENDIENTE_PAGO antes de soltar el turno. */
+export const TTL_RESERVA_MINUTOS = 15;
+
+/**
+ * Una reserva ocupa el turno salvo que sea un PENDIENTE_PAGO ya vencido.
+ *
+ * El vencimiento se evalúa acá y no sólo en el job de limpieza: el turno se
+ * libera en el instante en que expira, sin depender de que un scheduler haya
+ * corrido. El job pasa a ser housekeeping — persiste el CANCELADA y notifica —
+ * y su atraso o su caída ya no producen turnos fantasma.
+ *
+ * Un PAGO_PARCIAL no expira nunca: pagó el mínimo y el saldo se cobra aparte.
+ *
+ * Sin `createdAt` no hay edad que medir, así que la reserva sigue bloqueando:
+ * jamás se libera un turno por falta de información.
+ */
+export function reservaBloqueaTurno(reserva: ReservaItem, nowTimestamp: number): boolean {
+  if (
+    reserva.estado !== "CONFIRMADA" &&
+    reserva.estado !== "PENDIENTE_PAGO" &&
+    reserva.estado !== "PAGO_PARCIAL"
+  ) {
+    return false;
+  }
+
+  if (reserva.estado !== "PENDIENTE_PAGO" || reserva.createdAt == null) {
+    return true;
+  }
+
+  const creadaEn = new Date(reserva.createdAt).getTime();
+  if (Number.isNaN(creadaEn)) return true;
+
+  return nowTimestamp - creadaEn < TTL_RESERVA_MINUTOS * 60 * 1000;
 }
 
 export interface SlotCalculado {
@@ -201,9 +237,9 @@ export function calcularSlotsDisponibles(params: {
     // Si el turno ya pasó hoy, se puede omitir o marcar no disponible
     const esPasado = slotInicioDate.getTime() < nowTimestamp;
 
-    // Verificar si alguna reserva confirmada o pendiente solapa este slot
+    // Verificar si alguna reserva vigente solapa este slot
     const reservaSolapada = reservas.find((r) => {
-      if (r.estado !== "CONFIRMADA" && r.estado !== "PENDIENTE_PAGO" && r.estado !== "PAGO_PARCIAL") {
+      if (!reservaBloqueaTurno(r, nowTimestamp)) {
         return false;
       }
       const rInicio = new Date(r.slotInicio);

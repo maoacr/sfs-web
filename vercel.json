@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/liberar-expiradas",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }
