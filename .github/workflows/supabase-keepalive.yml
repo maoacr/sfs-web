@@ -1,0 +1,40 @@
+name: Supabase keepalive
+
+# Supabase pausa proyectos del plan Free tras 7 días sin suficiente
+# "user database activity". Los docs piden unas pocas queries por día:
+# https://supabase.com/docs/guides/platform/free-project-pausing
+#
+# Este workflow existe porque el cron de Vercel (/api/cron/liberar-expiradas)
+# sólo corre en deployments de producción. Mientras la app no esté deployada,
+# nada toca la base y el proyecto se pausa. Una vez deployado a producción,
+# ese cron ya genera actividad de sobra y este workflow se puede borrar.
+
+on:
+  schedule:
+    # 3 veces al día (UTC). Margen amplio: la ventana de Supabase es de 7 días,
+    # y los cron de GitHub Actions pueden retrasarse bajo carga.
+    - cron: "17 6,14,22 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping la base de datos
+        env:
+          # Usar la connection string del pooler de Supabase (Supavisor), no la
+          # conexión directa: los runners de GitHub no tienen IPv6.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::Falta el secret DATABASE_URL en el repositorio."
+            exit 1
+          fi
+
+          # Lectura trivial sobre una tabla real: cuenta como query de usuario
+          # y no modifica nada.
+          psql "${DATABASE_URL}" --no-psqlrc --quiet --tuples-only \
+            -c "select 'keepalive ok at ' || now() || ' — reservas: ' || count(*) from reservas;"
