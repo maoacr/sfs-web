@@ -7,6 +7,7 @@ import { apiHandler } from "@/lib/api-handler";
 import { registerSchema, type RegisterInput } from "@/lib/schemas";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 import { setCsrfCookie } from "@/lib/csrf";
+import { setSessionCookies } from "@/lib/cookies";
 
 /**
  * POST /api/auth/register
@@ -89,21 +90,7 @@ export const POST = apiHandler<RegisterInput>(
       { status: 201 }
     );
 
-    response.cookies.set("sfs_token", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 15 * 60,
-    });
-
-    response.cookies.set("sfs_refresh", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60,
-    });
+    setSessionCookies(response, { accessToken, refreshToken });
     setCsrfCookie(response);
 
     return response;

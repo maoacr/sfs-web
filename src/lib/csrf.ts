@@ -26,6 +26,11 @@ export function setCsrfCookie(response: NextResponse, existente?: string): void 
   response.cookies.set(CSRF_COOKIE, token, {
     httpOnly: false, // debe ser leíble por JS para enviarlo como header
     secure: process.env.NODE_ENV === "production",
+    // Acá sí va "strict", a diferencia de las cookies de sesión (ver
+    // `cookies.ts`): esta cookie no hace falta en la vuelta cross-site de
+    // MercadoPago. `sameSite` no afecta a `document.cookie`, así que el
+    // cliente la sigue leyendo, y las escrituras que la usan son same-site.
+    // No unificar con la política de sesión "por consistencia".
     sameSite: "strict",
     path: "/",
     maxAge: 60 * 60 * 24, // 24 horas
