@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { db, reservas, canchas, tarifas, slotConfigs, estadoReservaEnum, type Reserva } from "@sfs/db";
+import { db, reservas, canchas, tarifas, slotConfigs, estadoReservaEnum } from "@sfs/db";
 import { and, eq, gt, inArray, isNull, lt, sum, asc, type SQL } from "drizzle-orm";
 import { aInstante } from "@/lib/zona-horaria";
 import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
-import { reservasDelDiaLocal } from "@/lib/consultas";
+import { reservasDelDiaLocal, reservaOcupaElTurno } from "@/lib/consultas";
 import { apiHandler } from "@/lib/api-handler";
 import { createReservaSchema, type CreateReservaInput } from "@/lib/schemas";
 import { notificarReserva } from "@/lib/event-listeners";
@@ -11,8 +11,6 @@ import { liberarReservasExpiradas } from "@/lib/ttl";
 import { calcularPrecio, usarPromocion } from "@/lib/pricing";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 import { toApiCancha, toApiUsuario } from "@/lib/db-mappers";
-
-const ESTADOS_ACTIVOS: Reserva["estado"][] = ["PENDIENTE_PAGO", "PAGO_PARCIAL", "CONFIRMADA"];
 
 /**
  * POST /api/reservas
@@ -90,7 +88,7 @@ export const POST = apiHandler<CreateReservaInput>(
     const conflicto = await db.query.reservas.findFirst({
       where: and(
         eq(reservas.canchaId, canchaId),
-        inArray(reservas.estado, ESTADOS_ACTIVOS),
+        reservaOcupaElTurno(),
         lt(reservas.slotInicio, fin),
         gt(reservas.slotFin, inicio)
       ),

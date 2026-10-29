@@ -39,6 +39,28 @@ export interface ReservaItem {
 export const TTL_RESERVA_MINUTOS = 15;
 
 /**
+ * Estados que ocupan el turno siempre, sin importar su antigüedad.
+ * Ya hubo plata de por medio o el partido se jugó.
+ */
+export const ESTADOS_QUE_SIEMPRE_OCUPAN = ["PAGO_PARCIAL", "CONFIRMADA"] as const;
+
+/** El único estado que suelta el turno al vencer el TTL. */
+export const ESTADO_QUE_VENCE = "PENDIENTE_PAGO" as const;
+
+/**
+ * Instante de corte: un `PENDIENTE_PAGO` creado DESPUÉS de este momento sigue
+ * ocupando el turno; uno creado antes o justo en él, ya no.
+ *
+ * Lo consumen los dos caminos — la disponibilidad lo evalúa en memoria y la
+ * creación de reservas lo traduce a SQL (`reservaOcupaElTurno` en
+ * `consultas.ts`). Si cada uno definiera su propio corte, el jugador vería el
+ * slot libre y comería un 409 al reservarlo.
+ */
+export function limiteExpiracion(nowTimestamp: number): Date {
+  return new Date(nowTimestamp - TTL_RESERVA_MINUTOS * 60 * 1000);
+}
+
+/**
  * Una reserva ocupa el turno salvo que sea un PENDIENTE_PAGO ya vencido.
  *
  * El vencimiento se evalúa acá y no sólo en el job de limpieza: el turno se
@@ -52,22 +74,19 @@ export const TTL_RESERVA_MINUTOS = 15;
  * jamás se libera un turno por falta de información.
  */
 export function reservaBloqueaTurno(reserva: ReservaItem, nowTimestamp: number): boolean {
-  if (
-    reserva.estado !== "CONFIRMADA" &&
-    reserva.estado !== "PENDIENTE_PAGO" &&
-    reserva.estado !== "PAGO_PARCIAL"
-  ) {
-    return false;
-  }
-
-  if (reserva.estado !== "PENDIENTE_PAGO" || reserva.createdAt == null) {
+  if ((ESTADOS_QUE_SIEMPRE_OCUPAN as readonly string[]).includes(reserva.estado)) {
     return true;
   }
+
+  if (reserva.estado !== ESTADO_QUE_VENCE) return false;
+
+  // Sin fecha de creación no hay edad que medir: sigue ocupando.
+  if (reserva.createdAt == null) return true;
 
   const creadaEn = new Date(reserva.createdAt).getTime();
   if (Number.isNaN(creadaEn)) return true;
 
-  return nowTimestamp - creadaEn < TTL_RESERVA_MINUTOS * 60 * 1000;
+  return creadaEn > limiteExpiracion(nowTimestamp).getTime();
 }
 
 export interface SlotCalculado {

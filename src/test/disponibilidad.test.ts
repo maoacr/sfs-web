@@ -6,6 +6,11 @@ import {
   formatMinutesToHora,
   calcularPrecioSlot,
   turnoDentroDeHorario,
+  reservaBloqueaTurno,
+  limiteExpiracion,
+  TTL_RESERVA_MINUTOS,
+  ESTADOS_QUE_SIEMPRE_OCUPAN,
+  ESTADO_QUE_VENCE,
 } from "../lib/disponibilidad";
 import type { ReservaItem } from "../lib/disponibilidad";
 
@@ -289,6 +294,59 @@ describe("Motor de Disponibilidad y Slots (Fase 2)", () => {
       const slots = slotsCon({ estado: "PENDIENTE_PAGO", createdAt: hace20Min });
 
       expect(slot10(slots)?.disponible).toBe(true);
+    });
+  });
+
+  describe("Vocabulario compartido entre lectura y escritura", () => {
+    // La disponibilidad (GET) decide en memoria y la creación de reservas
+    // (POST) decide en SQL. Si cada una define por su cuenta qué ocupa un
+    // turno, el usuario ve el slot libre y recibe un 409 al reservarlo.
+    // Las dos se arman con estas constantes.
+
+    it("PAGO_PARCIAL y CONFIRMADA ocupan el turno siempre", () => {
+      expect(ESTADOS_QUE_SIEMPRE_OCUPAN).toEqual(["PAGO_PARCIAL", "CONFIRMADA"]);
+    });
+
+    it("PENDIENTE_PAGO no ocupa siempre: es el único que vence", () => {
+      expect(ESTADOS_QUE_SIEMPRE_OCUPAN).not.toContain("PENDIENTE_PAGO");
+      expect(ESTADO_QUE_VENCE).toBe("PENDIENTE_PAGO");
+    });
+
+    it("el límite de expiración es el TTL hacia atrás desde ahora", () => {
+      const ahora = new Date("2026-10-01T12:00:00.000Z").getTime();
+
+      expect(limiteExpiracion(ahora).toISOString()).toBe("2026-10-01T11:45:00.000Z");
+      expect(ahora - limiteExpiracion(ahora).getTime()).toBe(TTL_RESERVA_MINUTOS * 60 * 1000);
+    });
+
+    it("reservaBloqueaTurno respeta ese mismo límite", () => {
+      const ahora = new Date("2026-10-01T12:00:00.000Z").getTime();
+      const limite = limiteExpiracion(ahora);
+
+      const base = { id: "r", slotInicio: new Date(), slotFin: new Date() };
+
+      // Un milisegundo más nueva que el límite: sigue ocupando.
+      expect(
+        reservaBloqueaTurno(
+          { ...base, estado: "PENDIENTE_PAGO", createdAt: new Date(limite.getTime() + 1) },
+          ahora
+        )
+      ).toBe(true);
+
+      // Justo en el límite o más vieja: ya no ocupa.
+      expect(
+        reservaBloqueaTurno({ ...base, estado: "PENDIENTE_PAGO", createdAt: limite }, ahora)
+      ).toBe(false);
+    });
+
+    it("los estados que siempre ocupan ignoran el límite", () => {
+      const ahora = new Date("2026-10-01T12:00:00.000Z").getTime();
+      const antiquisima = new Date(ahora - 365 * 24 * 60 * 60 * 1000);
+      const base = { id: "r", slotInicio: new Date(), slotFin: new Date() };
+
+      for (const estado of ESTADOS_QUE_SIEMPRE_OCUPAN) {
+        expect(reservaBloqueaTurno({ ...base, estado, createdAt: antiquisima }, ahora)).toBe(true);
+      }
     });
   });
 });
