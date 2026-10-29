@@ -20,7 +20,7 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const FROM = "SFS <notificaciones@maoacr.com>";
+const FROM = process.env.EMAIL_FROM ?? "SFS <notificaciones@maoacr.com>";
 
 // El servidor corre en UTC: las horas se muestran en la zona de la cancha.
 const fH = (instante: Date, zona: string) => formatearHora(instante, zona);
