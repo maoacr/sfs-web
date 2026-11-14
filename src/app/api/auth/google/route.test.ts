@@ -69,7 +69,13 @@ import { POST } from "./route";
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const ID_USUARIO = "11111111-1111-4111-8111-111111111111";
-const SUB_GOOGLE = "google-sub-abc";
+
+/**
+ * El `sub` de Google son 21 dígitos; `identity_id` es un uuid de 36. Que no
+ * se parezcan es lo que hace evidente cuál de los dos guardó el route.
+ */
+const SUB_GOOGLE = "103847562910384756291";
+const IDENTITY_ID = "8a2c4e10-6b3f-4c21-9d77-0e5a1b2c3d4e";
 
 interface Fila {
   id: string;
@@ -96,18 +102,41 @@ function fila(cambios: Partial<Fila> = {}): Fila {
   };
 }
 
-const IDENTITY_DATA_OK: Record<string, unknown> = {
+/**
+ * Las diez claves que Google mandó DE VERDAD, verificadas contra
+ * `auth.identities.identity_data` y `auth.users.raw_user_meta_data` después
+ * de la primera corrida real.
+ *
+ * No vienen `given_name` ni `family_name`. El nombre del usuario sale de
+ * partir `full_name`, que es el camino que se ejecuta en producción — no el
+ * caso raro que parecía cuando esto se escribió contra un mock inventado.
+ */
+const IDENTITY_DATA_REAL: Record<string, unknown> = {
+  iss: "https://accounts.google.com",
+  sub: SUB_GOOGLE,
+  provider_id: SUB_GOOGLE,
+  email: "jugador@gmail.com",
   email_verified: true,
-  given_name: "Mario",
-  family_name: "Crespo",
-  avatar_url: "https://google.test/avatar.png",
+  phone_verified: false,
+  full_name: "Mario Crespo",
+  name: "Mario Crespo",
+  avatar_url: "https://lh3.googleusercontent.com/a/ejemplo",
+  picture: "https://lh3.googleusercontent.com/a/ejemplo",
 };
+
+/** El payload real menos una clave, para simular lo que Google no mandó. */
+function sinClave(clave: string): Record<string, unknown> {
+  const copia = { ...IDENTITY_DATA_REAL };
+  delete copia[clave];
+  return copia;
+}
 
 function sesionDeGoogle(
   opciones: {
     email?: string | null;
     sub?: string;
     identityData?: Record<string, unknown>;
+    /** Si no se pasa, espeja `identityData` — que es lo que hace Supabase. */
     metadata?: Record<string, unknown>;
     identities?: unknown[];
     extraUsuario?: Record<string, unknown>;
@@ -116,8 +145,8 @@ function sesionDeGoogle(
   const {
     email = "jugador@gmail.com",
     sub = SUB_GOOGLE,
-    identityData = IDENTITY_DATA_OK,
-    metadata = {},
+    identityData = IDENTITY_DATA_REAL,
+    metadata,
     identities,
     extraUsuario = {},
   } = opciones;
@@ -127,9 +156,19 @@ function sesionDeGoogle(
       user: {
         id: "uuid-de-supabase",
         email,
-        user_metadata: metadata,
+        // Supabase refleja identity_data en user_metadata: los dos llegaron
+        // con exactamente las mismas diez claves.
+        user_metadata: metadata ?? identityData,
         identities:
-          identities ?? [{ provider: "google", id: sub, identity_data: identityData }],
+          identities ?? [
+            {
+              provider: "google",
+              id: sub,
+              identity_id: IDENTITY_ID,
+              user_id: "uuid-de-supabase",
+              identity_data: identityData,
+            },
+          ],
         ...extraUsuario,
       },
     },
@@ -224,7 +263,7 @@ describe("POST /api/auth/google — rechazos", () => {
 
   it("rechaza sin escribir nada si Google no verificó el email", async () => {
     h.getUser.mockResolvedValue(
-      sesionDeGoogle({ identityData: { email_verified: false, given_name: "Mario" } })
+      sesionDeGoogle({ identityData: { ...IDENTITY_DATA_REAL, email_verified: false } })
     );
     registros({ porEmail: fila() });
 
@@ -241,7 +280,7 @@ describe("POST /api/auth/google — rechazos", () => {
     // saltearía nuestra propia regla, así que sólo cuenta el claim de Google.
     h.getUser.mockResolvedValue(
       sesionDeGoogle({
-        identityData: { given_name: "Mario" },
+        identityData: sinClave("email_verified"),
         extraUsuario: { email_confirmed_at: "2026-01-01T00:00:00Z" },
       })
     );
@@ -324,7 +363,7 @@ describe("POST /api/auth/google — vínculo y alta", () => {
     );
   });
 
-  it("crea la cuenta sin contraseña y con el nombre que manda Google", async () => {
+  it("crea la cuenta sin contraseña, partiendo el full_name de Google", async () => {
     const res = await POST(peticion());
 
     expect(res.status).toBe(200);
@@ -339,17 +378,62 @@ describe("POST /api/auth/google — vínculo y alta", () => {
     );
   });
 
-  it("parte el nombre completo cuando Google no manda given_name", async () => {
+  /**
+   * Google hoy no manda estos dos campos — se verificó contra la base después
+   * de la primera corrida real. El route igual los prefiere si algún día
+   * llegan, así que la rama existe y se cubre; simplemente dejó de ser el
+   * camino por defecto.
+   */
+  it("prefiere given_name y family_name si alguna vez llegan", async () => {
     h.getUser.mockResolvedValue(
       sesionDeGoogle({
-        identityData: { email_verified: true, full_name: "Mario Alejandro Crespo" },
+        identityData: {
+          ...IDENTITY_DATA_REAL,
+          given_name: "Mario Alejandro",
+          family_name: "Crespo Reyes",
+        },
       })
     );
 
     await POST(peticion());
 
     expect(h.valoresDelInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ nombre: "Mario", apellido: "Alejandro Crespo" })
+      expect.objectContaining({ nombre: "Mario Alejandro", apellido: "Crespo Reyes" })
+    );
+  });
+
+  /**
+   * El route acepta `email_verified` desde `identity_data` o desde
+   * `user_metadata`. En la práctica Supabase los espeja, pero la rama existe
+   * y sin esto quedaría sin cubrir.
+   */
+  it("acepta email_verified cuando sólo viene en user_metadata", async () => {
+    h.getUser.mockResolvedValue(
+      sesionDeGoogle({
+        identityData: sinClave("email_verified"),
+        metadata: IDENTITY_DATA_REAL,
+      })
+    );
+
+    const res = await POST(peticion());
+
+    expect(res.status).toBe(200);
+  });
+
+  /**
+   * La confusión más cara del flujo: `identities[].id` es el sub de Google y
+   * `identities[].identity_id` es el uuid de la fila en auth.identities.
+   * Guardar el segundo rompe el vínculo en silencio — la cuenta se crea, pero
+   * el siguiente login no la encuentra y crea otra.
+   */
+  it("guarda el sub de Google, no el uuid de la fila de identidades", async () => {
+    await POST(peticion());
+
+    expect(h.valoresDelInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ googleSub: SUB_GOOGLE })
+    );
+    expect(h.valoresDelInsert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ googleSub: IDENTITY_ID })
     );
   });
 });
