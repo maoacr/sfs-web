@@ -8,17 +8,57 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
    Sub-components defined at module level to avoid focus loss on re-render.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function Input({ id, label, type = "text", required, minLength, value, onChange, placeholder }: {
+function IconoOjo({ tachado }: { tachado: boolean }) {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+      strokeWidth={1.5} aria-hidden="true">
+      {tachado ? (
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243" />
+      ) : (
+        <>
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function Input({ id, label, type = "text", required, minLength, value, onChange, placeholder, autoComplete }: {
   id: string; label: string; type?: string; required?: boolean; minLength?: number;
-  value: string; onChange: (v: string) => void; placeholder?: string;
+  value: string; onChange: (v: string) => void; placeholder?: string; autoComplete?: string;
 }) {
+  const [visible, setVisible] = useState(false);
+  const esPassword = type === "password";
+
+  /**
+   * Mostrar la contraseña no es una comodidad: NIST 800-63B lo recomienda
+   * porque quien ve lo que escribe se equivoca menos y se anima a claves más
+   * largas. Cambia el `type` del mismo nodo — no se re-monta el input, así
+   * que no se pierde el cursor ni lo que el gestor de contraseñas ya llenó.
+   */
+  const tipoVisible = esPassword && visible ? "text" : type;
+
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-text">{label}</label>
-      <input id={id} type={type} required={required} minLength={minLength} value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-3 text-base sm:text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass"
-        placeholder={placeholder} />
+      <div className="relative mt-1">
+        <input id={id} type={tipoVisible} required={required} minLength={minLength} value={value}
+          autoComplete={autoComplete}
+          onChange={(e) => onChange(e.target.value)}
+          className={`block w-full rounded-lg border border-border bg-surface py-3 pl-3 text-base sm:text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass ${esPassword ? "pr-11" : "pr-3"}`}
+          placeholder={placeholder} />
+        {esPassword && (
+          <button type="button" onClick={() => setVisible((v) => !v)}
+            aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={visible}
+            className="absolute inset-y-0 right-0 flex items-center rounded-r-lg px-3 text-text-muted transition-colors hover:text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-grass">
+            <IconoOjo tachado={visible} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -111,6 +151,7 @@ type FormPanelProps = {
   loading: boolean;
   email: string; setEmail: (v: string) => void;
   password: string; setPassword: (v: string) => void;
+  confirmacion: string; setConfirmacion: (v: string) => void;
   primerNombre: string; setPrimerNombre: (v: string) => void;
   segundoNombre: string; setSegundoNombre: (v: string) => void;
   apellidos: string; setApellidos: (v: string) => void;
@@ -124,6 +165,7 @@ type FormPanelProps = {
 
 function FormPanel(props: FormPanelProps) {
   const { isLogin, error, loading, email, setEmail, password, setPassword,
+    confirmacion, setConfirmacion,
     primerNombre, setPrimerNombre, segundoNombre, setSegundoNombre,
     apellidos, setApellidos, apodo, setApodo,
     codigoPais, setCodigoPais, telefono, setTelefono,
@@ -220,8 +262,15 @@ function FormPanel(props: FormPanelProps) {
             </>
           )}
 
-          <Input id="email" label="Email" type="email" required value={email} onChange={setEmail} placeholder="tu@email.com" />
-          <Input id="password" label="Contraseña" type="password" required minLength={8} value={password} onChange={setPassword} placeholder="Mínimo 8 caracteres" />
+          <Input id="email" label="Email" type="email" required value={email} onChange={setEmail} placeholder="tu@email.com" autoComplete="email" />
+          <Input id="password" label="Contraseña" type="password" required minLength={8} value={password} onChange={setPassword} placeholder="Mínimo 8 caracteres"
+            autoComplete={isLogin ? "current-password" : "new-password"} />
+
+          {!isLogin && (
+            <Input id="confirmacion" label="Repetir contraseña" type="password" required minLength={8}
+              value={confirmacion} onChange={setConfirmacion} placeholder="Escribila de nuevo"
+              autoComplete="new-password" />
+          )}
 
           {error && <div className="rounded-lg bg-error-bg px-4 py-3 text-sm text-error">{error}</div>}
 
@@ -252,6 +301,7 @@ type AuthFormProps = { mode: "login" | "register" };
 export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmacion, setConfirmacion] = useState("");
   const [primerNombre, setPrimerNombre] = useState("");
   const [segundoNombre, setSegundoNombre] = useState("");
   const [apellidos, setApellidos] = useState("");
@@ -293,6 +343,20 @@ export function AuthForm({ mode }: AuthFormProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    /**
+     * La confirmación se queda acá: es una verificación del formulario, no
+     * una regla del dominio. `/api/auth/register` sólo conoce `password`.
+     *
+     * Vale la pena recordar lo que esto NO resuelve: si alguien se equivoca
+     * igual en los dos campos, pasa. Y quien olvide su contraseña el mes que
+     * viene queda afuera lo mismo, porque todavía no hay recuperación.
+     */
+    if (!isLogin && password !== confirmacion) {
+      setError("Las contraseñas no coinciden. Revisá que las dos sean iguales.");
+      return;
+    }
+
     setLoading(true);
     try {
       const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
@@ -328,6 +392,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         isLogin={isLogin} error={error} loading={loading}
         email={email} setEmail={setEmail}
         password={password} setPassword={setPassword}
+        confirmacion={confirmacion} setConfirmacion={setConfirmacion}
         primerNombre={primerNombre} setPrimerNombre={setPrimerNombre}
         segundoNombre={segundoNombre} setSegundoNombre={setSegundoNombre}
         apellidos={apellidos} setApellidos={setApellidos}
