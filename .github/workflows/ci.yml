@@ -1,0 +1,104 @@
+name: CI
+
+# Puertas de calidad en cada PR y en cada push a main.
+#
+# Las tres validaciones corren SIN secretos: la suite de tests no lee
+# process.env (verificado — vitest no carga .env a process.env, y los 115
+# tests pasan con todas las variables sin definir). Si en algún momento un
+# test necesita una variable, ponerle un valor dummy acá y no un secret:
+# un test que depende de credenciales reales no es un test, es un ping.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Varios pushes seguidos sobre un PR cancelan los runs viejos en vez de
+# hacer cola: lo que importa es el veredicto sobre la última versión.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # El lint incremental diffea contra el merge-base del PR, así que
+          # necesita la historia completa (un clone shallow no la tiene).
+          fetch-depth: 0
+
+      # pnpm antes de setup-node: el `cache: pnpm` de abajo necesita que el
+      # binario ya exista para resolver el store. La versión sale sola del
+      # campo packageManager del package.json (pnpm@10.25.0).
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Alineado con Vercel y con el entorno local de desarrollo.
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Los pasos de abajo usan `!cancelled()` a propósito: si falla el
+      # typecheck, igual queremos ver el resultado de tests y lint en la
+      # misma corrida. Un run, el panorama completo — no whack-a-mole.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        if: ${{ !cancelled() }}
+        run: pnpm test
+
+      # Ratchet deliberado. El repo arrastra 27 errores de lint heredados
+      # (13 no-explicit-any y 14 de react-hooks en componentes sin tests).
+      # Bloquear todo hoy dejaría el CI rojo de entrada, y un CI rojo
+      # permanente se ignora hasta volverse decorativo. Entonces el gate
+      # corre sólo sobre los archivos que toca el PR: el código nuevo nace
+      # limpio, y los heredados se arreglan cuando uno pasa por ellos.
+      # Cuando los 27 lleguen a 0, esto se reemplaza por un `pnpm lint` seco.
+      - name: Lint (archivos del PR)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          # Garantiza que la rama base exista como ref local. checkout@v4 con
+          # fetch-depth 0 normalmente ya la trae; este fetch es idempotente y
+          # evita que el paso dependa de ese detalle de implementación.
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+          # Tres puntos = diff desde el merge-base, no desde la punta de la
+          # base: así los commits que entraron a main mientras el PR estaba
+          # abierto no aparecen como archivos tocados por el PR.
+          # ACMR excluye los borrados (no se puede lintear lo que no está).
+          # Array en vez de string: tolera nombres de archivo con espacios.
+          # `while read` en vez de mapfile: mapfile necesita bash 4+, y así
+          # el paso también corre en el bash 3.2 de macOS, que es lo que
+          # permite simular este gate en local antes de abrir el PR.
+          archivos=()
+          while IFS= read -r archivo; do
+            archivos+=("${archivo}")
+          done < <(
+            git diff --name-only --diff-filter=ACMR \
+              "origin/${BASE_REF}...HEAD" \
+              -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs'
+          )
+
+          if [ "${#archivos[@]}" -eq 0 ]; then
+            echo "El PR no toca archivos JS/TS — nada que lintear."
+            exit 0
+          fi
+
+          echo "Linteando:"
+          printf '  %s\n' "${archivos[@]}"
+
+          # --no-warn-ignored: que un archivo ignorado por config no rompa
+          # el paso si alguna vez cae en el diff.
+          pnpm exec eslint --no-warn-ignored "${archivos[@]}"
