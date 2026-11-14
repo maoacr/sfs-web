@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Sub-components defined at module level to avoid focus loss on re-render.
@@ -118,6 +119,7 @@ type FormPanelProps = {
   telefono: string; setTelefono: (v: string) => void;
   role: "PLAYER" | "OWNER"; setRole: (v: "PLAYER" | "OWNER") => void;
   onSubmit: (e: React.FormEvent) => void;
+  onGoogle: () => void;
 };
 
 function FormPanel(props: FormPanelProps) {
@@ -125,7 +127,7 @@ function FormPanel(props: FormPanelProps) {
     primerNombre, setPrimerNombre, segundoNombre, setSegundoNombre,
     apellidos, setApellidos, apodo, setApodo,
     codigoPais, setCodigoPais, telefono, setTelefono,
-    role, setRole, onSubmit } = props;
+    role, setRole, onSubmit, onGoogle } = props;
 
   return (
     <div className="w-full lg:w-1/2 flex flex-col justify-center p-4 sm:p-6 lg:p-12 xl:p-16">
@@ -149,9 +151,8 @@ function FormPanel(props: FormPanelProps) {
         </div>
 
         {/* Google OAuth button */}
-        <button type="button"
-          onClick={() => alert("Google OAuth — próximamente")}
-          className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 text-base sm:text-sm font-medium text-text hover:bg-surface-hover transition-colors">
+        <button type="button" onClick={onGoogle} disabled={loading}
+          className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 text-base sm:text-sm font-medium text-text hover:bg-surface-hover disabled:opacity-50 transition-colors">
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -263,6 +264,32 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   const isLogin = mode === "login";
 
+  /**
+   * Arranca el baile de OAuth. Supabase negocia con Google y devuelve al
+   * usuario a `/auth/callback`, que canjea el token por nuestras cookies.
+   * La sesión de SFS sigue siendo `sfs_token` — esto sólo prueba quién es.
+   */
+  async function handleGoogle() {
+    setError("");
+    setLoading(true);
+    try {
+      const supabase = getSupabaseBrowser();
+      const { error: errorOAuth } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (errorOAuth) {
+        setError("No pudimos abrir el inicio de sesión con Google.");
+        setLoading(false);
+      }
+      // Si salió bien, el browser ya está navegando a Google: no apagamos
+      // `loading` para que el botón no vuelva a quedar clickeable.
+    } catch {
+      setError("Google no está configurado todavía.");
+      setLoading(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -309,6 +336,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         telefono={telefono} setTelefono={setTelefono}
         role={role} setRole={setRole}
         onSubmit={handleSubmit}
+        onGoogle={handleGoogle}
       />
     </div>
   );
