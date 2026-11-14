@@ -36,27 +36,38 @@ function fila(cambios: Record<string, unknown> = {}) {
 }
 
 let contadorIp = 0;
-function peticion(cuerpo: unknown = { email: "jugador@gmail.com" }, ipFija?: string) {
+function peticion(
+  cuerpo: unknown = { email: "jugador@gmail.com" },
+  ipFija?: string,
+  headersExtra: Record<string, string> = {}
+) {
   contadorIp += 1;
   return new NextRequest("http://localhost/api/auth/recuperar", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-forwarded-for": ipFija ?? `10.1.0.${contadorIp}`,
+      ...headersExtra,
     },
     body: JSON.stringify(cuerpo),
   });
 }
 
-/** El html del mail es el único lugar donde aparece el token. */
-function tokenDelMail(): string {
+/** El html del mail es donde vive el link completo. */
+function htmlDelMail(): string {
   const [, , html] = h.enviarEmail.mock.calls[0] as [string, string, string];
-  return /token=([\w.-]+)/.exec(html)?.[1] ?? "";
+  return html;
+}
+
+/** El token sólo aparece dentro del link del mail. */
+function tokenDelMail(): string {
+  return /token=([\w.-]+)/.exec(htmlDelMail())?.[1] ?? "";
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_SECRET = "secreto-de-sesion-para-tests";
+  delete process.env.NEXT_PUBLIC_APP_URL;
   h.findFirst.mockResolvedValue(null);
   h.enviarEmail.mockResolvedValue(undefined);
 });
@@ -133,6 +144,58 @@ describe("POST /api/auth/recuperar", () => {
 
     expect(res.status).toBe(200);
     expect(h.enviarEmail).not.toHaveBeenCalled();
+  });
+
+  describe("de dónde sale la URL del link", () => {
+    it("usa NEXT_PUBLIC_APP_URL cuando está configurada", async () => {
+      process.env.NEXT_PUBLIC_APP_URL = "https://sfs-web-omega.vercel.app";
+      h.findFirst.mockResolvedValue(fila());
+
+      await POST(peticion());
+
+      expect(htmlDelMail()).toContain("https://sfs-web-omega.vercel.app/auth/restablecer?token=");
+    });
+
+    /**
+     * Host-header poisoning. Derivar la base del request sería cómodo y es el
+     * ataque clásico contra recuperación de contraseña: el mail le llega a la
+     * víctima real, pero con un link al dominio del atacante y un token
+     * válido adentro. La URL tiene que venir de configuración, siempre.
+     */
+    it("ignora Host y x-forwarded-host, vengan como vengan", async () => {
+      process.env.NEXT_PUBLIC_APP_URL = "https://sfs-web-omega.vercel.app";
+      h.findFirst.mockResolvedValue(fila());
+
+      await POST(
+        peticion(undefined, undefined, {
+          host: "evil.com",
+          "x-forwarded-host": "evil.com",
+          "x-forwarded-proto": "https",
+        })
+      );
+
+      const html = htmlDelMail();
+      expect(html).toContain("https://sfs-web-omega.vercel.app/auth/restablecer?token=");
+      expect(html).not.toContain("evil.com");
+    });
+
+    it("en desarrollo cae a localhost para poder probar", async () => {
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      h.findFirst.mockResolvedValue(fila());
+
+      await POST(peticion());
+
+      expect(htmlDelMail()).toContain("http://localhost:3000/auth/restablecer?token=");
+    });
+
+    it("le saca la barra final a la URL configurada", async () => {
+      process.env.NEXT_PUBLIC_APP_URL = "https://sfs-web-omega.vercel.app/";
+      h.findFirst.mockResolvedValue(fila());
+
+      await POST(peticion());
+
+      expect(htmlDelMail()).not.toContain("app//auth/restablecer");
+    });
   });
 
   it("corta con 429 al cuarto intento desde la misma IP", async () => {

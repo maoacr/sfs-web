@@ -7,7 +7,31 @@ import { RATE_LIMITS } from "@/lib/rate-limit";
 import { enviarEmail } from "@/lib/email";
 import { firmarTokenReset } from "@/lib/reset-token";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+/**
+ * Base del link que va en el mail.
+ *
+ * Sale de CONFIGURACIÓN y nunca del request. Derivarla de `Host` o de
+ * `x-forwarded-host` sería cómodo —funcionaría sola en los dos entornos— y es
+ * el ataque clásico contra recuperación de contraseña: un atacante manda
+ * `Host: evil.com`, el mail le llega a la víctima real con un link a evil.com
+ * que lleva un token válido, y le cosecha el token cuando hace click.
+ *
+ * En producción, si falta la variable preferimos romper antes que mandar un
+ * link a localhost: ese mail gasta el único token que la persona pidió, y el
+ * problema no se nota hasta que alguien se queja.
+ */
+function urlBase(): string {
+  const configurada = process.env.NEXT_PUBLIC_APP_URL;
+  if (configurada) return configurada.replace(/\/+$/, "");
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Falta NEXT_PUBLIC_APP_URL: el link de recuperación necesita una URL pública configurada."
+    );
+  }
+
+  return "http://localhost:3000";
+}
 
 /**
  * POST /api/auth/recuperar
@@ -43,7 +67,7 @@ export const POST = apiHandler<RecuperarInput>(
     // La huella del password_hash actual viaja dentro del token: cuando la
     // contraseña cambie, este link deja de valer (ver `lib/reset-token.ts`).
     const token = await firmarTokenReset(usuario.id, usuario.passwordHash);
-    const link = `${APP_URL}/auth/restablecer?token=${token}`;
+    const link = `${urlBase()}/auth/restablecer?token=${token}`;
 
     await enviarEmail(
       usuario.email,
