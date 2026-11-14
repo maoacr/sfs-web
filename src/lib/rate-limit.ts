@@ -13,11 +13,21 @@ interface RateLimitEntry {
 export interface RateLimitConfig {
   maxRequests: number;
   windowMs: number; // duración de la ventana en ms
+  /**
+   * Nombre del balde de contadores. Dos endpoints con el mismo `bucket`
+   * comparten contador; con baldes distintos no se pisan.
+   *
+   * Existe porque sin él la key era sólo la IP: todos los endpoints sumaban
+   * al mismo contador mientras cada uno lo comparaba contra su propio límite.
+   * Navegar la app dejaba sin login a quien después quisiera entrar.
+   */
+  bucket: string;
 }
 
 const store = new Map<string, RateLimitEntry>();
 
 const DEFAULT_CONFIG: RateLimitConfig = {
+  bucket: "default",
   maxRequests: 100,
   windowMs: 60_000, // 1 minuto
 };
@@ -86,15 +96,20 @@ export function checkRateLimit(
 }
 
 /**
- * Obtiene la key de rate limiting desde el request.
- * Prioridad: userId (si autenticado) > IP del cliente.
+ * Key de rate limiting: un contador por balde y por cliente.
+ *
+ * El balde va en la key y el pathname NO. Incluir la ruta abriría un contador
+ * por cada id de las rutas dinámicas, lo que además de filtrar memoria haría
+ * esquivable el límite con sólo cambiar el id.
  */
-export function getRateLimitKey(request: Request): string {
-  // Intentar extraer IP
+export function getRateLimitKey(request: Request, bucket: string): string {
+  // Primer salto de x-forwarded-for: el cliente real detrás de los proxies.
+  // En local el header no existe y todo cae en "unknown", que para un único
+  // desarrollador alcanza.
   const forwarded = request.headers.get("x-forwarded-for");
   const ip = forwarded?.split(",")[0]?.trim() || "unknown";
 
-  return `rate:${ip}`;
+  return `rate:${bucket}:${ip}`;
 }
 
 /**
@@ -117,9 +132,12 @@ export function setRateLimitHeaders<T extends Response>(
  * Configuraciones por endpoint
  */
 export const RATE_LIMITS = {
-  AUTH_LOGIN: { maxRequests: 5, windowMs: 60_000 }, // 5 intentos/min
-  AUTH_REGISTER: { maxRequests: 3, windowMs: 60_000 }, // 3 registros/min
-  DEFAULT: { maxRequests: 100, windowMs: 60_000 },
-  DISPONIBILIDAD: { maxRequests: 60, windowMs: 60_000 }, // 1 query/seg
-  STRICT: { maxRequests: 10, windowMs: 60_000 }, // 10/min
+  // `auth` lo comparten /api/auth/login y /api/auth/google a propósito: los
+  // dos son intentos de autenticarse, y el límite es del intento y no del
+  // método. Cinco por contraseña más cinco por Google serían diez.
+  AUTH_LOGIN: { bucket: "auth", maxRequests: 5, windowMs: 60_000 }, // 5 intentos/min
+  AUTH_REGISTER: { bucket: "auth_register", maxRequests: 3, windowMs: 60_000 }, // 3 registros/min
+  DEFAULT: { bucket: "default", maxRequests: 100, windowMs: 60_000 },
+  DISPONIBILIDAD: { bucket: "disponibilidad", maxRequests: 60, windowMs: 60_000 }, // 1 query/seg
+  STRICT: { bucket: "strict", maxRequests: 10, windowMs: 60_000 }, // 10/min
 } as const;

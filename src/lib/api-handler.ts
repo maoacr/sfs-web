@@ -72,8 +72,9 @@ export function apiHandler<TBody = unknown, TQuery = Record<string, string>>(
   ): Promise<NextResponse> => {
     // ─── 1. Rate Limiting ─────────────────────────────────────────────────
 
-    const rateKey = getRateLimitKey(request);
+    // El config primero: la key necesita saber en qué balde cae este endpoint.
     const rateConfig = options.rateLimit || RATE_LIMITS.DEFAULT;
+    const rateKey = getRateLimitKey(request, rateConfig.bucket);
 
     const rateResult = checkRateLimit(rateKey, rateConfig);
     if (!rateResult.allowed) {
