@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   loginSchema,
+  googleAuthSchema,
   registerSchema,
   createCanchaSchema,
   createComplejoSchema,
@@ -94,6 +95,31 @@ describe("Auth Schemas", () => {
       role: "PLAYER",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("googleAuthSchema exige el accessToken", () => {
+    expect(googleAuthSchema.safeParse({}).success).toBe(false);
+    expect(googleAuthSchema.safeParse({ accessToken: "" }).success).toBe(false);
+  });
+
+  /**
+   * Éste no es un test de forma: es la primera línea de defensa de
+   * `/api/auth/google`. El route saca email, nombre y `sub` del token ya
+   * verificado contra Supabase, y este schema garantiza que nada de eso pueda
+   * llegar desde el cliente. Si alguien le agrega `.passthrough()`, o suma un
+   * campo de identidad, un atacante podría entrar como otra persona en cuanto
+   * el route lea una de esas claves. Que falle acá y no en producción.
+   */
+  it("googleAuthSchema descarta cualquier identidad que venga del cliente", () => {
+    const result = googleAuthSchema.parse({
+      accessToken: "token-de-supabase",
+      email: "victima@gmail.com",
+      sub: "sub-de-la-victima",
+      rol: "ADMIN",
+    });
+
+    expect(result).toEqual({ accessToken: "token-de-supabase" });
+    expect(Object.keys(result)).toEqual(["accessToken"]);
   });
 });
 
