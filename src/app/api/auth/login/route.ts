@@ -24,9 +24,19 @@ export const POST = apiHandler<LoginInput>(
       where: eq(usuarios.email, email.toLowerCase().trim()),
     });
 
-    if (!user || !user.passwordHash) {
+    if (!user) {
       return NextResponse.json(
         { error: "Email o contraseña incorrectos" },
+        { status: 401 }
+      );
+    }
+
+    // Cuenta sin hash = cuenta que entra por Google (ver `src/lib/google-auth.ts`).
+    // Decirle "contraseña incorrecta" la manda a pelear contra un mensaje que
+    // miente: no hay contraseña que pueda funcionar.
+    if (!user.passwordHash) {
+      return NextResponse.json(
+        { error: "Esta cuenta inicia sesión con Google. Usá el botón \"Continuar con Google\"." },
         { status: 401 }
       );
     }
