@@ -22,6 +22,16 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Contraseña requerida"),
 });
 
+/**
+ * Lo único que `/api/auth/google` acepta del cliente: el access token que
+ * emitió Supabase. El email, el nombre y el `sub` NO se reciben del browser —
+ * los lee el servidor del token verificado. Si el cliente pudiera mandarlos,
+ * cualquiera entraría como cualquiera.
+ */
+export const googleAuthSchema = z.object({
+  accessToken: z.string().min(1, "Token requerido").max(4096),
+});
+
 export const registerSchema = z.object({
   email: z.string().email("Email inválido").max(255),
   password: passwordSchema,
@@ -260,6 +270,7 @@ export const invitarMiembroSchema = z.object({
 // ─── Utilidad ────────────────────────────────────────────────────────────────
 
 export type LoginInput = z.infer<typeof loginSchema>;
+export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type CreateCanchaInput = z.infer<typeof createCanchaSchema>;
 export type UpdateCanchaInput = z.infer<typeof updateCanchaSchema>;
