@@ -12,6 +12,11 @@ const PUBLIC_PATHS = [
   // Vuelta de Google: todavía no hay `sfs_token` — justamente lo va a emitir.
   "/auth/callback",
   "/api/auth/google",
+  // Recuperar la cuenta es justamente lo que hace quien NO puede entrar.
+  "/auth/recuperar",
+  "/auth/restablecer",
+  "/api/auth/recuperar",
+  "/api/auth/restablecer",
   // Called by MercadoPago and Vercel Cron without cookies; they verify their own signature/secret.
   "/api/webhooks/",
   "/api/cron/",

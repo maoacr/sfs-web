@@ -32,6 +32,23 @@ export const googleAuthSchema = z.object({
   accessToken: z.string().min(1, "Token requerido").max(4096),
 });
 
+/**
+ * Pedir el link de recuperación. Lo único que se acepta es el email: el
+ * endpoint responde siempre lo mismo, exista o no la cuenta.
+ */
+export const recuperarSchema = z.object({
+  email: z.string().email("Email inválido").max(255),
+});
+
+/**
+ * Usar el link. El token lleva adentro de qué cuenta se trata y una huella de
+ * su contraseña actual, así que no hace falta —ni se acepta— un email acá.
+ */
+export const restablecerSchema = z.object({
+  token: z.string().min(1, "Token requerido").max(4096),
+  password: passwordSchema,
+});
+
 export const registerSchema = z.object({
   email: z.string().email("Email inválido").max(255),
   password: passwordSchema,
@@ -271,6 +288,8 @@ export const invitarMiembroSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;
+export type RecuperarInput = z.infer<typeof recuperarSchema>;
+export type RestablecerInput = z.infer<typeof restablecerSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type CreateCanchaInput = z.infer<typeof createCanchaSchema>;
 export type UpdateCanchaInput = z.infer<typeof updateCanchaSchema>;

@@ -137,6 +137,9 @@ export const RATE_LIMITS = {
   // método. Cinco por contraseña más cinco por Google serían diez.
   AUTH_LOGIN: { bucket: "auth", maxRequests: 5, windowMs: 60_000 }, // 5 intentos/min
   AUTH_REGISTER: { bucket: "auth_register", maxRequests: 3, windowMs: 60_000 }, // 3 registros/min
+  // Mandar mails a pedido de cualquiera es un vector de abuso: alguien podría
+  // inundar la casilla de otro. Ventana más larga y techo más bajo que login.
+  AUTH_RECUPERAR: { bucket: "auth_recuperar", maxRequests: 3, windowMs: 15 * 60_000 }, // 3 cada 15 min
   DEFAULT: { bucket: "default", maxRequests: 100, windowMs: 60_000 },
   DISPONIBILIDAD: { bucket: "disponibilidad", maxRequests: 60, windowMs: 60_000 }, // 1 query/seg
   STRICT: { bucket: "strict", maxRequests: 10, windowMs: 60_000 }, // 10/min
