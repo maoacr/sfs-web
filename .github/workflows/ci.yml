@@ -9,7 +9,17 @@ name: CI
 # un test que depende de credenciales reales no es un test, es un ping.
 
 on:
+  # Los tipos por defecto de `pull_request` son opened, synchronize y
+  # reopened. Falta `edited`, que es el que salta cuando se le cambia la BASE
+  # a un PR — y cambiar la base cambia el diff, así que cambia lo que hay que
+  # validar. Sin esto, un PR re-apuntado se puede mergear sin pasar la puerta,
+  # que es exactamente lo que pasó al colapsar la cadena de #2 a #5.
+  #
+  # `edited` también salta al editar título o descripción, así que algún run
+  # va a correr sin que el código haya cambiado. Son 40 segundos: más barato
+  # que la condición que haría falta para distinguirlos.
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
