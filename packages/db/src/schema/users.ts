@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, index } from "drizzle-orm/pg-core";
 import { rolUsuarioEnum } from "./enums";
 
 export const usuarios = pgTable(
@@ -6,7 +6,18 @@ export const usuarios = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     email: varchar("email", { length: 255 }).notNull().unique(),
-    passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+    /**
+     * Nullable a propósito: el hash existe SI esta cuenta puede entrar con
+     * contraseña. Las cuentas de Google no tienen ninguna, y una cuenta que
+     * se vincula a Google pierde la que tenía (ver `src/lib/google-auth.ts`).
+     */
+    passwordHash: varchar("password_hash", { length: 255 }),
+    /**
+     * `sub` de Google. Es el identificador estable de la identidad: el email
+     * del usuario puede cambiar, esto no. Único para que dos filas no puedan
+     * reclamar la misma identidad.
+     */
+    googleSub: varchar("google_sub", { length: 255 }).unique(),
     nombre: varchar("nombre", { length: 100 }).notNull(),
     apellido: varchar("apellido", { length: 100 }).notNull(),
     apodo: varchar("apodo", { length: 50 }),
