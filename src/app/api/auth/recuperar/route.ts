@@ -21,12 +21,12 @@ import { firmarTokenReset } from "@/lib/reset-token";
  * problema no se nota hasta que alguien se queja.
  */
 function urlBase(): string {
-  const configurada = process.env.NEXT_PUBLIC_APP_URL;
+  const configurada = process.env.APP_URL;
   if (configurada) return configurada.replace(/\/+$/, "");
 
   if (process.env.NODE_ENV === "production") {
     throw new Error(
-      "Falta NEXT_PUBLIC_APP_URL: el link de recuperación necesita una URL pública configurada."
+      "Falta APP_URL: el link de recuperación necesita una URL pública configurada."
     );
   }
 

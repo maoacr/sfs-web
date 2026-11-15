@@ -11,7 +11,7 @@ import type { Pago } from "@sfs/db";
  */
 
 const accessToken = process.env.MP_ACCESS_TOKEN || "";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const APP_URL = process.env.APP_URL || "http://localhost:3000";
 
 function mpClient() {
   if (!accessToken) throw new Error("MP_ACCESS_TOKEN no configurado");

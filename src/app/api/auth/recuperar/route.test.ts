@@ -67,7 +67,7 @@ function tokenDelMail(): string {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_SECRET = "secreto-de-sesion-para-tests";
-  delete process.env.NEXT_PUBLIC_APP_URL;
+  delete process.env.APP_URL;
   h.findFirst.mockResolvedValue(null);
   h.enviarEmail.mockResolvedValue(undefined);
 });
@@ -147,8 +147,8 @@ describe("POST /api/auth/recuperar", () => {
   });
 
   describe("de dónde sale la URL del link", () => {
-    it("usa NEXT_PUBLIC_APP_URL cuando está configurada", async () => {
-      process.env.NEXT_PUBLIC_APP_URL = "https://sfs-web-omega.vercel.app";
+    it("usa APP_URL cuando está configurada", async () => {
+      process.env.APP_URL = "https://sfs-web-omega.vercel.app";
       h.findFirst.mockResolvedValue(fila());
 
       await POST(peticion());
@@ -163,7 +163,7 @@ describe("POST /api/auth/recuperar", () => {
      * válido adentro. La URL tiene que venir de configuración, siempre.
      */
     it("ignora Host y x-forwarded-host, vengan como vengan", async () => {
-      process.env.NEXT_PUBLIC_APP_URL = "https://sfs-web-omega.vercel.app";
+      process.env.APP_URL = "https://sfs-web-omega.vercel.app";
       h.findFirst.mockResolvedValue(fila());
 
       await POST(
@@ -180,7 +180,7 @@ describe("POST /api/auth/recuperar", () => {
     });
 
     it("en desarrollo cae a localhost para poder probar", async () => {
-      delete process.env.NEXT_PUBLIC_APP_URL;
+      delete process.env.APP_URL;
       h.findFirst.mockResolvedValue(fila());
 
       await POST(peticion());
@@ -189,7 +189,7 @@ describe("POST /api/auth/recuperar", () => {
     });
 
     it("le saca la barra final a la URL configurada", async () => {
-      process.env.NEXT_PUBLIC_APP_URL = "https://sfs-web-omega.vercel.app/";
+      process.env.APP_URL = "https://sfs-web-omega.vercel.app/";
       h.findFirst.mockResolvedValue(fila());
 
       await POST(peticion());
