@@ -7,7 +7,9 @@ import type { Pago } from "@sfs/db";
  *
  * Variables de entorno:
  * - MP_ACCESS_TOKEN: token de acceso (TEST-xxx para sandbox, APP_USR-xxx para prod)
- * - MP_WEBHOOK_SECRET: clave secreta de webhooks del panel de MP
+ * - MP_WEBHOOK_SECRET: clave secreta de webhooks del panel de MP. MP emite una
+ *   por modo (prueba y productivo) y acá hay un solo endpoint, así que admite
+ *   varias separadas por coma: vale la firma que coincida con cualquiera.
  */
 
 const accessToken = process.env.MP_ACCESS_TOKEN || "";
@@ -70,6 +72,10 @@ export async function createCheckoutPreference(params: {
  * Valida el header x-signature de MP. El manifest firmado es
  * `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`, omitiendo las partes
  * que MP no envía. Un data.id alfanumérico se firma en minúsculas.
+ *
+ * `secret` admite varias claves separadas por coma. Hace falta porque MP firma
+ * con la clave del modo que originó el pago —y un vendedor de prueba notifica
+ * como modo productivo—, mientras que el endpoint es uno solo.
  */
 export function verifyWebhookRequest({
   dataId,
@@ -82,7 +88,12 @@ export function verifyWebhookRequest({
   signatureHeader: string | null;
   secret?: string;
 }): boolean {
-  if (!secret) {
+  const secretos = secret
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (secretos.length === 0) {
     console.warn("[MP] MP_WEBHOOK_SECRET no configurado — aceptando sin verificar");
     return true;
   }
@@ -102,11 +113,13 @@ export function verifyWebhookRequest({
   const manifest =
     `id:${id};` + (requestId ? `request-id:${requestId};` : "") + `ts:${ts};`;
 
-  const esperado = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
-  return (
-    esperado.length === v1.length &&
-    crypto.timingSafeEqual(Buffer.from(esperado), Buffer.from(v1))
-  );
+  return secretos.some((secreto) => {
+    const esperado = crypto.createHmac("sha256", secreto).update(manifest).digest("hex");
+    return (
+      esperado.length === v1.length &&
+      crypto.timingSafeEqual(Buffer.from(esperado), Buffer.from(v1))
+    );
+  });
 }
 
 // ─── Payment Operations ──────────────────────────────────────────────────────
