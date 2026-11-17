@@ -2,6 +2,7 @@ import { db, pagos, reservas, type Pago, type Reserva } from "@sfs/db";
 import { eq, sql } from "drizzle-orm";
 import { createCheckoutPreference, estadoPagoDesdeMp } from "@/lib/mercadopago";
 import { esUuid } from "@/lib/uuid";
+import { comisionDe, desdeMercadoPago } from "@/lib/metodo-pago";
 
 export function aplicarPago({
   montoTotal,
@@ -28,7 +29,15 @@ export function aplicarPago({
 export async function iniciarPagoMp(params: { reservaId: string; userId: string; monto: number }) {
   const [pago] = await db
     .insert(pagos)
-    .values({ reservaId: params.reservaId, userId: params.userId, monto: params.monto.toFixed(2) })
+    .values({
+      reservaId: params.reservaId,
+      userId: params.userId,
+      monto: params.monto.toFixed(2),
+      // Nace por la app. El método real lo trae el webhook: recién cuando MP
+      // confirma se sabe si fue PSE, tarjeta o saldo.
+      canal: "APP",
+      metodo: "OTRO",
+    })
     .returning({ id: pagos.id });
 
   try {
@@ -55,6 +64,8 @@ export interface PagoMp {
   status?: string;
   status_detail?: string;
   payment_method_id?: string;
+  payment_type_id?: string;
+  fee_details?: { amount?: number }[];
   external_reference?: string;
   transaction_amount?: number;
 }
@@ -91,6 +102,9 @@ export async function registrarPagoMp(payment: PagoMp): Promise<ResultadoPagoMp>
       return { tipo: "ignorado", motivo: "pago ya procesado" } as const;
     }
 
+    const { metodo, entidad } = desdeMercadoPago(payment);
+    const comision = comisionDe(payment);
+
     const mpMetadata = {
       ...((pago.mpMetadata as Record<string, unknown> | null) ?? {}),
       payment: {
@@ -98,13 +112,15 @@ export async function registrarPagoMp(payment: PagoMp): Promise<ResultadoPagoMp>
         status: payment.status,
         statusDetail: payment.status_detail,
         metodo: payment.payment_method_id,
+        tipo: payment.payment_type_id,
+        feeDetails: payment.fee_details,
       },
     };
 
     if (estadoNuevo !== "APROBADO") {
       await tx
         .update(pagos)
-        .set({ estadoPago: estadoNuevo, mpPaymentId, mpMetadata })
+        .set({ estadoPago: estadoNuevo, mpPaymentId, mpMetadata, metodo, entidad, comision: comision.toFixed(2) })
         .where(eq(pagos.id, pago.id));
       return { tipo: "actualizado", estadoPago: estadoNuevo } as const;
     }
@@ -119,7 +135,15 @@ export async function registrarPagoMp(payment: PagoMp): Promise<ResultadoPagoMp>
 
     await tx
       .update(pagos)
-      .set({ estadoPago: "APROBADO", monto: monto.toFixed(2), mpPaymentId, mpMetadata })
+      .set({
+        estadoPago: "APROBADO",
+        monto: monto.toFixed(2),
+        mpPaymentId,
+        mpMetadata,
+        metodo,
+        entidad,
+        comision: comision.toFixed(2),
+      })
       .where(eq(pagos.id, pago.id));
 
     // El pago puede aprobarse después de que el TTL o el usuario cancelaron la reserva.

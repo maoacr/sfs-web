@@ -20,6 +20,25 @@ export const estadoReservaEnum = pgEnum("estado_reserva", [
   "COMPLETADA",
 ]);
 
+/**
+ * CÓMO se movió la plata. Son tipos, no instituciones: Nequi, Daviplata y
+ * Bancolombia son todos `TRANSFERENCIA`, y cuál fue se guarda en `entidad`.
+ * La lista es corta y estable a propósito — es la que se agrupa en los
+ * reportes.
+ */
+export const metodoPagoEnum = pgEnum("metodo_pago", [
+  "EFECTIVO",
+  "TRANSFERENCIA",
+  "PSE",
+  "TARJETA_DEBITO",
+  "TARJETA_CREDITO",
+  "BILLETERA",
+  "OTRO",
+]);
+
+/** DÓNDE se originó el pago: por la app o en el mostrador del complejo. */
+export const canalPagoEnum = pgEnum("canal_pago", ["APP", "PRESENCIAL"]);
+
 export const estadoPagoEnum = pgEnum("estado_pago", [
   "PENDIENTE",
   "APROBADO",

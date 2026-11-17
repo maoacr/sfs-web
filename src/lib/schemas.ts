@@ -191,12 +191,30 @@ export const updateTarifaSchema = tarifaCampos.partial();
 
 // fecha y hora son locales de la cancha; el servidor calcula el instante con
 // la zona horaria del complejo y la duración del turno.
+/**
+ * El método es el TIPO; la entidad es la institución. Nequi y Bancolombia son
+ * los dos `TRANSFERENCIA` y se distinguen por `entidad`.
+ */
+export const metodoPagoValues = z.enum([
+  "EFECTIVO",
+  "TRANSFERENCIA",
+  "PSE",
+  "TARJETA_DEBITO",
+  "TARJETA_CREDITO",
+  "BILLETERA",
+  "OTRO",
+]);
+
 export const createReservaSchema = z.object({
   canchaId: z.string().min(1, "ID de cancha requerido"),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD requerido"),
   hora: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido"),
-  playerId: z.string().min(1).optional(),
-  playerNombre: z.string().optional(),
+  playerId: z.string().uuid("El jugador debe estar inscrito en el sistema").optional(),
+  // Sólo las usa el dueño al agendar en el mostrador: cuánto cobró y cómo.
+  // Sin `montoPagado` se asume que cobró todo.
+  montoPagado: z.number().nonnegative().optional(),
+  metodo: metodoPagoValues.optional(),
+  entidad: z.string().max(60).optional(),
 });
 
 export const cambiarEstadoReservaSchema = z.object({
@@ -257,7 +275,10 @@ export const pagarSaldoSchema = z.object({
 });
 
 export const confirmarPagoSchema = z.object({
-  metodo: z.enum(["efectivo", "nequi", "transferencia"]).default("efectivo"),
+  metodo: metodoPagoValues.default("EFECTIVO"),
+  entidad: z.string().max(60).optional(),
+  // Sin monto se cobra todo el saldo. Con monto, el dueño registra un parcial.
+  monto: z.number().positive().optional(),
 });
 
 export const cancelarReservaSchema = z.object({
