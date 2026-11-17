@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { db, reservas, pagos } from "@sfs/db";
+import { db, reservas, pagos, type Pago } from "@sfs/db";
 import { and, eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { confirmarPagoSchema } from "@/lib/schemas";
 import { notificarReserva } from "@/lib/event-listeners";
 
-type ConfirmarPagoBody = { metodo: "efectivo" | "nequi" | "transferencia" };
+type ConfirmarPagoBody = { metodo?: Pago["metodo"]; entidad?: string; monto?: number };
 
 /**
  * POST /api/reservas/:id/confirmar-pago
@@ -35,9 +35,23 @@ export const POST = apiHandler<ConfirmarPagoBody>(
       return NextResponse.json({ error: "No se puede confirmar una reserva cancelada" }, { status: 400 });
     }
 
-    const metodo = body?.metodo || "efectivo";
+    const metodo = body?.metodo ?? "EFECTIVO";
     const montoTotal = Number(reserva.montoTotal);
-    const nuevoPago = montoTotal - Number(reserva.montoPagado);
+    const yaPagado = Number(reserva.montoPagado);
+    const saldo = montoTotal - yaPagado;
+
+    // Sin monto, el dueño está cobrando todo lo que falta.
+    const nuevoPago = body?.monto ?? saldo;
+
+    if (nuevoPago > saldo) {
+      return NextResponse.json(
+        { error: `El monto excede el saldo pendiente (${saldo.toLocaleString("es-CO")} COP)` },
+        { status: 400 }
+      );
+    }
+
+    const pagadoTotal = yaPagado + nuevoPago;
+    const saldoNuevo = montoTotal - pagadoTotal;
 
     await db.transaction(async (tx) => {
       await tx.insert(pagos).values({
@@ -45,21 +59,34 @@ export const POST = apiHandler<ConfirmarPagoBody>(
         userId: reserva.playerId,
         monto: nuevoPago.toFixed(2),
         estadoPago: "APROBADO",
-        mpMetadata: { metodo, confirmadoPor: user.sub },
+        // Lo cobró el dueño en el complejo: no pasó por la app ni por MP.
+        canal: "PRESENCIAL",
+        metodo,
+        entidad: body?.entidad ?? null,
+        mpMetadata: { confirmadoPor: user.sub },
       });
       await tx
         .update(reservas)
-        .set({ montoPagado: montoTotal.toFixed(2), saldoPendiente: "0.00", estado: "CONFIRMADA" })
+        .set({
+          montoPagado: pagadoTotal.toFixed(2),
+          saldoPendiente: saldoNuevo.toFixed(2),
+          estado: saldoNuevo > 0 ? "PAGO_PARCIAL" : "CONFIRMADA",
+        })
         .where(eq(reservas.id, reserva.id));
     });
 
-    await notificarReserva(reserva.id, "RESERVA_CONFIRMADA");
+    await notificarReserva(
+      reserva.id,
+      saldoNuevo > 0 ? "PAGO_PARCIAL_RECIBIDO" : "RESERVA_CONFIRMADA"
+    );
 
     return NextResponse.json({
       reservaId: reserva.id,
-      estado: "CONFIRMADA",
+      estado: saldoNuevo > 0 ? "PAGO_PARCIAL" : "CONFIRMADA",
       metodo,
+      entidad: body?.entidad ?? null,
       montoConfirmado: nuevoPago,
+      saldoPendiente: saldoNuevo,
     });
   },
   {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, reservas, canchas, tarifas, slotConfigs, estadoReservaEnum } from "@sfs/db";
+import { db, reservas, pagos, canchas, tarifas, slotConfigs, estadoReservaEnum } from "@sfs/db";
 import { and, eq, gt, inArray, isNull, lt, asc, type SQL } from "drizzle-orm";
 import { aInstante } from "@/lib/zona-horaria";
 import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
@@ -23,7 +23,7 @@ export const POST = apiHandler<CreateReservaInput>(
     }
 
     const user = ctx.user!;
-    const { canchaId, fecha, hora, playerId } = body;
+    const { canchaId, fecha, hora, playerId, montoPagado, metodo, entidad } = body;
 
     const esOwner = user.role === "OWNER";
 
@@ -127,22 +127,52 @@ export const POST = apiHandler<CreateReservaInput>(
 
     // ─── 5. Crear reserva ─────────────────────────────────────────────────
 
-    const [reserva] = await db
-      .insert(reservas)
-      .values({
-        tenantId: cancha.tenantId,
-        canchaId,
-        playerId: finalPlayerId,
-        slotInicio: inicio,
-        slotFin: fin,
-        montoTotal: montoTotal.toFixed(2),
-        montoPagado: esOwner ? montoTotal.toFixed(2) : "0.00",
-        saldoPendiente: esOwner ? "0.00" : montoTotal.toFixed(2),
-        estado: esOwner ? "CONFIRMADA" : "PENDIENTE_PAGO",
-      })
-      .returning();
+    // El dueño agenda en el mostrador y cobra ahí. Sin `montoPagado` se asume
+    // que cobró todo; con un monto menor la reserva queda con saldo, y ese
+    // saldo bloquea al jugador para la próxima igual que si hubiera pagado
+    // parcial por la app.
+    const cobrado = esOwner ? Math.min(montoPagado ?? montoTotal, montoTotal) : 0;
+    const saldoReserva = montoTotal - cobrado;
 
-    await notificarReserva(reserva.id, esOwner ? "RESERVA_CONFIRMADA" : "RESERVA_CREADA");
+    const reserva = await db.transaction(async (tx) => {
+      const [creada] = await tx
+        .insert(reservas)
+        .values({
+          tenantId: cancha.tenantId,
+          canchaId,
+          playerId: finalPlayerId,
+          slotInicio: inicio,
+          slotFin: fin,
+          montoTotal: montoTotal.toFixed(2),
+          montoPagado: cobrado.toFixed(2),
+          saldoPendiente: saldoReserva.toFixed(2),
+          estado: esOwner ? (saldoReserva > 0 ? "PAGO_PARCIAL" : "CONFIRMADA") : "PENDIENTE_PAGO",
+        })
+        .returning();
+
+      // Toda plata que entra deja fila en `pagos`. Antes este camino marcaba la
+      // reserva como pagada sin registrar nada: la plata que cobraba el dueño
+      // era invisible para cualquier reporte.
+      if (cobrado > 0) {
+        await tx.insert(pagos).values({
+          reservaId: creada.id,
+          userId: finalPlayerId,
+          monto: cobrado.toFixed(2),
+          estadoPago: "APROBADO",
+          canal: "PRESENCIAL",
+          metodo: metodo ?? "EFECTIVO",
+          entidad: entidad ?? null,
+          mpMetadata: { registradoPor: user.sub },
+        });
+      }
+
+      return creada;
+    });
+
+    await notificarReserva(
+      reserva.id,
+      !esOwner ? "RESERVA_CREADA" : saldoReserva > 0 ? "PAGO_PARCIAL_RECIBIDO" : "RESERVA_CONFIRMADA"
+    );
 
     return NextResponse.json(reserva, { status: 201 });
   },
