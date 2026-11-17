@@ -50,6 +50,13 @@
       "when": 1794943096741,
       "tag": "0006_pagos_metodo_canal",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794943572318,
+      "tag": "0007_backfill_metodo_pago",
+      "breakpoints": true
     }
   ]
 }
