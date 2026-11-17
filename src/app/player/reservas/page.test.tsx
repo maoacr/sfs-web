@@ -74,6 +74,49 @@ describe("PlayerReservas", () => {
     expect(screen.getByRole("heading", { name: /^historial$/i })).toBeInTheDocument();
   });
 
+  it("presenta las reservas como una lista", async () => {
+    montarCon([reserva(), reserva({ id: "reserva-2", estado: "CONFIRMADA", saldoPendiente: 0 })]);
+
+    expect(await screen.findAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("los botones dicen de qué reserva son", async () => {
+    montarCon([reserva()]);
+
+    const pagar = await screen.findByRole("button", { name: /pagar saldo/i });
+    expect(pagar).toHaveAccessibleName(/cancha 1/i);
+
+    const cancelar = screen.getByRole("button", { name: /cancelar/i });
+    expect(cancelar).toHaveAccessibleName(/cancha 1/i);
+  });
+
+  it("pide confirmación antes de cancelar", async () => {
+    montarCon([reserva()]);
+
+    fireEvent.click(await screen.findByRole("button", { name: /cancelar/i }));
+    expect(apiFetch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /sí, cancelar/i }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+  });
+
+  it("deja arrepentirse de cancelar", async () => {
+    montarCon([reserva()]);
+
+    fireEvent.click(await screen.findByRole("button", { name: /cancelar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /no, dejarla/i }));
+
+    expect(apiFetch).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /cancelar/i })).toBeInTheDocument();
+  });
+
+  it("anuncia que está cargando", () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+    render(<PlayerReservas />);
+
+    expect(screen.getByRole("status")).toHaveAccessibleName(/cargando/i);
+  });
+
   it("sigue mostrando el estado vacío cuando no hay ninguna", async () => {
     montarCon([]);
     expect(await screen.findByText(/no tenés reservas todavía/i)).toBeInTheDocument();

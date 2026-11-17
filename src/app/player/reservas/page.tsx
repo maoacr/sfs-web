@@ -47,44 +47,43 @@ export default function PlayerReservas() {
     setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "CANCELADA" } : r));
   }
 
-
   const fPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
 
   const activas = reservas.filter(r => !TERMINALES.has(r.estado));
   const pasadas = reservas.filter(r => TERMINALES.has(r.estado));
 
+  const secciones: { id: string; titulo: string; lista: Reserva[] }[] = [
+    { id: "proximas", titulo: "Próximas", lista: activas },
+    { id: "historial", titulo: "Historial", lista: pasadas },
+  ];
+
   return (
-    <div className="p-6 lg:p-8">
-      <div className="mb-8">
+    // `pb-28` deja aire para la BottomTabBar, que es fixed y taparía el final.
+    <div className="p-4 pb-28 sm:p-6 md:pb-8 lg:p-8">
+      <header className="mb-6 sm:mb-8">
         <h1 className="text-2xl font-bold text-text">Mis reservas</h1>
         <p className="mt-1 text-sm text-text-muted">Historial de canchas reservadas</p>
-      </div>
+      </header>
 
       {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-24 animate-pulse rounded-xl bg-surface border border-border" />)}</div>
+        <div role="status" aria-label="Cargando tus reservas" className="space-y-3">
+          {[1, 2, 3].map(i => <div key={i} className="h-32 animate-pulse rounded-2xl bg-surface border border-border" />)}
+        </div>
       ) : reservas.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface p-14 text-center">
+        <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center sm:p-14">
           <p className="text-text-muted text-base">No tenés reservas todavía.</p>
-          <Link href="/player/buscar" className="mt-4 inline-block text-sm font-medium text-grass hover:text-grass-light">Buscar canchas →</Link>
+          <Link href="/player/buscar" className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-grass hover:text-grass-light">Buscar canchas →</Link>
         </div>
       ) : (
         <div className="space-y-8">
-          {activas.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">Próximas</h2>
-              <div className="space-y-3">
-                {activas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} pagarSaldo={pagarSaldo} fPrecio={fPrecio} />)}
-              </div>
+          {secciones.filter(s => s.lista.length > 0).map(seccion => (
+            <section key={seccion.id} aria-labelledby={seccion.id}>
+              <h2 id={seccion.id} className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">{seccion.titulo}</h2>
+              <ul className="space-y-3">
+                {seccion.lista.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} pagarSaldo={pagarSaldo} fPrecio={fPrecio} />)}
+              </ul>
             </section>
-          )}
-          {pasadas.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">Historial</h2>
-              <div className="space-y-3">
-                {pasadas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} pagarSaldo={pagarSaldo} fPrecio={fPrecio} />)}
-              </div>
-            </section>
-          )}
+          ))}
         </div>
       )}
     </div>
@@ -95,37 +94,68 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
   r: Reserva; cancelar: (id: string) => void; pagarSaldo: (r: Reserva) => void;
   fPrecio: (n: number) => string;
 }) {
+  const [confirmando, setConfirmando] = useState(false);
+
   const s = ESTADOS[r.estado];
   const saldo = Number(r.saldoPendiente ?? 0);
+  const activa = !TERMINALES.has(r.estado);
+  const zona = r.cancha.complejo.zonaHoraria;
+
+  const cuando = `${formatearFecha(r.slotInicio, zona, { weekday: "long", day: "numeric", month: "long" })} · ${formatearHora(r.slotInicio, zona)} – ${formatearHora(r.slotFin, zona)}`;
+  // Los botones se leen fuera de contexto en un lector de pantalla: sin esto,
+  // una lista de cinco reservas suena como cinco "Cancelar" idénticos.
+  const cual = `${r.cancha.nombre}, ${cuando}`;
+
+  const accion = "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-4 text-sm font-semibold transition-colors sm:flex-none";
+
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-start gap-4">
-          <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-xl bg-field/30 text-xl shrink-0">⚽</div>
-          <div>
-            <p className="font-semibold text-text">{r.cancha.nombre}</p>
-            <p className="text-sm text-text-muted">{r.cancha.complejo.nombre} — {r.cancha.tipo}</p>
-            <p className="text-sm text-text-muted mt-1">
-              {formatearFecha(r.slotInicio, r.cancha.complejo.zonaHoraria, { weekday: "long", day: "numeric", month: "long" })} · {formatearHora(r.slotInicio, r.cancha.complejo.zonaHoraria)} – {formatearHora(r.slotFin, r.cancha.complejo.zonaHoraria)}
-            </p>
+    <li className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5">
+      <div className="flex items-start gap-3">
+        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-field/30 text-lg">⚽</span>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-text">{r.cancha.nombre}</p>
+          <p className="text-sm text-text-muted">{r.cancha.complejo.nombre} — {r.cancha.tipo}</p>
+          <p className="mt-1 text-sm text-text-muted">
+            <time dateTime={r.slotInicio}>{cuando}</time>
+          </p>
+        </div>
+
+        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${s?.color}`}>{s?.label}</span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-t border-border pt-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text">{fPrecio(Number(r.montoTotal))}</p>
+          {saldo > 0 && (
+            <p className="text-xs text-warning">Saldo pendiente: {fPrecio(saldo)}</p>
+          )}
+        </div>
+
+        {activa && !confirmando && (
+          <div className="flex w-full gap-2 sm:w-auto">
+            {saldo > 0 && (
+              <button onClick={() => pagarSaldo(r)} aria-label={`Pagar saldo de ${cual}`}
+                className={`${accion} bg-grass text-white hover:bg-grass-light`}>Pagar saldo</button>
+            )}
+            <button onClick={() => setConfirmando(true)} aria-label={`Cancelar la reserva de ${cual}`}
+              className={`${accion} border border-border text-text-dim hover:border-error hover:text-error`}>Cancelar</button>
+          </div>
+        )}
+      </div>
+
+      {confirmando && (
+        <div className="mt-3 rounded-xl border border-error/30 bg-error/10 p-3">
+          <p className="text-sm text-text">¿Seguro que querés cancelar esta reserva?</p>
+          <div className="mt-3 flex w-full gap-2">
+            <button onClick={() => { setConfirmando(false); cancelar(r.id); }}
+              aria-label={`Sí, cancelar la reserva de ${cual}`}
+              className={`${accion} bg-error text-white hover:opacity-90`}>Sí, cancelar</button>
+            <button onClick={() => setConfirmando(false)}
+              className={`${accion} border border-border text-text-muted hover:text-text`}>No, dejarla</button>
           </div>
         </div>
-        <div className="flex items-center gap-3 sm:flex-col sm:items-end">
-          <span className={`rounded-full border px-3 py-1 text-xs font-medium ${s?.color}`}>{s?.label}</span>
-          <span className="text-sm font-semibold text-text">{fPrecio(Number(r.montoTotal))}</span>
-          {saldo > 0 && (
-            <span className="text-xs text-warning">Saldo pendiente: {fPrecio(saldo)}</span>
-          )}
-          {saldo > 0 && !TERMINALES.has(r.estado) && (
-            <button onClick={() => pagarSaldo(r)}
-              className="rounded-lg bg-grass px-3 py-1.5 text-xs font-semibold text-white hover:bg-grass-light transition-colors">Pagar saldo</button>
-          )}
-          {!TERMINALES.has(r.estado) && (
-            <button onClick={() => cancelar(r.id)}
-              className="text-xs text-text-dim hover:text-error transition-colors font-medium">Cancelar</button>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </li>
   );
 }
