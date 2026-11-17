@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, reservas, canchas, tarifas, slotConfigs, estadoReservaEnum } from "@sfs/db";
-import { and, eq, gt, inArray, isNull, lt, sum, asc, type SQL } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, asc, type SQL } from "drizzle-orm";
 import { aInstante } from "@/lib/zona-horaria";
 import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
 import { reservasDelDiaLocal, reservaOcupaElTurno } from "@/lib/consultas";
@@ -10,6 +10,7 @@ import { notificarReserva } from "@/lib/event-listeners";
 import { liberarReservasExpiradas } from "@/lib/ttl";
 import { calcularPrecio, usarPromocion } from "@/lib/pricing";
 import { RATE_LIMITS } from "@/lib/rate-limit";
+import { saldoPendienteDe } from "@/lib/saldo";
 import { toApiCancha, toApiUsuario } from "@/lib/db-mappers";
 
 /**
@@ -24,18 +25,26 @@ export const POST = apiHandler<CreateReservaInput>(
     const user = ctx.user!;
     const { canchaId, fecha, hora, playerId } = body;
 
+    const esOwner = user.role === "OWNER";
+
+    // Quién va a quedar como titular de la reserva. El dueño puede agendar a
+    // nombre de un jugador; cualquier otro rol sólo reserva para sí mismo.
+    const finalPlayerId = esOwner ? playerId || user.sub : user.sub;
+
     // ─── 1. Bloqueo por saldo pendiente ──────────────────────────────────
+    //
+    // Se mide contra el TITULAR, no contra quien manda la request: si no,
+    // el dueño agendando a nombre de un deudor sería un agujero en la regla
+    // y la deuda se volvería opcional. Deber bloquea, lo pida quien lo pida.
 
-    const [{ saldo }] = await db
-      .select({ saldo: sum(reservas.saldoPendiente) })
-      .from(reservas)
-      .where(and(eq(reservas.playerId, user.sub), eq(reservas.estado, "PAGO_PARCIAL")));
-
-    const totalSaldo = Number(saldo ?? 0);
+    const totalSaldo = await saldoPendienteDe(finalPlayerId);
     if (totalSaldo > 0) {
       return NextResponse.json(
         {
-          error: "Tenés saldo pendiente. Regularizá tus pagos antes de reservar.",
+          error:
+            finalPlayerId === user.sub
+              ? "Tenés saldo pendiente. Regularizá tus pagos antes de reservar."
+              : "Ese jugador tiene saldo pendiente. Cobrale lo que debe o registrá el pago antes de agendarle.",
           saldoPendiente: totalSaldo,
         },
         { status: 403 }
@@ -59,7 +68,6 @@ export const POST = apiHandler<CreateReservaInput>(
       return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
 
-    const esOwner = user.role === "OWNER";
     if (esOwner && cancha.tenantId !== user.sub) {
       return NextResponse.json({ error: "Cancha no encontrada" }, { status: 404 });
     }
@@ -80,8 +88,6 @@ export const POST = apiHandler<CreateReservaInput>(
     if (!esOwner && inicio.getTime() <= Date.now()) {
       return NextResponse.json({ error: "Ese horario ya pasó" }, { status: 400 });
     }
-
-    const finalPlayerId = esOwner ? playerId || user.sub : user.sub;
 
     // ─── 3. Verificar solapamiento ────────────────────────────────────────
 
