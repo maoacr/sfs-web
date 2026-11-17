@@ -54,6 +54,9 @@ export async function createCheckoutPreference(params: {
         failure: `${APP_URL}/player/buscar`,
         pending: `${APP_URL}/player/reservas`,
       },
+      // Sin esto MP arma las back_urls pero no las dispara: deja al jugador en
+      // el comprobante con un botón "Volver al sitio" que muchos no tocan.
+      auto_return: "approved",
       notification_url: `${APP_URL}/api/webhooks/mercadopago`,
     },
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import crypto from "crypto";
 import {
   verifyWebhookRequest,
@@ -115,6 +115,80 @@ describe("verifyWebhookRequest con varias claves", () => {
         secret: `${PRUEBA},${PRODUCTIVO}`,
       })
     ).toBe(false);
+  });
+});
+
+describe("createCheckoutPreference", () => {
+  interface PreferenceArgs {
+    body: {
+      auto_return?: string;
+      back_urls: { success: string; failure: string; pending: string };
+      notification_url: string;
+    };
+  }
+
+  const crear = vi.fn(async (_args: PreferenceArgs) => ({
+    id: "pref-1",
+    init_point: "https://mp/checkout",
+    sandbox_init_point: "https://mp/sandbox",
+  }));
+
+  function bodyDeLaPreference() {
+    const llamada = crear.mock.calls[0];
+    if (!llamada) throw new Error("No se creó ninguna preference");
+    return llamada[0].body;
+  }
+
+  async function importarConToken(token: string) {
+    vi.resetModules();
+    crear.mockClear();
+    vi.stubEnv("MP_ACCESS_TOKEN", token);
+    vi.stubEnv("APP_URL", "https://sfs.example.com");
+    vi.doMock("mercadopago", () => ({
+      default: class {},
+      Preference: class {
+        create = crear;
+      },
+      Payment: class {},
+      PaymentRefund: class {},
+    }));
+    return import("@/lib/mercadopago");
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.doUnmock("mercadopago");
+  });
+
+  const params = { pagoId: "pago-1", reservaId: "reserva-1", monto: 80000 };
+
+  it("manda auto_return para que MP devuelva al jugador al sitio", async () => {
+    const { createCheckoutPreference } = await importarConToken("TEST-abc");
+    await createCheckoutPreference(params);
+
+    expect(crear).toHaveBeenCalledTimes(1);
+    expect(bodyDeLaPreference().auto_return).toBe("approved");
+  });
+
+  it("apunta back_urls y notification_url a APP_URL", async () => {
+    const { createCheckoutPreference } = await importarConToken("TEST-abc");
+    await createCheckoutPreference(params);
+
+    const { back_urls, notification_url } = bodyDeLaPreference();
+    expect(back_urls.success).toBe("https://sfs.example.com/player/reservas");
+    expect(notification_url).toBe("https://sfs.example.com/api/webhooks/mercadopago");
+  });
+
+  it("usa el sandbox_init_point con credenciales TEST-", async () => {
+    const { createCheckoutPreference } = await importarConToken("TEST-abc");
+    const { checkoutUrl } = await createCheckoutPreference(params);
+    expect(checkoutUrl).toBe("https://mp/sandbox");
+  });
+
+  it("usa el init_point con credenciales APP_USR-", async () => {
+    const { createCheckoutPreference } = await importarConToken("APP_USR-abc");
+    const { checkoutUrl } = await createCheckoutPreference(params);
+    expect(checkoutUrl).toBe("https://mp/checkout");
   });
 });
 
