@@ -7,15 +7,23 @@ import { apiFetch } from "@/lib/api-client";
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
-  slotInicio: string; slotFin: string; montoTotal: number; estado: string;
+  slotInicio: string; slotFin: string; montoTotal: number; saldoPendiente: number; estado: string;
 }
 
 const ESTADOS: Record<string, { label: string; color: string }> = {
   PENDIENTE_PAGO: { label: "Pendiente", color: "bg-warning/20 text-warning border-warning/20" },
+  PAGO_PARCIAL: { label: "Pago parcial", color: "bg-warning/20 text-warning border-warning/20" },
   CONFIRMADA: { label: "Confirmada", color: "bg-grass/20 text-grass-light border-grass/20" },
   COMPLETADA: { label: "Completada", color: "bg-text-dim/20 text-text-dim border-text-dim/10" },
   CANCELADA: { label: "Cancelada", color: "bg-error/20 text-error border-error/20" },
+  EXPIRADA: { label: "Expirada", color: "bg-text-dim/20 text-text-dim border-text-dim/10" },
 };
+
+/**
+ * Los baldes se arman por exclusión, no por lista blanca: un estado nuevo en el
+ * enum aparece entre las activas en vez de desaparecer de la pantalla sin aviso.
+ */
+const TERMINALES = new Set(["COMPLETADA", "CANCELADA", "EXPIRADA"]);
 
 export default function PlayerReservas() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
@@ -25,6 +33,15 @@ export default function PlayerReservas() {
     fetch("/api/reservas").then(r => r.json()).then(setReservas).catch(console.error).finally(() => setLoading(false));
   }, []);
 
+  async function pagarSaldo(r: Reserva) {
+    const res = await apiFetch(`/api/reservas/${r.id}/pagar-saldo`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ monto: Number(r.saldoPendiente) }),
+    });
+    const data = await res.json();
+    if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+  }
+
   async function cancelar(id: string) {
     await apiFetch(`/api/reservas/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "CANCELADA" }) });
     setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "CANCELADA" } : r));
@@ -33,8 +50,8 @@ export default function PlayerReservas() {
 
   const fPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
 
-  const activas = reservas.filter(r => r.estado === "PENDIENTE_PAGO" || r.estado === "CONFIRMADA");
-  const pasadas = reservas.filter(r => r.estado === "COMPLETADA" || r.estado === "CANCELADA");
+  const activas = reservas.filter(r => !TERMINALES.has(r.estado));
+  const pasadas = reservas.filter(r => TERMINALES.has(r.estado));
 
   return (
     <div className="p-6 lg:p-8">
@@ -56,7 +73,7 @@ export default function PlayerReservas() {
             <section>
               <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">Próximas</h2>
               <div className="space-y-3">
-                {activas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} fPrecio={fPrecio} />)}
+                {activas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} pagarSaldo={pagarSaldo} fPrecio={fPrecio} />)}
               </div>
             </section>
           )}
@@ -64,7 +81,7 @@ export default function PlayerReservas() {
             <section>
               <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">Historial</h2>
               <div className="space-y-3">
-                {pasadas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} fPrecio={fPrecio} />)}
+                {pasadas.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} pagarSaldo={pagarSaldo} fPrecio={fPrecio} />)}
               </div>
             </section>
           )}
@@ -74,11 +91,12 @@ export default function PlayerReservas() {
   );
 }
 
-function ReservaCard({ r, cancelar, fPrecio }: {
-  r: Reserva; cancelar: (id: string) => void;
+function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
+  r: Reserva; cancelar: (id: string) => void; pagarSaldo: (r: Reserva) => void;
   fPrecio: (n: number) => string;
 }) {
   const s = ESTADOS[r.estado];
+  const saldo = Number(r.saldoPendiente ?? 0);
   return (
     <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -95,7 +113,14 @@ function ReservaCard({ r, cancelar, fPrecio }: {
         <div className="flex items-center gap-3 sm:flex-col sm:items-end">
           <span className={`rounded-full border px-3 py-1 text-xs font-medium ${s?.color}`}>{s?.label}</span>
           <span className="text-sm font-semibold text-text">{fPrecio(Number(r.montoTotal))}</span>
-          {(r.estado === "PENDIENTE_PAGO" || r.estado === "CONFIRMADA") && (
+          {saldo > 0 && (
+            <span className="text-xs text-warning">Saldo pendiente: {fPrecio(saldo)}</span>
+          )}
+          {saldo > 0 && !TERMINALES.has(r.estado) && (
+            <button onClick={() => pagarSaldo(r)}
+              className="rounded-lg bg-grass px-3 py-1.5 text-xs font-semibold text-white hover:bg-grass-light transition-colors">Pagar saldo</button>
+          )}
+          {!TERMINALES.has(r.estado) && (
             <button onClick={() => cancelar(r.id)}
               className="text-xs text-text-dim hover:text-error transition-colors font-medium">Cancelar</button>
           )}
