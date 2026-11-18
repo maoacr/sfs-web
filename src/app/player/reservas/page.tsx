@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
@@ -33,7 +33,28 @@ const ESTADOS: Record<string, { label: string; color: string }> = {
  */
 const TERMINALES = new Set(["COMPLETADA", "CANCELADA", "EXPIRADA"]);
 
-export default function PlayerReservas() {
+function Esqueleto() {
+  return (
+    <div role="status" aria-label="Cargando tus reservas" className="space-y-3">
+      {[1, 2, 3].map(i => <div key={i} className="h-32 animate-pulse rounded-2xl bg-surface border border-border" />)}
+    </div>
+  );
+}
+
+/**
+ * `useSearchParams` obliga a una frontera de Suspense: sin ella Next no puede
+ * prerenderizar la página y el build falla. La cáscara estática queda afuera y
+ * sólo lo que depende de la query espera adentro.
+ */
+export default function PlayerReservasPage() {
+  return (
+    <Suspense fallback={<div className="p-4 pb-28 sm:p-6 md:pb-8 lg:p-8"><Esqueleto /></div>}>
+      <PlayerReservas />
+    </Suspense>
+  );
+}
+
+function PlayerReservas() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,9 +118,7 @@ export default function PlayerReservas() {
       {error && <Aviso tono="error">{error}</Aviso>}
 
       {loading ? (
-        <div role="status" aria-label="Cargando tus reservas" className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-32 animate-pulse rounded-2xl bg-surface border border-border" />)}
-        </div>
+        <Esqueleto />
       ) : reservas.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center sm:p-14">
           <p className="text-text-muted text-base">No tenés reservas todavía.</p>
