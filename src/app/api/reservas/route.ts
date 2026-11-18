@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, reservas, pagos, canchas, tarifas, slotConfigs, estadoReservaEnum } from "@sfs/db";
-import { and, eq, gt, inArray, isNull, lt, asc, type SQL } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, asc, desc, type SQL } from "drizzle-orm";
 import { aInstante } from "@/lib/zona-horaria";
 import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
 import { reservasDelDiaLocal, reservaOcupaElTurno } from "@/lib/consultas";
@@ -220,12 +220,24 @@ export const GET = apiHandler(
           with: { complejo: { columns: { nombre: true, zonaHoraria: true } } },
         },
         player: { columns: { nombre: true, apellido: true, apodo: true, telefono: true } },
+        // El último intento de pago: es lo que le permite a la UI explicar por
+        // qué no se acreditó, en vez de dejar a la persona adivinando.
+        pagos: {
+          columns: { estadoPago: true, detalleEstado: true, monto: true, createdAt: true },
+          orderBy: [desc(pagos.createdAt)],
+          limit: 1,
+        },
       },
       orderBy: [asc(reservas.slotInicio)],
     });
 
     return NextResponse.json(
-      lista.map((r) => ({ ...r, cancha: toApiCancha(r.cancha), player: toApiUsuario(r.player) }))
+      lista.map(({ pagos: ultimos, ...r }) => ({
+        ...r,
+        cancha: toApiCancha(r.cancha),
+        player: toApiUsuario(r.player),
+        ultimoPago: ultimos[0] ?? null,
+      }))
     );
   },
   { requireAuth: true }

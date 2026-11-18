@@ -120,7 +120,15 @@ export async function registrarPagoMp(payment: PagoMp): Promise<ResultadoPagoMp>
     if (estadoNuevo !== "APROBADO") {
       await tx
         .update(pagos)
-        .set({ estadoPago: estadoNuevo, mpPaymentId, mpMetadata, metodo, entidad, comision: comision.toFixed(2) })
+        .set({
+          estadoPago: estadoNuevo,
+          mpPaymentId,
+          mpMetadata,
+          metodo,
+          entidad,
+          comision: comision.toFixed(2),
+          detalleEstado: payment.status_detail ?? null,
+        })
         .where(eq(pagos.id, pago.id));
       return { tipo: "actualizado", estadoPago: estadoNuevo } as const;
     }
@@ -143,6 +151,7 @@ export async function registrarPagoMp(payment: PagoMp): Promise<ResultadoPagoMp>
         metodo,
         entidad,
         comision: comision.toFixed(2),
+        detalleEstado: payment.status_detail ?? null,
       })
       .where(eq(pagos.id, pago.id));
 

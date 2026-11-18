@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
+import { explicarPago } from "@/lib/resultado-pago";
+
+interface UltimoPago {
+  estadoPago: string;
+  detalleEstado: string | null;
+}
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
   slotInicio: string; slotFin: string; montoTotal: number; saldoPendiente: number; estado: string;
+  ultimoPago?: UltimoPago | null;
 }
 
 const ESTADOS: Record<string, { label: string; color: string }> = {
@@ -25,21 +33,57 @@ const ESTADOS: Record<string, { label: string; color: string }> = {
  */
 const TERMINALES = new Set(["COMPLETADA", "CANCELADA", "EXPIRADA"]);
 
-export default function PlayerReservas() {
+function Esqueleto() {
+  return (
+    <div role="status" aria-label="Cargando tus reservas" className="space-y-3">
+      {[1, 2, 3].map(i => <div key={i} className="h-32 animate-pulse rounded-2xl bg-surface border border-border" />)}
+    </div>
+  );
+}
+
+/**
+ * `useSearchParams` obliga a una frontera de Suspense: sin ella Next no puede
+ * prerenderizar la página y el build falla. La cáscara estática queda afuera y
+ * sólo lo que depende de la query espera adentro.
+ */
+export default function PlayerReservasPage() {
+  return (
+    <Suspense fallback={<div className="p-4 pb-28 sm:p-6 md:pb-8 lg:p-8"><Esqueleto /></div>}>
+      <PlayerReservas />
+    </Suspense>
+  );
+}
+
+function PlayerReservas() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // MercadoPago devuelve al jugador con `status` en la query. Es lo primero
+  // que sabemos del resultado —el webhook puede tardar— así que es lo que le
+  // mostramos apenas vuelve, sin esperar nada.
+  const statusDeMp = useSearchParams().get("status");
 
   useEffect(() => {
     fetch("/api/reservas").then(r => r.json()).then(setReservas).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   async function pagarSaldo(r: Reserva) {
+    setError(null);
+    // Sin `monto`: el saldo lo decide el servidor al momento de cobrar. Un
+    // número traído en el `fetch` de hace diez minutos puede estar viejo —un
+    // compañero pudo abonar, o el dueño registrar efectivo— y acá hay plata.
     const res = await apiFetch(`/api/reservas/${r.id}/pagar-saldo`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ monto: Number(r.saldoPendiente) }),
+      body: JSON.stringify({}),
     });
-    const data = await res.json();
-    if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.checkoutUrl) {
+      setError(data?.error ?? "No pudimos iniciar el pago. Intentá de nuevo en un momento.");
+      return;
+    }
+    window.location.href = data.checkoutUrl;
   }
 
   async function cancelar(id: string) {
@@ -65,10 +109,16 @@ export default function PlayerReservas() {
         <p className="mt-1 text-sm text-text-muted">Historial de canchas reservadas</p>
       </header>
 
+      {statusDeMp && (
+        <Aviso tono={statusDeMp === "approved" ? "ok" : statusDeMp === "rejected" ? "error" : "espera"}>
+          {explicarPago(statusDeMp).mensaje}
+        </Aviso>
+      )}
+
+      {error && <Aviso tono="error">{error}</Aviso>}
+
       {loading ? (
-        <div role="status" aria-label="Cargando tus reservas" className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-32 animate-pulse rounded-2xl bg-surface border border-border" />)}
-        </div>
+        <Esqueleto />
       ) : reservas.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center sm:p-14">
           <p className="text-text-muted text-base">No tenés reservas todavía.</p>
@@ -90,6 +140,20 @@ export default function PlayerReservas() {
   );
 }
 
+const TONOS = {
+  ok: "border-grass/30 bg-grass/10 text-grass-light",
+  error: "border-error/30 bg-error/10 text-text",
+  espera: "border-warning/30 bg-warning/10 text-text",
+} as const;
+
+function Aviso({ tono, children }: { tono: keyof typeof TONOS; children: React.ReactNode }) {
+  return (
+    <div role="alert" className={`mb-6 rounded-xl border p-4 text-sm ${TONOS[tono]}`}>
+      {children}
+    </div>
+  );
+}
+
 function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
   r: Reserva; cancelar: (id: string) => void; pagarSaldo: (r: Reserva) => void;
   fPrecio: (n: number) => string;
@@ -100,6 +164,15 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
   const saldo = Number(r.saldoPendiente ?? 0);
   const activa = !TERMINALES.has(r.estado);
   const zona = r.cancha.complejo.zonaHoraria;
+
+  // Sólo explicamos cuando MercadoPago dijo algo concreto. Sin `detalleEstado`
+  // no hay nada honesto que contar, y un mensaje vago asusta más que ayuda.
+  const ultimo = r.ultimoPago;
+  const explicacion = ultimo?.detalleEstado ? explicarPago(undefined, ultimo.detalleEstado) : null;
+  const pagoFallido = explicacion !== null && ultimo?.estadoPago !== "APROBADO";
+  // Ante un duplicado o un pago en curso, ofrecer el botón es invitar a pagar
+  // dos veces o a esperar de gusto.
+  const puedeReintentar = explicacion?.reintentable ?? true;
 
   const cuando = `${formatearFecha(r.slotInicio, zona, { weekday: "long", day: "numeric", month: "long" })} · ${formatearHora(r.slotInicio, zona)} – ${formatearHora(r.slotFin, zona)}`;
   // Los botones se leen fuera de contexto en un lector de pantalla: sin esto,
@@ -134,7 +207,7 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
 
         {activa && !confirmando && (
           <div className="flex w-full gap-2 sm:w-auto">
-            {saldo > 0 && (
+            {saldo > 0 && puedeReintentar && (
               <button onClick={() => pagarSaldo(r)} aria-label={`Pagar saldo de ${cual}`}
                 className={`${accion} bg-grass text-white hover:bg-grass-light`}>Pagar saldo</button>
             )}
@@ -143,6 +216,12 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
           </div>
         )}
       </div>
+
+      {pagoFallido && (
+        <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-text">
+          {explicacion.mensaje}
+        </p>
+      )}
 
       {confirmando && (
         <div className="mt-3 rounded-xl border border-error/30 bg-error/10 p-3">

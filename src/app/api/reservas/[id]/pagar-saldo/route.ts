@@ -48,7 +48,14 @@ export const POST = apiHandler<PagarSaldoInput>(
     }
 
     const saldoPendiente = Number(reserva.saldoPendiente);
-    if (monto > saldoPendiente) {
+
+    // Sin monto, se cobra todo el saldo que la reserva tiene AHORA.
+    const aCobrar = monto ?? saldoPendiente;
+
+    if (aCobrar <= 0) {
+      return NextResponse.json({ error: "Esta reserva no tiene saldo pendiente" }, { status: 400 });
+    }
+    if (aCobrar > saldoPendiente) {
       return NextResponse.json(
         { error: `El monto excede el saldo pendiente (${saldoPendiente.toLocaleString("es-CO")} COP)` },
         { status: 400 }
@@ -56,8 +63,8 @@ export const POST = apiHandler<PagarSaldoInput>(
     }
 
     try {
-      const { checkoutUrl } = await iniciarPagoMp({ reservaId: reserva.id, userId: user.sub, monto });
-      return NextResponse.json({ reservaId: reserva.id, monto, pagadoPor: user.sub, checkoutUrl });
+      const { checkoutUrl } = await iniciarPagoMp({ reservaId: reserva.id, userId: user.sub, monto: aCobrar });
+      return NextResponse.json({ reservaId: reserva.id, monto: aCobrar, pagadoPor: user.sub, checkoutUrl });
     } catch (error) {
       console.error("[MP] Error creando preference:", error);
       return NextResponse.json({ error: "Error al crear el pago. Intenta de nuevo." }, { status: 502 });

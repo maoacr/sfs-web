@@ -271,7 +271,11 @@ export const crearPagoSchema = z.object({
 });
 
 export const pagarSaldoSchema = z.object({
-  monto: z.number().min(1, "El monto debe ser mayor a 0"),
+  // Opcional a propósito: sin monto se cobra todo el saldo, leído en el
+  // servidor al momento del cobro. El saldo que ve el cliente puede estar
+  // viejo —un compañero pudo abonar, o el dueño registrar efectivo— y acá
+  // hay plata de por medio. Se manda sólo para abonar una parte.
+  monto: z.number().min(1, "El monto debe ser mayor a 0").optional(),
 });
 
 export const confirmarPagoSchema = z.object({

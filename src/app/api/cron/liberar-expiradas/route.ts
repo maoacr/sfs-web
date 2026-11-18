@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { liberarReservasExpiradas } from "@/lib/ttl";
+import { expirarPagosAbandonados, liberarReservasExpiradas } from "@/lib/ttl";
 
 /**
  * GET /api/cron/liberar-expiradas
@@ -21,11 +21,13 @@ export async function GET(request: Request) {
 
   try {
     const expiradas = await liberarReservasExpiradas();
+    const pagosColgados = await expirarPagosAbandonados();
 
     return NextResponse.json({
       ok: true,
       liberadas: expiradas.length,
       ids: expiradas.map((r) => r.id),
+      pagosExpirados: pagosColgados.length,
     });
   } catch (error) {
     console.error("[Cron] Error liberando expiradas:", error);

@@ -39,11 +39,17 @@ export const metodoPagoEnum = pgEnum("metodo_pago", [
 /** DÓNDE se originó el pago: por la app o en el mostrador del complejo. */
 export const canalPagoEnum = pgEnum("canal_pago", ["APP", "PRESENCIAL"]);
 
+/**
+ * `RECHAZADO` es "el banco dijo que no". `EXPIRADO` es "la persona se fue sin
+ * pagar". Mezclarlos arruinaría cualquier reporte de ventas perdidas: uno es
+ * un problema de medio de pago, el otro de conversión.
+ */
 export const estadoPagoEnum = pgEnum("estado_pago", [
   "PENDIENTE",
   "APROBADO",
   "RECHAZADO",
   "REEMBOLSADO",
+  "EXPIRADO",
 ]);
 
 export const tipoDescuentoEnum = pgEnum("tipo_descuento", [

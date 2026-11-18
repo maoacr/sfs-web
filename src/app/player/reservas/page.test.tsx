@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import PlayerReservas from "./page";
 
+const params = new URLSearchParams();
+vi.mock("next/navigation", () => ({ useSearchParams: () => params }));
+
 const apiFetch = vi.fn(async () => ({
   ok: true,
   json: async () => ({ checkoutUrl: "https://mp/checkout" }),
@@ -36,6 +39,7 @@ function montarCon(lista: unknown[]) {
 
 beforeEach(() => {
   apiFetch.mockClear();
+  for (const clave of [...params.keys()]) params.delete(clave);
 });
 
 describe("PlayerReservas", () => {
@@ -49,7 +53,7 @@ describe("PlayerReservas", () => {
     expect(await screen.findByText(/saldo pendiente/i)).toBeInTheDocument();
   });
 
-  it("deja pagar el saldo desde la tarjeta", async () => {
+  it("deja pagar el saldo sin mandar el monto: lo decide el servidor", async () => {
     montarCon([reserva()]);
 
     fireEvent.click(await screen.findByRole("button", { name: /pagar saldo/i }));
@@ -57,7 +61,8 @@ describe("PlayerReservas", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     const [ruta, opciones] = apiFetch.mock.calls[0] as unknown as [string, { body: string }];
     expect(ruta).toBe("/api/reservas/reserva-1/pagar-saldo");
-    expect(JSON.parse(opciones.body)).toEqual({ monto: 80000 });
+    // El saldo del cliente puede estar viejo; el servidor lo lee al cobrar.
+    expect(JSON.parse(opciones.body)).toEqual({});
   });
 
   it("no ofrece pagar saldo cuando la reserva está confirmada", async () => {
@@ -120,5 +125,70 @@ describe("PlayerReservas", () => {
   it("sigue mostrando el estado vacío cuando no hay ninguna", async () => {
     montarCon([]);
     expect(await screen.findByText(/no tenés reservas todavía/i)).toBeInTheDocument();
+  });
+});
+
+describe("PlayerReservas — resultado del pago", () => {
+  it("al volver rechazado de MercadoPago se lo dice, no lo deja adivinando", async () => {
+    params.set("status", "rejected");
+    montarCon([reserva()]);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/rechaz/i);
+  });
+
+  it("al volver aprobado lo confirma", async () => {
+    params.set("status", "approved");
+    montarCon([reserva({ estado: "CONFIRMADA", saldoPendiente: 0 })]);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/acredit/i);
+  });
+
+  it("sin vuelta de MercadoPago no muestra ningún aviso", async () => {
+    montarCon([reserva()]);
+
+    await screen.findByText("Cancha 1");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("explica el motivo concreto del último pago fallido", async () => {
+    montarCon([
+      reserva({
+        ultimoPago: { estadoPago: "RECHAZADO", detalleEstado: "cc_rejected_insufficient_amount" },
+      }),
+    ]);
+
+    expect(await screen.findByText(/fondos/i)).toBeInTheDocument();
+  });
+
+  it("ante un pago duplicado esconde el botón: reintentar cobraría dos veces", async () => {
+    montarCon([
+      reserva({
+        ultimoPago: { estadoPago: "RECHAZADO", detalleEstado: "cc_rejected_duplicated_payment" },
+      }),
+    ]);
+
+    expect(await screen.findByText("Cancha 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /pagar saldo/i })).not.toBeInTheDocument();
+  });
+
+  it("un pago en revisión manual tampoco invita a pagar de nuevo", async () => {
+    montarCon([
+      reserva({
+        ultimoPago: { estadoPago: "PENDIENTE", detalleEstado: "pending_review_manual" },
+      }),
+    ]);
+
+    expect(await screen.findByText(/revis/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /pagar saldo/i })).not.toBeInTheDocument();
+  });
+
+  it("un rechazo por fondos sí deja volver a intentar con otra tarjeta", async () => {
+    montarCon([
+      reserva({
+        ultimoPago: { estadoPago: "RECHAZADO", detalleEstado: "cc_rejected_insufficient_amount" },
+      }),
+    ]);
+
+    expect(await screen.findByRole("button", { name: /pagar saldo/i })).toBeInTheDocument();
   });
 });
