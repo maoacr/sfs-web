@@ -39,6 +39,16 @@ export interface ReservaItem {
 export const TTL_RESERVA_MINUTOS = 15;
 
 /**
+ * Minutos que un pago aguanta en PENDIENTE sin que MercadoPago lo reconozca.
+ *
+ * Es el mismo número que el TTL de la reserva por una razón: pasado ese rato
+ * el turno ya se soltó, así que el intento de pago tampoco tiene sentido. Son
+ * constantes separadas igual, porque responden a preguntas distintas y una
+ * puede cambiar sin la otra.
+ */
+export const TTL_PAGO_MINUTOS = 15;
+
+/**
  * Estados que ocupan el turno siempre, sin importar su antigüedad.
  * Ya hubo plata de por medio o el partido se jugó.
  */
