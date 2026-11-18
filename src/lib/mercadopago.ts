@@ -51,7 +51,10 @@ export async function createCheckoutPreference(params: {
       metadata: { reserva_id: params.reservaId },
       back_urls: {
         success: `${APP_URL}/player/reservas`,
-        failure: `${APP_URL}/player/buscar`,
+        // Antes iba al buscador: la persona pagaba, le rebotaba, y aparecía
+        // en un listado de canchas sin una palabra de qué pasó. Vuelve a su
+        // reserva, que es donde el resultado tiene sentido.
+        failure: `${APP_URL}/player/reservas`,
         pending: `${APP_URL}/player/reservas`,
       },
       // Sin esto MP arma las back_urls pero no las dispara: deja al jugador en
