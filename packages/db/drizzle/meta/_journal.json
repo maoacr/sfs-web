@@ -57,6 +57,13 @@
       "when": 1794943572318,
       "tag": "0007_backfill_metodo_pago",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795045080597,
+      "tag": "0008_estado_pago_expirado",
+      "breakpoints": true
     }
   ]
 }

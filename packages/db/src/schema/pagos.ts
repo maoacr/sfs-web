@@ -42,6 +42,17 @@ export const pagos = pgTable(
      * porque es `monto - comision`.
      */
     comision: decimal("comision", { precision: 10, scale: 2 }).default("0.00").notNull(),
+
+    /**
+     * El `status_detail` crudo de MercadoPago: `cc_rejected_insufficient_amount`,
+     * `pending_review_manual`, `accredited`.
+     *
+     * Se guarda el código y no el mensaje porque el código es el hecho estable
+     * y consultable —"¿cuántas ventas perdí por fondos insuficientes?"— mientras
+     * que el texto es presentación y lo arma `src/lib/resultado-pago.ts` al
+     * mostrarlo. Sirve para todos los estados, no sólo los rechazos.
+     */
+    detalleEstado: varchar("detalle_estado", { length: 60 }),
     mpSplitId: varchar("mp_split_id", { length: 255 }),
     mpPaymentId: varchar("mp_payment_id", { length: 255 }),
     mpMetadata: jsonb("mp_metadata"),
@@ -55,6 +66,8 @@ export const pagos = pgTable(
     index("idx_pagos_reserva_id").on(table.reservaId),
     // Los reportes agrupan por estas dos y filtran por fecha.
     index("idx_pagos_canal_metodo").on(table.canal, table.metodo),
+    // Para reportar por qué se caen los pagos.
+    index("idx_pagos_detalle_estado").on(table.detalleEstado),
     index("idx_pagos_created_at").on(table.createdAt),
     index("idx_pagos_user_id").on(table.userId),
     index("idx_pagos_mp_payment_id").on(table.mpPaymentId),
