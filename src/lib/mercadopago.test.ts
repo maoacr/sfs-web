@@ -139,11 +139,11 @@ describe("createCheckoutPreference", () => {
     return llamada[0].body;
   }
 
-  async function importarConToken(token: string) {
+  async function importarConToken(token: string, appUrl = "https://sfs.example.com") {
     vi.resetModules();
     crear.mockClear();
     vi.stubEnv("MP_ACCESS_TOKEN", token);
-    vi.stubEnv("APP_URL", "https://sfs.example.com");
+    vi.stubEnv("APP_URL", appUrl);
     vi.doMock("mercadopago", () => ({
       default: class {},
       Preference: class {
@@ -167,6 +167,31 @@ describe("createCheckoutPreference", () => {
     await createCheckoutPreference(params);
 
     expect(crear).toHaveBeenCalledTimes(1);
+    expect(bodyDeLaPreference().auto_return).toBe("approved");
+  });
+
+  it("omite auto_return cuando APP_URL no es pública", async () => {
+    // MercadoPago rechaza la preference entera con "back_url.success must be
+    // defined" —que no significa que falte, sino que no le sirve—. Sin
+    // auto_return el pago funciona igual, sólo queda el botón "Volver al
+    // sitio". Perder el redirect es mucho mejor que no poder cobrar en local.
+    const { createCheckoutPreference } = await importarConToken("TEST-abc", "http://localhost:3000");
+    await createCheckoutPreference(params);
+
+    expect(bodyDeLaPreference().auto_return).toBeUndefined();
+  });
+
+  it("sigue mandando las back_urls aunque omita auto_return", async () => {
+    const { createCheckoutPreference } = await importarConToken("TEST-abc", "http://localhost:3000");
+    await createCheckoutPreference(params);
+
+    expect(bodyDeLaPreference().back_urls.success).toBe("http://localhost:3000/player/reservas");
+  });
+
+  it("manda auto_return con una URL pública de túnel", async () => {
+    const { createCheckoutPreference } = await importarConToken("TEST-abc", "https://algo.trycloudflare.com");
+    await createCheckoutPreference(params);
+
     expect(bodyDeLaPreference().auto_return).toBe("approved");
   });
 

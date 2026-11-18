@@ -15,6 +15,21 @@ import type { Pago } from "@sfs/db";
 const accessToken = process.env.MP_ACCESS_TOKEN || "";
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 
+/**
+ * MercadoPago sólo acepta `auto_return` si las `back_urls` apuntan a un sitio
+ * público. Con `http://localhost` rechaza la preference ENTERA con el mensaje
+ * "auto_return invalid. back_url.success must be defined", que no significa
+ * que falte la URL —está ahí— sino que no le sirve.
+ *
+ * Sin `auto_return` el pago funciona igual: MercadoPago deja el botón "Volver
+ * al sitio" en el comprobante en vez de redirigir solo. Perder ese redirect en
+ * desarrollo es infinitamente mejor que no poder cobrar.
+ *
+ * Un túnel https (cloudflared, ngrok) cuenta como público y recupera el
+ * redirect sin tocar nada.
+ */
+const URL_ES_PUBLICA = APP_URL.startsWith("https://");
+
 function mpClient() {
   if (!accessToken) throw new Error("MP_ACCESS_TOKEN no configurado");
   return new MercadoPago({ accessToken, options: { timeout: 5000 } });
@@ -59,7 +74,7 @@ export async function createCheckoutPreference(params: {
       },
       // Sin esto MP arma las back_urls pero no las dispara: deja al jugador en
       // el comprobante con un botón "Volver al sitio" que muchos no tocan.
-      auto_return: "approved",
+      ...(URL_ES_PUBLICA ? { auto_return: "approved" as const } : {}),
       notification_url: `${APP_URL}/api/webhooks/mercadopago`,
     },
   });
