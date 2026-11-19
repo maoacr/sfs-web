@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { explicarPago } from "@/lib/resultado-pago";
+import { explicarPago, explicarVueltaDeMp } from "@/lib/resultado-pago";
 
 describe("explicarPago — rechazos de tarjeta", () => {
   it("dice qué dato revisar cuando el rechazo es por datos mal cargados", () => {
@@ -87,5 +87,33 @@ describe("explicarPago — lo que no conocemos", () => {
     for (const status of casos) {
       expect(explicarPago(status, "").mensaje.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("explicarVueltaDeMp — el `status` de la redirección", () => {
+  it("entiende el vocabulario de la API", () => {
+    expect(explicarVueltaDeMp("approved")?.mensaje).toMatch(/acredit/i);
+    expect(explicarVueltaDeMp("rejected")?.mensaje).toMatch(/rechaz/i);
+    expect(explicarVueltaDeMp("pending")?.mensaje).toBeTruthy();
+  });
+
+  it("entiende también el de las back_urls, que no es el mismo", () => {
+    // La doc de MP usa `failure`/`success` para las back_urls y
+    // `rejected`/`approved` para la API. Son el mismo hecho con dos nombres.
+    expect(explicarVueltaDeMp("failure")?.mensaje).toMatch(/rechaz/i);
+    expect(explicarVueltaDeMp("success")?.mensaje).toMatch(/acredit/i);
+  });
+
+  it("no inventa un aviso cuando no hay status", () => {
+    expect(explicarVueltaDeMp(null)).toBeNull();
+    expect(explicarVueltaDeMp("")).toBeNull();
+  });
+
+  it("calla ante un status que no entiende, en vez de alarmar", () => {
+    // Volver del checkout sin pagar manda `status=null`. Avisar
+    // "no pudimos confirmar el pago" por un no-evento asusta sin motivo:
+    // la tarjeta ya muestra la verdad que vino de la base.
+    expect(explicarVueltaDeMp("null")).toBeNull();
+    expect(explicarVueltaDeMp("algo_que_mp_invente")).toBeNull();
   });
 });

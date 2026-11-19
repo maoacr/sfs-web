@@ -105,3 +105,57 @@ export function explicarPago(status?: string, detalle?: string): ExplicacionPago
 
   return DESCONOCIDO;
 }
+
+/**
+ * Los nombres con que MercadoPago informa el resultado al redirigir.
+ *
+ * No son los mismos que usa la API: la doc de back_urls habla de
+ * `success`/`failure` y la de pagos de `approved`/`rejected`. Es el mismo
+ * hecho con dos vocabularios, y mezclarlos hacía caer todo en el mensaje
+ * genérico de "no pudimos confirmar".
+ */
+export type Tono = "ok" | "error" | "espera";
+
+/**
+ * Qué cara poner. Sale del estado, no del texto del mensaje: inferirlo
+ * leyendo la copia es frágil y se rompe apenas alguien reescribe una frase.
+ */
+const TONO_VUELTA: Record<string, Tono> = {
+  approved: "ok",
+  rejected: "error",
+  pending: "espera",
+  in_process: "espera",
+};
+
+const ALIAS_VUELTA: Record<string, string> = {
+  approved: "approved",
+  success: "approved",
+  rejected: "rejected",
+  failure: "rejected",
+  pending: "pending",
+  in_process: "in_process",
+};
+
+/**
+ * Explica la vuelta del checkout a partir del `status` de la query, o `null`
+ * si no hay nada honesto que decir.
+ *
+ * Devuelve `null` —en vez del mensaje genérico— a propósito. Volver del
+ * checkout sin haber pagado manda `status=null`, y avisar "no pudimos
+ * confirmar el estado del pago" por ese no-evento asusta sin motivo. La
+ * tarjeta de la reserva ya muestra la verdad, que viene de la base y no de
+ * un parámetro de URL que cualquiera puede escribir.
+ */
+export function explicarVueltaDeMp(
+  status: string | null | undefined
+): (ExplicacionPago & { tono: Tono }) | null {
+  if (!status) return null;
+
+  const normalizado = ALIAS_VUELTA[status.toLowerCase()];
+  if (!normalizado) return null;
+
+  const explicacion = POR_STATUS[normalizado];
+  if (!explicacion) return null;
+
+  return { ...explicacion, tono: TONO_VUELTA[normalizado] ?? "espera" };
+}
