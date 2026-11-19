@@ -182,6 +182,29 @@ describe("PlayerReservas — resultado del pago", () => {
     expect(screen.queryByRole("button", { name: /pagar saldo/i })).not.toBeInTheDocument();
   });
 
+  it("un pago aprobado NO bloquea pagar el saldo que queda", async () => {
+    // Un abono exitoso del 50% deja la reserva en PAGO_PARCIAL. "No reintentar
+    // ese pago" y "no poder pagar el resto" son cosas distintas.
+    montarCon([
+      reserva({
+        estado: "PAGO_PARCIAL",
+        saldoPendiente: 80000,
+        ultimoPago: { estadoPago: "APROBADO", detalleEstado: "accredited" },
+      }),
+    ]);
+
+    expect(await screen.findByRole("button", { name: /pagar saldo/i })).toBeInTheDocument();
+  });
+
+  it("tampoco muestra el motivo de un pago que salió bien", async () => {
+    montarCon([
+      reserva({ ultimoPago: { estadoPago: "APROBADO", detalleEstado: "accredited" } }),
+    ]);
+
+    await screen.findByText("Cancha 1");
+    expect(screen.queryByText(/se acreditó/i)).not.toBeInTheDocument();
+  });
+
   it("un rechazo por fondos sí deja volver a intentar con otra tarjeta", async () => {
     montarCon([
       reserva({

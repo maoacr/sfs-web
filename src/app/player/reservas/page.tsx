@@ -169,10 +169,17 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
   // no hay nada honesto que contar, y un mensaje vago asusta más que ayuda.
   const ultimo = r.ultimoPago;
   const explicacion = ultimo?.detalleEstado ? explicarPago(undefined, ultimo.detalleEstado) : null;
-  const pagoFallido = explicacion !== null && ultimo?.estadoPago !== "APROBADO";
+
+  // "El último pago no se acreditó" es la única situación donde su resultado
+  // dice algo sobre el próximo. Un abono exitoso del 50% deja la reserva en
+  // PAGO_PARCIAL: que no se reintente ESE pago no tiene nada que ver con poder
+  // pagar el saldo que queda, y confundirlo deja a la persona sin forma de
+  // terminar de pagar.
+  const ultimoSinAcreditar = explicacion !== null && ultimo?.estadoPago !== "APROBADO";
+
   // Ante un duplicado o un pago en curso, ofrecer el botón es invitar a pagar
   // dos veces o a esperar de gusto.
-  const puedeReintentar = explicacion?.reintentable ?? true;
+  const puedeReintentar = ultimoSinAcreditar ? explicacion.reintentable : true;
 
   const cuando = `${formatearFecha(r.slotInicio, zona, { weekday: "long", day: "numeric", month: "long" })} · ${formatearHora(r.slotInicio, zona)} – ${formatearHora(r.slotFin, zona)}`;
   // Los botones se leen fuera de contexto en un lector de pantalla: sin esto,
@@ -217,7 +224,7 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
         )}
       </div>
 
-      {pagoFallido && (
+      {ultimoSinAcreditar && (
         <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-text">
           {explicacion.mensaje}
         </p>
