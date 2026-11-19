@@ -143,6 +143,23 @@ describe("PlayerReservas — resultado del pago", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/acredit/i);
   });
 
+  it("no alarma cuando MercadoPago manda un status que no significa nada", async () => {
+    // Volver del checkout sin pagar manda `status=null`. La tarjeta ya cuenta
+    // la verdad; un aviso de "no pudimos confirmar" acá es un susto gratis.
+    params.set("status", "null");
+    montarCon([reserva()]);
+
+    await screen.findByText("Cancha 1");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("entiende failure, que es como MP nombra el rechazo al redirigir", async () => {
+    params.set("status", "failure");
+    montarCon([reserva()]);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/rechaz/i);
+  });
+
   it("sin vuelta de MercadoPago no muestra ningún aviso", async () => {
     montarCon([reserva()]);
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
-import { explicarPago } from "@/lib/resultado-pago";
+import { explicarPago, explicarVueltaDeMp } from "@/lib/resultado-pago";
 
 interface UltimoPago {
   estadoPago: string;
@@ -61,8 +61,10 @@ function PlayerReservas() {
 
   // MercadoPago devuelve al jugador con `status` en la query. Es lo primero
   // que sabemos del resultado —el webhook puede tardar— así que es lo que le
-  // mostramos apenas vuelve, sin esperar nada.
+  // mostramos apenas vuelve. Si no lo entendemos, no se muestra nada: la
+  // tarjeta ya cuenta la verdad y viene de la base, no de la URL.
   const statusDeMp = useSearchParams().get("status");
+  const vuelta = explicarVueltaDeMp(statusDeMp);
 
   useEffect(() => {
     fetch("/api/reservas").then(r => r.json()).then(setReservas).catch(console.error).finally(() => setLoading(false));
@@ -109,9 +111,9 @@ function PlayerReservas() {
         <p className="mt-1 text-sm text-text-muted">Historial de canchas reservadas</p>
       </header>
 
-      {statusDeMp && (
-        <Aviso tono={statusDeMp === "approved" ? "ok" : statusDeMp === "rejected" ? "error" : "espera"}>
-          {explicarPago(statusDeMp).mensaje}
+      {vuelta && (
+        <Aviso tono={vuelta.tono}>
+          {vuelta.mensaje}
         </Aviso>
       )}
 
