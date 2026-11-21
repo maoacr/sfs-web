@@ -15,6 +15,14 @@ interface Slot { inicio: string; fin: string; horaInicio: string; horaFin: strin
 interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; imagenes: string[]; slots: Slot[] }
 interface ComplejoSlot { id: string; nombre: string; direccion: string; telefono: string | null; lat: number | null; lng: number | null; canchas: CanchaSlot[] }
 
+/** Lo que devuelve `/api/disponibilidad`: la cancha con su complejo adentro. */
+type CanchaConComplejo = CanchaSlot & {
+  complejo: {
+    id: string; nombre: string; telefono: string | null;
+    lat: number | null; lng: number | null;
+  } & Parameters<typeof formatAddress>[0];
+};
+
 const TIPOS = ["F5", "F6", "F7", "F8", "F9", "F11"];
 
 export default function PlayerBuscar() {
@@ -37,7 +45,7 @@ export default function PlayerBuscar() {
         .then(r => r.json()).then(canchas => {
           if (!active) return;
           const byComplejo: Record<string, ComplejoSlot> = {};
-          (Array.isArray(canchas) ? canchas : []).forEach((c: any) => {
+          (Array.isArray(canchas) ? canchas : []).forEach((c: CanchaConComplejo) => {
             if (!byComplejo[c.complejo.id]) {
               byComplejo[c.complejo.id] = {
                 id: c.complejo.id, nombre: c.complejo.nombre,
@@ -52,7 +60,9 @@ export default function PlayerBuscar() {
         .catch(() => {})
         .finally(() => { if (active) setLoading(false); });
     };
-    setLoading(true);
+    // `load` arranca sin `setLoading(true)` síncrono: setear estado en el
+    // cuerpo del efecto encadena renders. El esqueleto sale del valor inicial
+    // y los refrescos cada 10s reemplazan los datos sin parpadeo.
     load();
     const interval = setInterval(load, 10000);
     return () => { active = false; clearInterval(interval); };
@@ -148,6 +158,22 @@ export default function PlayerBuscar() {
    ComplejoCard — used in mobile Swiper and tablet+ grid
    ═══════════════════════════════════════════════════════════════════════════ */
 
+
+/**
+ * Si el carrusel puede dar la vuelta sin romperse.
+ *
+ * Swiper en modo loop clona slides para simular la continuidad, y necesita al
+ * menos `slidesPerView * 2 + 1` para llenar el buffer de clones. Con menos,
+ * reutiliza el mismo nodo en las dos puntas: el swipe se mueve pero muestra
+ * siempre la misma cancha.
+ *
+ * Antes la condición era `count >= 2`, así que un complejo con exactamente
+ * dos canchas caía justo en el caso roto.
+ */
+export function admiteLoop(count: number, slidesPerView: number): boolean {
+  return count >= slidesPerView * 2 + 1;
+}
+
 function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   complejo: ComplejoSlot;
   fP: (n: number) => string;
@@ -156,17 +182,22 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
 }) {
   const count = complejo.canchas.length;
   const isCompact = !isMobile || count >= 4;
-  const [isXl, setIsXl] = useState(false);
+  // El valor inicial se lee en el inicializador y no en el efecto: así no hay
+  // un setState síncrono encadenando un render de más. El efecto queda sólo
+  // para lo que de verdad es: suscribirse a los cambios.
+  const [isXl, setIsXl] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1280px)");
-    setIsXl(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsXl(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
 
   const slidesPerView = isXl && count >= 2 ? 2 : 1;
+  const conLoop = admiteLoop(count, slidesPerView);
 
   return (
     <div className={`flex flex-col ${isMobile ? "flex-1 pb-2 min-h-0" : "h-full p-4"}`}>
@@ -189,8 +220,8 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
         spaceBetween={isMobile ? 16 : 12}
         centeredSlides
         centeredSlidesBounds
-        loop={count >= 2}
-        loopAdditionalSlides={count >= 2 ? 1 : 0}
+        loop={conLoop}
+        loopAdditionalSlides={conLoop ? 1 : 0}
         className={`w-full min-h-0 ${isMobile ? "px-4" : "px-0"}`}
         style={isMobile ? { flex: 1 } : { flex: 1 }}
         pagination={isCompact ? { clickable: true } : false}
