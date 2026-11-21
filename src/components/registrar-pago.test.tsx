@@ -44,6 +44,23 @@ describe("RegistrarPago", () => {
     expect(screen.queryByLabelText(/entidad|banco/i)).not.toBeInTheDocument();
   });
 
+  it("no ofrece PSE ni billetera: en el mostrador eso es una transferencia", () => {
+    montar();
+    const opciones = Array.from(screen.getByLabelText(/método/i).querySelectorAll("option"))
+      .map(o => (o as HTMLOptionElement).value);
+
+    expect(opciones).not.toContain("PSE");
+    expect(opciones).not.toContain("BILLETERA");
+  });
+
+  it("ofrece lo que de verdad pasa en un mostrador", () => {
+    montar();
+    const opciones = Array.from(screen.getByLabelText(/método/i).querySelectorAll("option"))
+      .map(o => (o as HTMLOptionElement).value);
+
+    expect(opciones).toEqual(["EFECTIVO", "TRANSFERENCIA", "TARJETA_DEBITO", "TARJETA_CREDITO", "OTRO"]);
+  });
+
   it("pide la entidad cuando el cobro fue por transferencia", () => {
     montar();
     fireEvent.change(screen.getByLabelText(/método/i), { target: { value: "TRANSFERENCIA" } });

@@ -8,7 +8,7 @@ import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago"
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
   player: { primerNombre: string; apellidos: string; apodo: string | null; telefono: string | null };
-  slotInicio: string; slotFin: string; montoTotal: number; saldoPendiente: number; estado: string;
+  slotInicio: string; slotFin: string; montoTotal: number; montoPagado: number; saldoPendiente: number; estado: string;
 }
 
 const ESTADOS: Record<string, { label: string; color: string }> = {
@@ -20,8 +20,10 @@ const ESTADOS: Record<string, { label: string; color: string }> = {
   EXPIRADA: { label: "Expirada", color: "bg-text-dim/20 text-text-dim" },
 };
 
-/** Sobre una reserva muerta no se cobra nada. */
+/** Sobre una reserva muerta no se cobra ni se actúa. */
 const MUERTAS = new Set(["CANCELADA", "EXPIRADA"]);
+
+const nombreDe = (p: Reserva["player"]) => `${p.primerNombre} ${p.apellidos}`.trim();
 
 interface Filter { complejoId: string; canchaId: string }
 interface ComplejoOpt { id: string; nombre: string; canchas: { id: string; nombre: string }[] }
@@ -35,6 +37,7 @@ export default function OwnerReservas() {
   const [filter, setFilter] = useState<Filter>({ complejoId: "", canchaId: "" });
   const [recargas, setRecargas] = useState(0);
   const [cobrando, setCobrando] = useState<ReservaACobrar | null>(null);
+  const [cancelando, setCancelando] = useState<Reserva | null>(null);
 
   useEffect(() => {
     fetch("/api/complejos").then(r => r.json()).then(data => setComplejos(Array.isArray(data) ? data : []));
@@ -119,14 +122,19 @@ export default function OwnerReservas() {
               </div>
               <div className="flex items-center gap-2">
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${ESTADOS[r.estado]?.color}`}>{ESTADOS[r.estado]?.label}</span>
-                {r.estado === "CONFIRMADA" && (
-                  <>
-                    <button onClick={() => cambiarEstado(r.id, "COMPLETADA")} className="text-[10px] text-text-dim hover:text-grass">✓</button>
-                    <button onClick={() => cambiarEstado(r.id, "CANCELADA")} className="text-[10px] text-text-dim hover:text-error">✕</button>
-                  </>
+                {!MUERTAS.has(r.estado) && r.estado !== "COMPLETADA" && (
+                  <button onClick={() => cambiarEstado(r.id, "COMPLETADA")}
+                    aria-label={`Marcar como jugada la reserva de ${nombreDe(r.player)}`}
+                    className="rounded-lg border border-border px-2 py-1 text-[10px] text-text-muted hover:border-grass hover:text-grass">
+                    Marcar jugada
+                  </button>
                 )}
-                {r.estado === "PENDIENTE_PAGO" && (
-                  <button onClick={() => cambiarEstado(r.id, "CANCELADA")} className="text-[10px] text-text-dim hover:text-error">Cancelar</button>
+                {!MUERTAS.has(r.estado) && (
+                  <button onClick={() => setCancelando(r)}
+                    aria-label={`Cancelar la reserva de ${nombreDe(r.player)}`}
+                    className="rounded-lg border border-border px-2 py-1 text-[10px] text-text-muted hover:border-error hover:text-error">
+                    Cancelar
+                  </button>
                 )}
                 {Number(r.saldoPendiente) > 0 && !MUERTAS.has(r.estado) && (
                   <button
@@ -147,6 +155,14 @@ export default function OwnerReservas() {
 
       {showNew && <NewReservaModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); setRecargas(n => n + 1); }} />}
 
+      {cancelando && (
+        <ConfirmarCancelacion
+          reserva={cancelando}
+          onCerrar={() => setCancelando(null)}
+          onConfirmar={() => { const id = cancelando.id; setCancelando(null); cambiarEstado(id, "CANCELADA"); }}
+        />
+      )}
+
       {cobrando && (
         <RegistrarPago
           reserva={cobrando}
@@ -154,6 +170,49 @@ export default function OwnerReservas() {
           onRegistrado={() => { setCobrando(null); setRecargas(n => n + 1); }}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Cancelar no es "sacar de la lista": dispara la política de reembolso del
+ * complejo y le devuelve plata al jugador. Antes era una `✕` de diez píxeles
+ * sin etiqueta ni confirmación, al lado de un `✓` que hacía algo
+ * completamente distinto.
+ */
+function ConfirmarCancelacion({ reserva, onCerrar, onConfirmar }: {
+  reserva: Reserva; onCerrar: () => void; onConfirmar: () => void;
+}) {
+  const pagado = Number(reserva.montoPagado ?? 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4">
+      <div role="dialog" aria-labelledby="titulo-cancelar"
+        className="w-full max-w-md rounded-t-2xl border border-border bg-bg p-5 sm:rounded-2xl">
+        <h2 id="titulo-cancelar" className="text-lg font-bold text-text">¿Cancelar esta reserva?</h2>
+        <p className="mt-2 text-sm text-text-muted">
+          {reserva.cancha.nombre} · {nombreDe(reserva.player)} ·{" "}
+          {formatearHora(reserva.slotInicio, reserva.cancha.complejo.zonaHoraria)}
+        </p>
+
+        {pagado > 0 && (
+          <p className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-text">
+            Ya pagó {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(pagado)}.
+            Al cancelar se le aplica la política de reembolso del complejo.
+          </p>
+        )}
+
+        <div className="mt-6 flex gap-2">
+          <button onClick={onCerrar} type="button"
+            className="min-h-11 flex-1 rounded-xl border border-border px-4 text-sm font-medium text-text-muted hover:bg-surface-hover">
+            No, dejarla
+          </button>
+          <button onClick={onConfirmar} type="button"
+            className="min-h-11 flex-1 rounded-xl bg-error px-4 text-sm font-semibold text-white hover:opacity-90">
+            Sí, cancelar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
