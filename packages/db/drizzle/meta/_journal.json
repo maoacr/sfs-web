@@ -64,6 +64,13 @@
       "when": 1795045080597,
       "tag": "0008_estado_pago_expirado",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795287086209,
+      "tag": "0009_invitado_en_reserva",
+      "breakpoints": true
     }
   ]
 }

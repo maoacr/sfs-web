@@ -23,7 +23,7 @@ export const POST = apiHandler<CreateReservaInput>(
     }
 
     const user = ctx.user!;
-    const { canchaId, fecha, hora, playerId, montoPagado, metodo, entidad } = body;
+    const { canchaId, fecha, hora, playerId, montoPagado, metodo, entidad, invitadoNombre } = body;
 
     const esOwner = user.role === "OWNER";
 
@@ -144,6 +144,9 @@ export const POST = apiHandler<CreateReservaInput>(
           slotInicio: inicio,
           slotFin: fin,
           montoTotal: montoTotal.toFixed(2),
+          // Sólo se anota el invitado si la reserva NO quedó vinculada a un
+          // usuario real: si hay `playerId`, el nombre lo da su cuenta.
+          invitadoNombre: esOwner && !playerId ? (invitadoNombre ?? null) : null,
           montoPagado: cobrado.toFixed(2),
           saldoPendiente: saldoReserva.toFixed(2),
           estado: esOwner ? (saldoReserva > 0 ? "PAGO_PARCIAL" : "CONFIRMADA") : "PENDIENTE_PAGO",

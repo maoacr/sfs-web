@@ -218,13 +218,16 @@ function ConfirmarCancelacion({ reserva, onCerrar, onConfirmar }: {
 }
 
 interface CanchaOpt { id: string; nombre: string; tipo: string }
+interface ClienteOpt { id: string; primerNombre: string; apellidos: string; telefono: string | null }
 
 function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [canchas, setCanchas] = useState<CanchaOpt[]>([]);
   const [canchaId, setCanchaId] = useState("");
   const [fecha, setFecha] = useState(() => fechaHoy());
   const [hora, setHora] = useState("18:00");
-  const [playerNombre, setPlayerNombre] = useState("");
+  const [clienteTexto, setClienteTexto] = useState("");
+  const [sugerencias, setSugerencias] = useState<ClienteOpt[]>([]);
+  const [elegido, setElegido] = useState<ClienteOpt | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -232,12 +235,32 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
       .then(r => r.json())
       .then((data: CanchaOpt[]) => setCanchas(Array.isArray(data) ? data : [])); }, []);
 
+  // Se busca con una pausa para no disparar una consulta por tecla. Todo el
+  // setState vive dentro del timeout a propósito: hacerlo en el cuerpo del
+  // efecto encadena renders.
+  useEffect(() => {
+    const consulta = elegido ? "" : clienteTexto.trim();
+    const id = setTimeout(() => {
+      if (consulta.length < 2) return setSugerencias([]);
+      fetch(`/api/clientes?q=${encodeURIComponent(consulta)}`)
+        .then(r => r.json())
+        .then((data: ClienteOpt[]) => setSugerencias(Array.isArray(data) ? data : []))
+        .catch(() => setSugerencias([]));
+    }, 250);
+    return () => clearTimeout(id);
+  }, [clienteTexto, elegido]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setLoading(true); setError("");
     try {
       // fecha y hora son locales de la cancha; el servidor calcula el instante y la duración
       const res = await apiFetch("/api/reservas", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canchaId, fecha, hora, playerNombre }) });
+        body: JSON.stringify({
+          canchaId, fecha, hora,
+          // Con cliente elegido la reserva queda vinculada a su cuenta y la ve
+          // en su app. Sin elegir, se anota el nombre y no se bloquea nada.
+          ...(elegido ? { playerId: elegido.id } : { invitadoNombre: clienteTexto.trim() }),
+        }) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       onCreated();
     } catch (err) { setError(err instanceof Error ? err.message : "Error"); }
@@ -252,17 +275,46 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
         <h2 className="text-lg font-bold text-text">Nueva reserva manual</h2>
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text">Cancha</label>
-            <select value={canchaId} onChange={e => setCanchaId(e.target.value)} required className={i}>
+            <label htmlFor="cancha" className="block text-sm font-medium text-text">Cancha</label>
+            <select id="cancha" value={canchaId} onChange={e => setCanchaId(e.target.value)} required className={i}>
               <option value="">Seleccionar...</option>
               {canchas.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.tipo})</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-sm font-medium text-text">Fecha</label><input type="date" value={fecha} onChange={e => setFecha(e.target.value)} required className={i} /></div>
-            <div><label className="block text-sm font-medium text-text">Hora</label><input type="time" value={hora} onChange={e => setHora(e.target.value)} required className={i} /></div>
+            <div><label htmlFor="fecha-reserva" className="block text-sm font-medium text-text">Fecha</label><input id="fecha-reserva" type="date" value={fecha} onChange={e => setFecha(e.target.value)} required className={i} /></div>
+            <div><label htmlFor="hora-reserva" className="block text-sm font-medium text-text">Hora</label><input id="hora-reserva" type="time" value={hora} onChange={e => setHora(e.target.value)} required className={i} /></div>
           </div>
-          <div><label className="block text-sm font-medium text-text">Cliente</label><input type="text" value={playerNombre} onChange={e => setPlayerNombre(e.target.value)} required className={i} placeholder="Nombre" /></div>
+          <div className="relative">
+            <label htmlFor="cliente" className="block text-sm font-medium text-text">Cliente</label>
+            <input id="cliente" type="text" required className={i} autoComplete="off"
+              placeholder="Buscá por nombre…"
+              value={elegido ? `${elegido.primerNombre} ${elegido.apellidos}`.trim() : clienteTexto}
+              onChange={e => { setElegido(null); setClienteTexto(e.target.value); }} />
+
+            {sugerencias.length > 0 && (
+              <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-border bg-surface shadow-xl">
+                {sugerencias.map(c => (
+                  <li key={c.id}>
+                    <button type="button"
+                      onClick={() => { setElegido(c); setSugerencias([]); }}
+                      className="block w-full px-3 py-2 text-left text-sm text-text hover:bg-surface-hover">
+                      {c.primerNombre} {c.apellidos}
+                      {c.telefono && <span className="ml-2 text-xs text-text-dim">{c.telefono}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {elegido ? (
+              <p className="mt-1 text-xs text-grass">Queda vinculada a su cuenta: la va a ver en su app.</p>
+            ) : clienteTexto.trim().length >= 2 ? (
+              <p className="mt-1 text-xs text-warning">
+                No está registrado. La reserva se crea igual y queda anotada a su nombre.
+              </p>
+            ) : null}
+          </div>
           {error && <p className="text-sm text-error">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm text-text-muted hover:bg-surface-hover">Cancelar</button>

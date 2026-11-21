@@ -108,3 +108,84 @@ describe("OwnerReservas — acciones sobre una reserva", () => {
     expect(await screen.findByRole("button", { name: /marcar.*jugada/i })).toBeInTheDocument();
   });
 });
+
+describe("OwnerReservas — cliente de una reserva manual", () => {
+  const CLIENTE = { id: "cliente-1", primerNombre: "Ana", apellidos: "Gómez", telefono: "3009999999" };
+
+  const CANCHA_OPT = { id: "cancha-1", nombre: "Cancha 1", tipo: "FUTBOL_5" };
+
+  function montarModal(clientes: unknown[] = []) {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes("/api/clientes") ? clientes : url.includes("/api/canchas") ? [CANCHA_OPT] : [],
+    })));
+    render(<OwnerReservas />);
+    fireEvent.click(screen.getByRole("button", { name: /\+ Nueva/i }));
+  }
+
+  async function elegirCancha() {
+    const select = await screen.findByLabelText(/cancha/i);
+    fireEvent.change(select, { target: { value: "cancha-1" } });
+  }
+
+  it("busca clientes mientras se escribe", async () => {
+    montarModal([CLIENTE]);
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "ana" } });
+
+    expect(await screen.findByRole("button", { name: /ana gómez/i })).toBeInTheDocument();
+  });
+
+  it("no busca con menos de dos letras: devolvería media base", async () => {
+    montarModal([CLIENTE]);
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "a" } });
+
+    await waitFor(() => {
+      const llamadas = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls;
+      expect(llamadas.filter(([u]) => String(u).includes("/api/clientes"))).toHaveLength(0);
+    });
+  });
+
+  it("al elegir un cliente avisa que la reserva queda vinculada", async () => {
+    montarModal([CLIENTE]);
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "ana" } });
+    fireEvent.click(await screen.findByRole("button", { name: /ana gómez/i }));
+
+    expect(screen.getByText(/va a ver en su app/i)).toBeInTheDocument();
+  });
+
+  it("avisa cuando la persona no está registrada, sin bloquear", async () => {
+    montarModal([]);
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Pedro Nuevo" } });
+
+    expect(await screen.findByText(/no está registrado/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
+  });
+
+  it("manda playerId cuando se eligió a alguien del sistema", async () => {
+    montarModal([CLIENTE]);
+    await elegirCancha();
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "ana" } });
+    fireEvent.click(await screen.findByRole("button", { name: /ana gómez/i }));
+    fireEvent.click(screen.getByRole("button", { name: /crear/i }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const [, opciones] = apiFetch.mock.calls[0] as unknown as [string, { body: string }];
+    const cuerpo = JSON.parse(opciones.body);
+    expect(cuerpo.playerId).toBe("cliente-1");
+    expect(cuerpo.invitadoNombre).toBeUndefined();
+  });
+
+  it("manda invitadoNombre cuando no está en el sistema", async () => {
+    montarModal([]);
+    await elegirCancha();
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Pedro Nuevo" } });
+    fireEvent.click(screen.getByRole("button", { name: /crear/i }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const [, opciones] = apiFetch.mock.calls[0] as unknown as [string, { body: string }];
+    const cuerpo = JSON.parse(opciones.body);
+    expect(cuerpo.invitadoNombre).toBe("Pedro Nuevo");
+    expect(cuerpo.playerId).toBeUndefined();
+  });
+});
