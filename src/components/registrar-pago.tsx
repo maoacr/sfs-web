@@ -10,19 +10,24 @@ export interface ReservaACobrar {
 }
 
 /**
- * Los métodos con los que el dueño puede recibir plata en el mostrador.
+ * Lo que de verdad pasa en un mostrador.
  *
- * `metodo` es el TIPO y `entidad` la institución: Nequi, Daviplata y
- * Bancolombia son los tres TRANSFERENCIA y se distinguen por la entidad. Por
- * eso el efectivo es el único que no la pide — no hay institución detrás.
+ * El enum de la base tiene más valores —PSE, BILLETERA— porque guarda también
+ * lo que reporta MercadoPago, donde esa distinción existe y sirve. Pero acá
+ * nadie te paga "por PSE": te transfiere, y el carril lo elige la persona en
+ * su banco. Ofrecer PSE y Billetera al lado de Transferencia es pedirle al
+ * dueño que clasifique algo que desde su lado es un solo hecho: entró plata a
+ * la cuenta.
+ *
+ * Nequi, Daviplata y Bancolombia son todos TRANSFERENCIA y se distinguen por
+ * `entidad`. El efectivo es el único que no la pide: no hay institución
+ * detrás.
  */
 const METODOS = [
   { valor: "EFECTIVO", label: "Efectivo" },
-  { valor: "TRANSFERENCIA", label: "Transferencia" },
-  { valor: "PSE", label: "PSE" },
+  { valor: "TRANSFERENCIA", label: "Transferencia o billetera" },
   { valor: "TARJETA_DEBITO", label: "Tarjeta débito" },
   { valor: "TARJETA_CREDITO", label: "Tarjeta crédito" },
-  { valor: "BILLETERA", label: "Billetera digital" },
   { valor: "OTRO", label: "Otro" },
 ] as const;
 
@@ -109,7 +114,7 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
             <div>
               <label htmlFor="entidad" className="mb-1.5 block text-sm font-medium text-text">Entidad o banco</label>
               <input id="entidad" type="text" value={entidad} onChange={e => setEntidad(e.target.value)}
-                placeholder="Nequi, Daviplata, Bancolombia…" className={campo} />
+                placeholder="Nequi, Daviplata, Bancolombia, Davivienda…" className={campo} />
             </div>
           )}
         </div>
