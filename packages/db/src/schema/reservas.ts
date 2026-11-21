@@ -1,4 +1,4 @@
-import { pgTable, uuid, decimal, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, decimal, timestamp, index, varchar } from "drizzle-orm/pg-core";
 import { estadoReservaEnum } from "./enums";
 import { usuarios } from "./users";
 import { canchas } from "./canchas";
@@ -22,6 +22,20 @@ export const reservas = pgTable(
     montoPagado: decimal("monto_pagado", { precision: 10, scale: 2 }).default("0.00").notNull(),
     saldoPendiente: decimal("saldo_pendiente", { precision: 10, scale: 2 }).default("0.00").notNull(),
     estado: estadoReservaEnum("estado").default("PENDIENTE_PAGO").notNull(),
+
+    /**
+     * Nombre de quien juega cuando NO tiene cuenta en el sistema.
+     *
+     * El dueño anota reservas de gente que cae al mostrador y nunca se
+     * registró; bloquear eso sería inventarle fricción a su operación. Pero la
+     * reserva queda a nombre de su propia cuenta —`playerId` es NOT NULL y
+     * apunta al dueño—, así que sin esta columna se perdería para siempre de
+     * quién era en realidad. Con ella, el día que esa persona se registre hay
+     * un hilo del que tirar.
+     *
+     * Null significa que la reserva sí está vinculada a un usuario real.
+     */
+    invitadoNombre: varchar("invitado_nombre", { length: 120 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
