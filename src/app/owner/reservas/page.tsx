@@ -41,7 +41,9 @@ export default function OwnerReservas() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+    // Sin `setLoading(true)` acá: setear estado de forma síncrona en el cuerpo
+    // de un efecto encadena renders. El esqueleto se muestra por el valor
+    // inicial, y al recargar la lista se reemplaza sin parpadeo.
     fetch(`/api/reservas?fecha=${fecha}`)
       .then(r => r.json()).then(data => setReservas(Array.isArray(data) ? data : []))
       .catch(() => setReservas([]))
@@ -156,8 +158,10 @@ export default function OwnerReservas() {
   );
 }
 
+interface CanchaOpt { id: string; nombre: string; tipo: string }
+
 function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [canchas, setCanchas] = useState<any[]>([]);
+  const [canchas, setCanchas] = useState<CanchaOpt[]>([]);
   const [canchaId, setCanchaId] = useState("");
   const [fecha, setFecha] = useState(() => fechaHoy());
   const [hora, setHora] = useState("18:00");
@@ -165,7 +169,9 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => { fetch("/api/canchas?activas=true").then(r => r.json()).then(setCanchas); }, []);
+  useEffect(() => { fetch("/api/canchas?activas=true")
+      .then(r => r.json())
+      .then((data: CanchaOpt[]) => setCanchas(Array.isArray(data) ? data : [])); }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setLoading(true); setError("");
@@ -190,7 +196,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
             <label className="block text-sm font-medium text-text">Cancha</label>
             <select value={canchaId} onChange={e => setCanchaId(e.target.value)} required className={i}>
               <option value="">Seleccionar...</option>
-              {canchas.map((c: any) => <option key={c.id} value={c.id}>{c.nombre} ({c.tipo})</option>)}
+              {canchas.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.tipo})</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
