@@ -27,18 +27,24 @@ export const POST = apiHandler<ConfirmarPagoBody>(
       return NextResponse.json({ error: "Reserva no encontrada o no te pertenece" }, { status: 404 });
     }
 
-    if (reserva.estado === "CONFIRMADA" || reserva.estado === "COMPLETADA") {
-      return NextResponse.json({ error: "Esta reserva ya está confirmada" }, { status: 400 });
-    }
-
+    // Sobre una reserva muerta no se cobra nada.
     if (reserva.estado === "CANCELADA" || reserva.estado === "EXPIRADA") {
-      return NextResponse.json({ error: "No se puede confirmar una reserva cancelada" }, { status: 400 });
+      return NextResponse.json({ error: "No se puede cobrar una reserva cancelada" }, { status: 400 });
     }
 
     const metodo = body?.metodo ?? "EFECTIVO";
     const montoTotal = Number(reserva.montoTotal);
     const yaPagado = Number(reserva.montoPagado);
     const saldo = montoTotal - yaPagado;
+
+    // Lo que habilita el cobro es que haya saldo, no en qué punto del partido
+    // estemos. Antes esto se preguntaba por el estado, y como COMPLETADA se
+    // trataba igual que CONFIRMADA, marcar un partido como jugado dejaba la
+    // deuda sin forma de registrarse por ningún camino: el jugador quedaba
+    // bloqueado para siempre. "Se jugó" y "se pagó" son preguntas distintas.
+    if (saldo <= 0) {
+      return NextResponse.json({ error: "Esta reserva no tiene saldo pendiente" }, { status: 400 });
+    }
 
     // Sin monto, el dueño está cobrando todo lo que falta.
     const nuevoPago = body?.monto ?? saldo;
@@ -70,7 +76,14 @@ export const POST = apiHandler<ConfirmarPagoBody>(
         .set({
           montoPagado: pagadoTotal.toFixed(2),
           saldoPendiente: saldoNuevo.toFixed(2),
-          estado: saldoNuevo > 0 ? "PAGO_PARCIAL" : "CONFIRMADA",
+          // Cobrar no "des-juega" un partido: si ya estaba COMPLETADA se
+          // queda así. Sólo cambia el eje del dinero.
+          estado:
+            saldoNuevo > 0
+              ? "PAGO_PARCIAL"
+              : reserva.estado === "COMPLETADA"
+                ? "COMPLETADA"
+                : "CONFIRMADA",
         })
         .where(eq(reservas.id, reserva.id));
     });
@@ -82,7 +95,12 @@ export const POST = apiHandler<ConfirmarPagoBody>(
 
     return NextResponse.json({
       reservaId: reserva.id,
-      estado: saldoNuevo > 0 ? "PAGO_PARCIAL" : "CONFIRMADA",
+      estado:
+        saldoNuevo > 0
+          ? "PAGO_PARCIAL"
+          : reserva.estado === "COMPLETADA"
+            ? "COMPLETADA"
+            : "CONFIRMADA",
       metodo,
       entidad: body?.entidad ?? null,
       montoConfirmado: nuevoPago,
