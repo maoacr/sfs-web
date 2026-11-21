@@ -44,29 +44,29 @@ export const PUT = apiHandler<UpdateComplejoInput>(
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     }
 
-    const b = body ?? {};
+    const datos = body ?? {};
     const updateData: Partial<typeof complejos.$inferInsert> = {};
 
-    if (b.nombre !== undefined) updateData.nombre = b.nombre;
-    if (b.tipoVia !== undefined) updateData.tipoVia = b.tipoVia;
-    if (b.numeroVia !== undefined) updateData.numeroVia = b.numeroVia;
-    if (b.numeroSec !== undefined) updateData.numeroSec = b.numeroSec;
-    if (b.complemento !== undefined) updateData.complemento = b.complemento;
-    if (b.ciudad !== undefined) updateData.ciudad = b.ciudad ?? "";
-    if (b.departamento !== undefined) updateData.departamento = b.departamento ?? "";
-    if (b.tipoVia !== undefined || b.numeroVia !== undefined) {
+    if (datos.nombre !== undefined) updateData.nombre = datos.nombre;
+    if (datos.tipoVia !== undefined) updateData.tipoVia = datos.tipoVia;
+    if (datos.numeroVia !== undefined) updateData.numeroVia = datos.numeroVia;
+    if (datos.numeroSec !== undefined) updateData.numeroSec = datos.numeroSec;
+    if (datos.complemento !== undefined) updateData.complemento = datos.complemento;
+    if (datos.ciudad !== undefined) updateData.ciudad = datos.ciudad ?? "";
+    if (datos.departamento !== undefined) updateData.departamento = datos.departamento ?? "";
+    if (datos.tipoVia !== undefined || datos.numeroVia !== undefined) {
       updateData.direccion = formatAddress({ ...existente, ...updateData });
     }
-    if (b.descripcion !== undefined) updateData.descripcion = b.descripcion;
-    if (b.telefono !== undefined) updateData.telefono = b.telefono;
-    if (b.email !== undefined) updateData.email = b.email || null;
-    if (b.instagram !== undefined) updateData.instagram = b.instagram;
-    if (b.tiktok !== undefined) updateData.tiktok = b.tiktok;
-    if (b.twitter !== undefined) updateData.twitter = b.twitter;
-    if (b.facebook !== undefined) updateData.facebook = b.facebook;
-    if (b.zonaHoraria !== undefined) updateData.zonaHoraria = b.zonaHoraria;
-    if (b.lat !== undefined) updateData.latitud = b.lat === null ? null : String(b.lat);
-    if (b.lng !== undefined) updateData.longitud = b.lng === null ? null : String(b.lng);
+    if (datos.descripcion !== undefined) updateData.descripcion = datos.descripcion;
+    if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
+    if (datos.email !== undefined) updateData.email = datos.email || null;
+    if (datos.instagram !== undefined) updateData.instagram = datos.instagram;
+    if (datos.tiktok !== undefined) updateData.tiktok = datos.tiktok;
+    if (datos.twitter !== undefined) updateData.twitter = datos.twitter;
+    if (datos.facebook !== undefined) updateData.facebook = datos.facebook;
+    if (datos.zonaHoraria !== undefined) updateData.zonaHoraria = datos.zonaHoraria;
+    if (datos.lat !== undefined) updateData.latitud = datos.lat === null ? null : String(datos.lat);
+    if (datos.lng !== undefined) updateData.longitud = datos.lng === null ? null : String(datos.lng);
 
     const [updated] = await db.update(complejos).set(updateData).where(eq(complejos.id, id)).returning();
 

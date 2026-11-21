@@ -114,7 +114,7 @@ function NuevaCanchaForm() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Tipo de cancha</label>
-              <select value={tipo} onChange={e => { setTipo(e.target.value); const t = TIPOS.find(x => x.value === e.target.value); if (t) setCapacidad(t.jugadores); }}
+              <select value={tipo} onChange={e => { setTipo(e.target.value); const tipoSeleccionado = TIPOS.find(x => x.value === e.target.value); if (tipoSeleccionado) setCapacidad(tipoSeleccionado.jugadores); }}
                 className={`${inputClass} bg-surface`}>
                 {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label} ({t.jugadores} jugadores)</option>)}
               </select>

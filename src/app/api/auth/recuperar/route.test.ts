@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const h = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   enviarEmail: vi.fn(),
 }));
@@ -12,11 +12,11 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@sfs/db", () => ({
-  db: { query: { usuarios: { findFirst: h.findFirst } } },
+  db: { query: { usuarios: { findFirst: mocks.findFirst } } },
   usuarios: { id: "id", email: "email" },
 }));
 
-vi.mock("@/lib/email", () => ({ enviarEmail: h.enviarEmail }));
+vi.mock("@/lib/email", () => ({ enviarEmail: mocks.enviarEmail }));
 
 import { POST } from "./route";
 import { leerTokenReset, huellaPassword } from "@/lib/reset-token";
@@ -55,7 +55,7 @@ function peticion(
 
 /** El html del mail es donde vive el link completo. */
 function htmlDelMail(): string {
-  const [, , html] = h.enviarEmail.mock.calls[0] as [string, string, string];
+  const [, , html] = mocks.enviarEmail.mock.calls[0] as [string, string, string];
   return html;
 }
 
@@ -68,8 +68,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_SECRET = "secreto-de-sesion-para-tests";
   delete process.env.APP_URL;
-  h.findFirst.mockResolvedValue(null);
-  h.enviarEmail.mockResolvedValue(undefined);
+  mocks.findFirst.mockResolvedValue(null);
+  mocks.enviarEmail.mockResolvedValue(undefined);
 });
 
 describe("POST /api/auth/recuperar", () => {
@@ -77,7 +77,7 @@ describe("POST /api/auth/recuperar", () => {
     const res = await POST(peticion({ email: "no-es-un-email" }));
 
     expect(res.status).toBe(400);
-    expect(h.findFirst).not.toHaveBeenCalled();
+    expect(mocks.findFirst).not.toHaveBeenCalled();
   });
 
   /**
@@ -85,11 +85,11 @@ describe("POST /api/auth/recuperar", () => {
    * este endpoint en un oráculo de qué emails están registrados.
    */
   it("responde lo mismo exista o no la cuenta", async () => {
-    h.findFirst.mockResolvedValue(null);
+    mocks.findFirst.mockResolvedValue(null);
     const sinCuenta = await POST(peticion());
     const cuerpoSinCuenta = await sinCuenta.json();
 
-    h.findFirst.mockResolvedValue(fila());
+    mocks.findFirst.mockResolvedValue(fila());
     const conCuenta = await POST(peticion());
     const cuerpoConCuenta = await conCuenta.json();
 
@@ -98,20 +98,20 @@ describe("POST /api/auth/recuperar", () => {
   });
 
   it("no manda ningún mail si la cuenta no existe", async () => {
-    h.findFirst.mockResolvedValue(null);
+    mocks.findFirst.mockResolvedValue(null);
 
     await POST(peticion());
 
-    expect(h.enviarEmail).not.toHaveBeenCalled();
+    expect(mocks.enviarEmail).not.toHaveBeenCalled();
   });
 
   it("manda el mail con un link que lleva un token legible", async () => {
-    h.findFirst.mockResolvedValue(fila());
+    mocks.findFirst.mockResolvedValue(fila());
 
     const res = await POST(peticion());
 
     expect(res.status).toBe(200);
-    expect(h.enviarEmail).toHaveBeenCalledWith(
+    expect(mocks.enviarEmail).toHaveBeenCalledWith(
       "jugador@gmail.com",
       expect.stringContaining("contraseña"),
       expect.stringContaining("/auth/restablecer?token=")
@@ -128,28 +128,28 @@ describe("POST /api/auth/recuperar", () => {
    * salida si pierde acceso a su cuenta de Google.
    */
   it("también atiende a una cuenta que hoy entra sólo con Google", async () => {
-    h.findFirst.mockResolvedValue(fila({ passwordHash: null }));
+    mocks.findFirst.mockResolvedValue(fila({ passwordHash: null }));
 
     await POST(peticion());
 
-    expect(h.enviarEmail).toHaveBeenCalled();
+    expect(mocks.enviarEmail).toHaveBeenCalled();
     const leido = await leerTokenReset(tokenDelMail());
     expect(leido?.huella).toBe(huellaPassword(null));
   });
 
   it("no le manda nada a una cuenta ADMIN, pero responde igual", async () => {
-    h.findFirst.mockResolvedValue(fila({ rol: "ADMIN" }));
+    mocks.findFirst.mockResolvedValue(fila({ rol: "ADMIN" }));
 
     const res = await POST(peticion());
 
     expect(res.status).toBe(200);
-    expect(h.enviarEmail).not.toHaveBeenCalled();
+    expect(mocks.enviarEmail).not.toHaveBeenCalled();
   });
 
   describe("de dónde sale la URL del link", () => {
     it("usa APP_URL cuando está configurada", async () => {
       process.env.APP_URL = "https://sfs-web-omega.vercel.app";
-      h.findFirst.mockResolvedValue(fila());
+      mocks.findFirst.mockResolvedValue(fila());
 
       await POST(peticion());
 
@@ -164,7 +164,7 @@ describe("POST /api/auth/recuperar", () => {
      */
     it("ignora Host y x-forwarded-host, vengan como vengan", async () => {
       process.env.APP_URL = "https://sfs-web-omega.vercel.app";
-      h.findFirst.mockResolvedValue(fila());
+      mocks.findFirst.mockResolvedValue(fila());
 
       await POST(
         peticion(undefined, undefined, {
@@ -181,7 +181,7 @@ describe("POST /api/auth/recuperar", () => {
 
     it("en desarrollo cae a localhost para poder probar", async () => {
       delete process.env.APP_URL;
-      h.findFirst.mockResolvedValue(fila());
+      mocks.findFirst.mockResolvedValue(fila());
 
       await POST(peticion());
 
@@ -190,7 +190,7 @@ describe("POST /api/auth/recuperar", () => {
 
     it("le saca la barra final a la URL configurada", async () => {
       process.env.APP_URL = "https://sfs-web-omega.vercel.app/";
-      h.findFirst.mockResolvedValue(fila());
+      mocks.findFirst.mockResolvedValue(fila());
 
       await POST(peticion());
 

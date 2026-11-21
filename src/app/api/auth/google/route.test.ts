@@ -14,7 +14,7 @@ import { NextRequest } from "next/server";
  * equivocación entrega una cuenta ajena.
  */
 
-const h = vi.hoisted(() => {
+const mocks = vi.hoisted(() => {
   // `jwt.ts` lee los secretos en module load, y los imports de ESM se hoistean
   // por encima de cualquier asignación normal. Esto corre antes que todo, así
   // que el route firma tokens de verdad en lugar de obligarnos a mockear jose.
@@ -41,17 +41,17 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@sfs/db", () => ({
   db: {
-    query: { usuarios: { findFirst: h.findFirst } },
+    query: { usuarios: { findFirst: mocks.findFirst } },
     update: () => ({
       set: (valores: Record<string, unknown>) => {
-        h.valoresDelUpdate(valores);
-        return { where: () => ({ returning: h.filaActualizada }) };
+        mocks.valoresDelUpdate(valores);
+        return { where: () => ({ returning: mocks.filaActualizada }) };
       },
     }),
     insert: () => ({
       values: (valores: Record<string, unknown>) => {
-        h.valoresDelInsert(valores);
-        return { returning: h.filaCreada };
+        mocks.valoresDelInsert(valores);
+        return { returning: mocks.filaCreada };
       },
     }),
   },
@@ -59,10 +59,10 @@ vi.mock("@sfs/db", () => ({
 }));
 
 vi.mock("@/lib/supabase", () => ({
-  getSupabase: () => ({ auth: { getUser: h.getUser } }),
+  getSupabase: () => ({ auth: { getUser: mocks.getUser } }),
 }));
 
-vi.mock("@/lib/email", () => ({ enviarEmail: h.enviarEmail }));
+vi.mock("@/lib/email", () => ({ enviarEmail: mocks.enviarEmail }));
 
 import { POST } from "./route";
 
@@ -200,7 +200,7 @@ function peticion(
 
 function registros(encontradas: { porSub?: Fila | null; porEmail?: Fila | null }) {
   const { porSub = null, porEmail = null } = encontradas;
-  h.findFirst.mockImplementation(async (args: { where: { columna: string } }) => {
+  mocks.findFirst.mockImplementation(async (args: { where: { columna: string } }) => {
     if (args.where.columna === "google_sub") return porSub;
     if (args.where.columna === "email") return porEmail;
     return null;
@@ -208,17 +208,17 @@ function registros(encontradas: { porSub?: Fila | null; porEmail?: Fila | null }
 }
 
 const noEscribióNada = () => {
-  expect(h.valoresDelUpdate).not.toHaveBeenCalled();
-  expect(h.valoresDelInsert).not.toHaveBeenCalled();
+  expect(mocks.valoresDelUpdate).not.toHaveBeenCalled();
+  expect(mocks.valoresDelInsert).not.toHaveBeenCalled();
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.getUser.mockResolvedValue(sesionDeGoogle());
-  h.findFirst.mockResolvedValue(null);
-  h.filaActualizada.mockResolvedValue([fila()]);
-  h.filaCreada.mockResolvedValue([fila({ passwordHash: null })]);
-  h.enviarEmail.mockResolvedValue(undefined);
+  mocks.getUser.mockResolvedValue(sesionDeGoogle());
+  mocks.findFirst.mockResolvedValue(null);
+  mocks.filaActualizada.mockResolvedValue([fila()]);
+  mocks.filaCreada.mockResolvedValue([fila({ passwordHash: null })]);
+  mocks.enviarEmail.mockResolvedValue(undefined);
 });
 
 // ─── Rechazos ────────────────────────────────────────────────────────────────
@@ -228,12 +228,12 @@ describe("POST /api/auth/google — rechazos", () => {
     const res = await POST(peticion({}));
 
     expect(res.status).toBe(400);
-    expect(h.getUser).not.toHaveBeenCalled();
-    expect(h.findFirst).not.toHaveBeenCalled();
+    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.findFirst).not.toHaveBeenCalled();
   });
 
   it("responde 401 si Supabase no reconoce el token", async () => {
-    h.getUser.mockResolvedValue({ data: { user: null }, error: { message: "jwt expired" } });
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: { message: "jwt expired" } });
 
     const res = await POST(peticion());
 
@@ -242,7 +242,7 @@ describe("POST /api/auth/google — rechazos", () => {
   });
 
   it("responde 400 si la sesión no viene de Google", async () => {
-    h.getUser.mockResolvedValue(
+    mocks.getUser.mockResolvedValue(
       sesionDeGoogle({ identities: [{ provider: "github", id: "gh-1", identity_data: {} }] })
     );
 
@@ -253,7 +253,7 @@ describe("POST /api/auth/google — rechazos", () => {
   });
 
   it("responde 400 si Google no compartió un email", async () => {
-    h.getUser.mockResolvedValue(sesionDeGoogle({ email: null }));
+    mocks.getUser.mockResolvedValue(sesionDeGoogle({ email: null }));
 
     const res = await POST(peticion());
 
@@ -262,7 +262,7 @@ describe("POST /api/auth/google — rechazos", () => {
   });
 
   it("rechaza sin escribir nada si Google no verificó el email", async () => {
-    h.getUser.mockResolvedValue(
+    mocks.getUser.mockResolvedValue(
       sesionDeGoogle({ identityData: { ...IDENTITY_DATA_REAL, email_verified: false } })
     );
     registros({ porEmail: fila() });
@@ -278,7 +278,7 @@ describe("POST /api/auth/google — rechazos", () => {
   it("no acepta email_confirmed_at de Supabase como prueba de verificación", async () => {
     // Supabase setea `email_confirmed_at` por su cuenta. Caer a ese campo
     // saltearía nuestra propia regla, así que sólo cuenta el claim de Google.
-    h.getUser.mockResolvedValue(
+    mocks.getUser.mockResolvedValue(
       sesionDeGoogle({
         identityData: sinClave("email_verified"),
         extraUsuario: { email_confirmed_at: "2026-01-01T00:00:00Z" },
@@ -309,7 +309,7 @@ describe("POST /api/auth/google — vínculo y alta", () => {
 
     await POST(peticion());
 
-    const columnas = h.findFirst.mock.calls.map(
+    const columnas = mocks.findFirst.mock.calls.map(
       (llamada) => (llamada[0] as { where: { columna: string } }).where.columna
     );
     expect(columnas).toContain("google_sub");
@@ -331,10 +331,10 @@ describe("POST /api/auth/google — vínculo y alta", () => {
     const res = await POST(peticion());
 
     expect(res.status).toBe(200);
-    expect(h.valoresDelUpdate).toHaveBeenCalledWith(
+    expect(mocks.valoresDelUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ googleSub: SUB_GOOGLE, passwordHash: null })
     );
-    expect(h.enviarEmail).toHaveBeenCalledWith(
+    expect(mocks.enviarEmail).toHaveBeenCalledWith(
       "jugador@gmail.com",
       expect.stringContaining("Google"),
       expect.stringContaining("anulada")
@@ -347,10 +347,10 @@ describe("POST /api/auth/google — vínculo y alta", () => {
     const res = await POST(peticion());
 
     expect(res.status).toBe(200);
-    expect(h.valoresDelUpdate).toHaveBeenCalledWith(
+    expect(mocks.valoresDelUpdate).toHaveBeenCalledWith(
       expect.not.objectContaining({ passwordHash: null })
     );
-    expect(h.enviarEmail).not.toHaveBeenCalled();
+    expect(mocks.enviarEmail).not.toHaveBeenCalled();
   });
 
   it("no pisa el avatar que el usuario ya había elegido", async () => {
@@ -358,7 +358,7 @@ describe("POST /api/auth/google — vínculo y alta", () => {
 
     await POST(peticion());
 
-    expect(h.valoresDelUpdate).toHaveBeenCalledWith(
+    expect(mocks.valoresDelUpdate).toHaveBeenCalledWith(
       expect.not.objectContaining({ avatarUrl: expect.anything() })
     );
   });
@@ -367,7 +367,7 @@ describe("POST /api/auth/google — vínculo y alta", () => {
     const res = await POST(peticion());
 
     expect(res.status).toBe(200);
-    expect(h.valoresDelInsert).toHaveBeenCalledWith(
+    expect(mocks.valoresDelInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         email: "jugador@gmail.com",
         googleSub: SUB_GOOGLE,
@@ -385,7 +385,7 @@ describe("POST /api/auth/google — vínculo y alta", () => {
    * camino por defecto.
    */
   it("prefiere given_name y family_name si alguna vez llegan", async () => {
-    h.getUser.mockResolvedValue(
+    mocks.getUser.mockResolvedValue(
       sesionDeGoogle({
         identityData: {
           ...IDENTITY_DATA_REAL,
@@ -397,7 +397,7 @@ describe("POST /api/auth/google — vínculo y alta", () => {
 
     await POST(peticion());
 
-    expect(h.valoresDelInsert).toHaveBeenCalledWith(
+    expect(mocks.valoresDelInsert).toHaveBeenCalledWith(
       expect.objectContaining({ nombre: "Mario Alejandro", apellido: "Crespo Reyes" })
     );
   });
@@ -408,7 +408,7 @@ describe("POST /api/auth/google — vínculo y alta", () => {
    * y sin esto quedaría sin cubrir.
    */
   it("acepta email_verified cuando sólo viene en user_metadata", async () => {
-    h.getUser.mockResolvedValue(
+    mocks.getUser.mockResolvedValue(
       sesionDeGoogle({
         identityData: sinClave("email_verified"),
         metadata: IDENTITY_DATA_REAL,
@@ -429,10 +429,10 @@ describe("POST /api/auth/google — vínculo y alta", () => {
   it("guarda el sub de Google, no el uuid de la fila de identidades", async () => {
     await POST(peticion());
 
-    expect(h.valoresDelInsert).toHaveBeenCalledWith(
+    expect(mocks.valoresDelInsert).toHaveBeenCalledWith(
       expect.objectContaining({ googleSub: SUB_GOOGLE })
     );
-    expect(h.valoresDelInsert).not.toHaveBeenCalledWith(
+    expect(mocks.valoresDelInsert).not.toHaveBeenCalledWith(
       expect.objectContaining({ googleSub: IDENTITY_ID })
     );
   });
@@ -463,7 +463,7 @@ describe("POST /api/auth/google — superficie de ataque", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(h.valoresDelInsert).toHaveBeenCalledWith(
+    expect(mocks.valoresDelInsert).toHaveBeenCalledWith(
       expect.objectContaining({ email: "jugador@gmail.com", googleSub: SUB_GOOGLE })
     );
   });

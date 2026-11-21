@@ -74,14 +74,14 @@ export default function ReservarPage() {
 
   // Inicializar
   useEffect(() => {
-    const f = getQueryParam("fecha");
-    const h = getQueryParam("hora");
+    const fechaDeQuery = getQueryParam("fecha");
+    const horaDeQuery = getQueryParam("hora");
 
-    if (f && h) {
-      setPrefilledFecha(f);
-      setPrefilledHora(h);
-      setFecha(f);
-      setHora(h);
+    if (fechaDeQuery && horaDeQuery) {
+      setPrefilledFecha(fechaDeQuery);
+      setPrefilledHora(horaDeQuery);
+      setFecha(fechaDeQuery);
+      setHora(horaDeQuery);
     } else {
       setLoading(false);
     }
@@ -95,8 +95,8 @@ export default function ReservarPage() {
       fetch(`/api/canchas?tipo=&complejoId=&page=1&limit=100`)
         .then((r) => r.json())
         .then((data) => {
-          const c = Array.isArray(data) ? data.find((c: any) => c.id === canchaId) : null;
-          if (c) setCancha(c);
+          const canchaEncontrada = Array.isArray(data) ? data.find((canchaEncontrada: any) => canchaEncontrada.id === canchaId) : null;
+          if (canchaEncontrada) setCancha(canchaEncontrada);
         })
         .catch(() => {});
     }
@@ -105,8 +105,8 @@ export default function ReservarPage() {
   // Auto-calcular
   useEffect(() => {
     if (!prefilledFecha || !prefilledHora) return;
-    const q = new URLSearchParams({ fecha: prefilledFecha, hora: prefilledHora });
-    fetch(`/api/canchas/${canchaId}/precio?${q}`)
+    const parametros = new URLSearchParams({ fecha: prefilledFecha, hora: prefilledHora });
+    fetch(`/api/canchas/${canchaId}/precio?${parametros}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.error) {
@@ -125,9 +125,9 @@ export default function ReservarPage() {
     if (!fecha || !hora) { setError("Seleccioná fecha y hora"); return; }
     setLoading(true);
     setError("");
-    const q = new URLSearchParams({ fecha, hora });
-    if (codigo) q.set("codigo", codigo);
-    const res = await fetch(`/api/canchas/${canchaId}/precio?${q}`);
+    const parametros = new URLSearchParams({ fecha, hora });
+    if (codigo) parametros.set("codigo", codigo);
+    const res = await fetch(`/api/canchas/${canchaId}/precio?${parametros}`);
     const data = await res.json();
     if (!res.ok) setError(data.error || "Error al calcular precio");
     else { setPrecio(data); setStep("precio"); }

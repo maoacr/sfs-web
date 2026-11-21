@@ -66,8 +66,8 @@ export default function OwnerReservas() {
     return true;
   });
 
-  const fP = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
-  const s = "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
+  const formatearPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
+  const claseControl = "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
 
   return (
     <div className="p-4 lg:p-6">
@@ -82,13 +82,13 @@ export default function OwnerReservas() {
 
       {/* Filtros */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={s} />
-        <select value={filter.complejoId} onChange={e => { setFilter({ complejoId: e.target.value, canchaId: "" }); }} className={s}>
+        <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={claseControl} />
+        <select value={filter.complejoId} onChange={e => { setFilter({ complejoId: e.target.value, canchaId: "" }); }} className={claseControl}>
           <option value="">Todos los complejos</option>
           {complejos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         {filter.complejoId && (
-          <select value={filter.canchaId} onChange={e => setFilter(prev => ({ ...prev, canchaId: e.target.value }))} className={s}>
+          <select value={filter.canchaId} onChange={e => setFilter(prev => ({ ...prev, canchaId: e.target.value }))} className={claseControl}>
             <option value="">Todas las canchas</option>
             {complejos.find(c => c.id === filter.complejoId)?.canchas.map(ch => <option key={ch.id} value={ch.id}>{ch.nombre}</option>)}
           </select>
@@ -117,7 +117,7 @@ export default function OwnerReservas() {
                     {r.player.primerNombre} {r.player.apellidos}
                     {r.player.telefono && <span className="ml-1 text-text-dim">📞 {r.player.telefono}</span>}
                   </p>
-                  <p className="text-[10px] text-text-dim">{r.cancha.complejo.nombre} · {fP(Number(r.montoTotal))}</p>
+                  <p className="text-[10px] text-text-dim">{r.cancha.complejo.nombre} · {formatearPrecio(Number(r.montoTotal))}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -144,7 +144,7 @@ export default function OwnerReservas() {
                       titular: `${r.player.primerNombre} ${r.player.apellidos}`.trim(),
                     })}
                     className="rounded-lg bg-grass px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-grass-light">
-                    Cobrar {fP(Number(r.saldoPendiente))}
+                    Cobrar {formatearPrecio(Number(r.saldoPendiente))}
                   </button>
                 )}
               </div>
@@ -261,7 +261,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
           // en su app. Sin elegir, se anota el nombre y no se bloquea nada.
           ...(elegido ? { playerId: elegido.id } : { invitadoNombre: clienteTexto.trim() }),
         }) });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      if (!res.ok) { const errorBody = await res.json(); throw new Error(errorBody.error); }
       onCreated();
     } catch (err) { setError(err instanceof Error ? err.message : "Error"); }
     finally { setLoading(false); }

@@ -44,7 +44,7 @@ const mensajes: Record<EventoReserva, { player: { titulo: string; mensaje: strin
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 export async function notificarReserva(reservaId: string, tipo: EventoReserva) {
-  const r = await db.query.reservas.findFirst({
+  const reserva = await db.query.reservas.findFirst({
     where: eq(reservas.id, reservaId),
     with: {
       cancha: {
@@ -55,21 +55,21 @@ export async function notificarReserva(reservaId: string, tipo: EventoReserva) {
       tenant: { columns: { email: true } },
     },
   });
-  if (!r) return;
+  if (!reserva) return;
 
   await notificarCambioReserva({
     tipo,
-    reservaId: r.id,
-    canchaNombre: r.cancha.nombre,
-    complejoNombre: r.cancha.complejo.nombre,
-    slotInicio: r.slotInicio,
-    slotFin: r.slotFin,
-    zonaHoraria: r.cancha.complejo.zonaHoraria,
-    playerId: r.playerId,
-    playerNombre: nombreCompleto(r.player),
-    playerEmail: r.player.email,
-    tenantId: r.tenantId,
-    tenantEmail: r.tenant.email,
+    reservaId: reserva.id,
+    canchaNombre: reserva.cancha.nombre,
+    complejoNombre: reserva.cancha.complejo.nombre,
+    slotInicio: reserva.slotInicio,
+    slotFin: reserva.slotFin,
+    zonaHoraria: reserva.cancha.complejo.zonaHoraria,
+    playerId: reserva.playerId,
+    playerNombre: nombreCompleto(reserva.player),
+    playerEmail: reserva.player.email,
+    tenantId: reserva.tenantId,
+    tenantEmail: reserva.tenant.email,
   });
 }
 

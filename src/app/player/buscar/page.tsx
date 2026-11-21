@@ -76,7 +76,7 @@ export default function PlayerBuscar() {
     } finally { setBooking(null); }
   }
 
-  const fP = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
+  const formatearPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
   const fechaLarga = (f: string) => new Date(f + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
 
   return (
@@ -124,7 +124,7 @@ export default function PlayerBuscar() {
         >
           {complejos.map(comp => (
             <SwiperSlide key={comp.id} className="!flex !flex-col" style={{ height: "100%" }}>
-              <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} isMobile />
+              <ComplejoCard complejo={comp} formatearPrecio={formatearPrecio} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} isMobile />
             </SwiperSlide>
           ))}
         </Swiper>
@@ -133,7 +133,7 @@ export default function PlayerBuscar() {
         <div className="hidden md:block flex-1 overflow-y-auto p-4 space-y-6">
           {complejos.map(comp => (
               <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden h-[28rem] lg:h-[32rem]">
-              <ComplejoCard complejo={comp} fP={fP} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
+              <ComplejoCard complejo={comp} formatearPrecio={formatearPrecio} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
             </div>
           ))}
         </div>
@@ -146,7 +146,7 @@ export default function PlayerBuscar() {
           cancha={selectedCancha} complejoNombre={selectedCancha.complejoNombre}
           complejoDireccion={selectedCancha.complejoDireccion}
           complejoLat={selectedCancha.complejoLat} complejoLng={selectedCancha.complejoLng}
-          fP={fP} booking={booking}
+          formatearPrecio={formatearPrecio} booking={booking}
           onReservar={reservar} onClose={() => setSelectedCancha(null)}
         />
       )}
@@ -174,9 +174,9 @@ export function admiteLoop(count: number, slidesPerView: number): boolean {
   return count >= slidesPerView * 2 + 1;
 }
 
-function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
+function ComplejoCard({ complejo, formatearPrecio, onSelect, isMobile }: {
   complejo: ComplejoSlot;
-  fP: (n: number) => string;
+  formatearPrecio: (n: number) => string;
   onSelect: (cancha: CanchaSlot) => void;
   isMobile?: boolean;
 }) {
@@ -190,10 +190,10 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
   );
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1280px)");
+    const mediaQuery = window.matchMedia("(min-width: 1280px)");
     const handler = (e: MediaQueryListEvent) => setIsXl(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
   }, []);
 
   const slidesPerView = isXl && count >= 2 ? 2 : 1;
@@ -248,7 +248,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
                   <div className="absolute inset-x-0 bottom-0 p-5">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="rounded-lg bg-grass/90 px-3 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
-                      {cancha.precioBase && <span className="rounded-lg bg-black/50 px-3 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+                      {cancha.precioBase && <span className="rounded-lg bg-black/50 px-3 py-1 text-xs font-bold text-grass-light">{formatearPrecio(cancha.precioBase)}</span>}
                     </div>
                     <h3 className="font-bold text-white text-xl leading-tight mb-1">{cancha.nombre}</h3>
                     <p className="text-sm text-white/70">{cancha.capacidad} jugadores · {cancha.duracionSlotMinutos} min</p>
@@ -279,7 +279,7 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
                   <div className="flex-1 flex flex-col justify-center p-4 bg-surface">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <span className="rounded-md bg-grass/90 px-2 py-0.5 text-[11px] font-bold text-white">{cancha.tipo}</span>
-                      {cancha.precioBase && <span className="text-[11px] font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+                      {cancha.precioBase && <span className="text-[11px] font-bold text-grass-light">{formatearPrecio(cancha.precioBase)}</span>}
                     </div>
                     <h3 className="font-bold text-text text-sm leading-tight">{cancha.nombre}</h3>
                     <p className="text-xs text-text-dim mt-1">{cancha.capacidad} jug · {cancha.duracionSlotMinutos}min</p>
@@ -308,10 +308,10 @@ function ComplejoCard({ complejo, fP, onSelect, isMobile }: {
    Cancha Detail Sheet
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, fP, booking, onReservar, onClose }: {
+function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, formatearPrecio, booking, onReservar, onClose }: {
   cancha: CanchaSlot; complejoNombre: string; complejoDireccion: string;
   complejoLat: number | null; complejoLng: number | null;
-  fP: (n: number) => string;
+  formatearPrecio: (n: number) => string;
   booking: string | null; onReservar: (canchaId: string, slot: Slot) => void; onClose: () => void;
 }) {
   const slotsLibres = cancha.slots.filter(s => s.disponible);
@@ -338,7 +338,7 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-10 h-1 rounded-full bg-border" />
           </div>
-          <DetailImage cancha={cancha} fP={fP} onClose={onClose} />
+          <DetailImage cancha={cancha} formatearPrecio={formatearPrecio} onClose={onClose} />
           <DetailContent cancha={cancha} complejoNombre={complejoNombre} complejoDireccion={complejoDireccion}
             complejoLat={complejoLat} complejoLng={complejoLng} slotsLibres={slotsLibres}
             booking={booking} onReservar={onReservar} />
@@ -354,7 +354,7 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="rounded-lg bg-grass/90 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
-                {cancha.precioBase && <span className="rounded-lg bg-white/10 backdrop-blur px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+                {cancha.precioBase && <span className="rounded-lg bg-white/10 backdrop-blur px-2.5 py-1 text-xs font-bold text-grass-light">{formatearPrecio(cancha.precioBase)}</span>}
               </div>
               <h2 className="text-2xl font-bold text-white">{cancha.nombre}</h2>
               {complejoLat && complejoLng ? (
@@ -408,8 +408,8 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
   );
 }
 
-function DetailImage({ cancha, fP, onClose, className = "" }: {
-  cancha: CanchaSlot; fP: (n: number) => string; onClose: () => void; className?: string;
+function DetailImage({ cancha, formatearPrecio, onClose, className = "" }: {
+  cancha: CanchaSlot; formatearPrecio: (n: number) => string; onClose: () => void; className?: string;
 }) {
   return (
     <div className={`relative bg-surface-hover overflow-hidden ${className || "h-48 lg:h-56"}`}>
@@ -421,7 +421,7 @@ function DetailImage({ cancha, fP, onClose, className = "" }: {
       <button onClick={onClose} className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/50 text-white flex items-center justify-center text-sm hover:bg-black/70">✕</button>
       <div className="absolute bottom-3 left-3 flex gap-2">
         <span className="rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-white">{cancha.tipo}</span>
-        {cancha.precioBase && <span className="rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-grass-light">{fP(cancha.precioBase)}</span>}
+        {cancha.precioBase && <span className="rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-grass-light">{formatearPrecio(cancha.precioBase)}</span>}
       </div>
     </div>
   );

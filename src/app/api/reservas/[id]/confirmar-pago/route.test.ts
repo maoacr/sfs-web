@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const h = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
   getAuthUser: vi.fn(),
   reservaFindFirst: vi.fn(),
   insertEnPagos: vi.fn(),
@@ -12,14 +12,14 @@ const h = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth-api", async () => {
   const real = await vi.importActual<typeof import("@/lib/auth-api")>("@/lib/auth-api");
-  return { ...real, getAuthUser: h.getAuthUser };
+  return { ...real, getAuthUser: mocks.getAuthUser };
 });
 
 const tx = {
-  insert: () => ({ values: async (v: Record<string, unknown>) => h.insertEnPagos(v) }),
+  insert: () => ({ values: async (v: Record<string, unknown>) => mocks.insertEnPagos(v) }),
   update: () => ({
     set: (v: Record<string, unknown>) => {
-      h.updateDeReservas(v);
+      mocks.updateDeReservas(v);
       return { where: async () => undefined };
     },
   }),
@@ -27,7 +27,7 @@ const tx = {
 
 vi.mock("@sfs/db", () => ({
   db: {
-    query: { reservas: { findFirst: h.reservaFindFirst } },
+    query: { reservas: { findFirst: mocks.reservaFindFirst } },
     transaction: async (cb: (t: typeof tx) => unknown) => cb(tx),
   },
   reservas: { id: "id", tenantId: "tenant_id" },
@@ -39,7 +39,7 @@ vi.mock("drizzle-orm", () => ({
   eq: (c: unknown, v: unknown) => ({ eq: [c, v] }),
 }));
 
-vi.mock("@/lib/event-listeners", () => ({ notificarReserva: h.notificarReserva }));
+vi.mock("@/lib/event-listeners", () => ({ notificarReserva: mocks.notificarReserva }));
 
 import { POST } from "./route";
 
@@ -78,9 +78,9 @@ function reserva(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
-  h.reservaFindFirst.mockResolvedValue(reserva());
-  h.notificarReserva.mockResolvedValue(undefined);
+  mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+  mocks.reservaFindFirst.mockResolvedValue(reserva());
+  mocks.notificarReserva.mockResolvedValue(undefined);
 });
 
 describe("POST /api/reservas/:id/confirmar-pago", () => {
@@ -88,7 +88,7 @@ describe("POST /api/reservas/:id/confirmar-pago", () => {
     const res = await POST(peticion({ metodo: "EFECTIVO" }), params);
 
     expect(res.status).toBe(200);
-    const pago = h.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
+    const pago = mocks.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(pago.canal).toBe("PRESENCIAL");
     expect(pago.metodo).toBe("EFECTIVO");
     expect(pago.monto).toBe("80000.00");
@@ -97,14 +97,14 @@ describe("POST /api/reservas/:id/confirmar-pago", () => {
   it("guarda la entidad cuando el cobro fue por transferencia", async () => {
     await POST(peticion({ metodo: "TRANSFERENCIA", entidad: "NEQUI" }), params);
 
-    const pago = h.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
+    const pago = mocks.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(pago.entidad).toBe("NEQUI");
   });
 
   it("deja registrar un abono parcial y la reserva queda con saldo", async () => {
     await POST(peticion({ metodo: "EFECTIVO", monto: 30000 }), params);
 
-    const reservaActualizada = h.updateDeReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    const reservaActualizada = mocks.updateDeReservas.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(reservaActualizada.montoPagado).toBe("110000.00");
     expect(reservaActualizada.saldoPendiente).toBe("50000.00");
     expect(reservaActualizada.estado).toBe("PAGO_PARCIAL");
@@ -114,44 +114,44 @@ describe("POST /api/reservas/:id/confirmar-pago", () => {
     // El dueño marcó el partido como completado y quedó saldo. Antes esto
     // devolvía 400 y la deuda no se podía registrar por ningún camino: el
     // jugador quedaba bloqueado para siempre sin forma de saldar.
-    h.reservaFindFirst.mockResolvedValue(reserva({ estado: "COMPLETADA" }));
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ estado: "COMPLETADA" }));
 
     const res = await POST(peticion({ metodo: "EFECTIVO" }), params);
 
     expect(res.status).toBe(200);
-    expect(h.insertEnPagos).toHaveBeenCalled();
+    expect(mocks.insertEnPagos).toHaveBeenCalled();
   });
 
   it("un partido jugado sigue jugado después de cobrarlo", async () => {
-    h.reservaFindFirst.mockResolvedValue(reserva({ estado: "COMPLETADA" }));
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ estado: "COMPLETADA" }));
 
     await POST(peticion({ metodo: "EFECTIVO" }), params);
 
-    const reservaActualizada = h.updateDeReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    const reservaActualizada = mocks.updateDeReservas.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(reservaActualizada.estado).toBe("COMPLETADA");
     expect(reservaActualizada.saldoPendiente).toBe("0.00");
   });
 
   it("una reserva sin saldo no se puede volver a cobrar", async () => {
-    h.reservaFindFirst.mockResolvedValue(reserva({ montoPagado: "160000.00", estado: "CONFIRMADA" }));
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ montoPagado: "160000.00", estado: "CONFIRMADA" }));
 
     const res = await POST(peticion({ metodo: "EFECTIVO" }), params);
 
     expect(res.status).toBe(400);
-    expect(h.insertEnPagos).not.toHaveBeenCalled();
+    expect(mocks.insertEnPagos).not.toHaveBeenCalled();
   });
 
   it("no se cobra una reserva cancelada", async () => {
-    h.reservaFindFirst.mockResolvedValue(reserva({ estado: "CANCELADA" }));
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ estado: "CANCELADA" }));
 
     const res = await POST(peticion({ metodo: "EFECTIVO" }), params);
 
     expect(res.status).toBe(400);
-    expect(h.insertEnPagos).not.toHaveBeenCalled();
+    expect(mocks.insertEnPagos).not.toHaveBeenCalled();
   });
 
   it("no se cobra una reserva expirada", async () => {
-    h.reservaFindFirst.mockResolvedValue(reserva({ estado: "EXPIRADA" }));
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ estado: "EXPIRADA" }));
 
     const res = await POST(peticion({ metodo: "EFECTIVO" }), params);
 
@@ -162,11 +162,11 @@ describe("POST /api/reservas/:id/confirmar-pago", () => {
     const res = await POST(peticion({ metodo: "EFECTIVO", monto: 999999 }), params);
 
     expect(res.status).toBe(400);
-    expect(h.insertEnPagos).not.toHaveBeenCalled();
+    expect(mocks.insertEnPagos).not.toHaveBeenCalled();
   });
 
   it("sólo el dueño de la reserva puede registrar el cobro", async () => {
-    h.reservaFindFirst.mockResolvedValue(undefined);
+    mocks.reservaFindFirst.mockResolvedValue(undefined);
 
     const res = await POST(peticion({ metodo: "EFECTIVO" }), params);
 

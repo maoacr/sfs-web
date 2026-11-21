@@ -70,9 +70,9 @@ export const PATCH = apiHandler(
     const updateData: Partial<typeof usuarios.$inferInsert> = {};
 
     if (body?.primerNombre || body?.segundoNombre) {
-      const p = body.primerNombre || "";
-      const s = body.segundoNombre || "";
-      updateData.nombre = `${p} ${s}`.trim();
+      const primerNombre = body.primerNombre || "";
+      const segundoNombre = body.segundoNombre || "";
+      updateData.nombre = `${primerNombre} ${segundoNombre}`.trim();
     }
     if (body?.apellidos) updateData.apellido = body.apellidos;
     if (body?.apodo !== undefined) updateData.apodo = body.apodo;

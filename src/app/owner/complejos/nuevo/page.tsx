@@ -38,8 +38,8 @@ export default function NuevoComplejo() {
     finally { setLoading(false); }
   }
 
-  const i = "mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass";
-  const l = "block text-sm font-medium text-text";
+  const claseInput = "mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass";
+  const claseEtiqueta = "block text-sm font-medium text-text";
 
   return (
     <div className="p-6 max-w-xl mx-auto">
@@ -55,11 +55,11 @@ export default function NuevoComplejo() {
       <div className="mt-8 rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className={l}>Nombre del complejo</label>
-            <input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} className={i} placeholder='Ej: "Fútbol Center El Campito"' />
+            <label className={claseEtiqueta}>Nombre del complejo</label>
+            <input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} className={claseInput} placeholder='Ej: "Fútbol Center El Campito"' />
           </div>
           <div>
-            <label className={l}>Dirección</label>
+            <label className={claseEtiqueta}>Dirección</label>
             <div className="grid grid-cols-[auto_1fr] gap-2 mt-1">
               <select value={tipoVia} onChange={e => setTipoVia(e.target.value)}
                 className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
@@ -70,7 +70,7 @@ export default function NuevoComplejo() {
                 <option value="Avenida">Avenida</option>
                 <option value="Autopista">Autopista</option>
               </select>
-              <input type="text" required value={numeroVia} onChange={e => setNumeroVia(e.target.value)} className={i}
+              <input type="text" required value={numeroVia} onChange={e => setNumeroVia(e.target.value)} className={claseInput}
                 placeholder="Número (ej: 123)" />
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2">
@@ -80,32 +80,32 @@ export default function NuevoComplejo() {
                   className="block w-full rounded-r-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass"
                   placeholder="45-67" />
               </div>
-              <input type="text" value={complemento} onChange={e => setComplemento(e.target.value)} className={i}
+              <input type="text" value={complemento} onChange={e => setComplemento(e.target.value)} className={claseInput}
                 placeholder="Complemento (Apto, Local...)" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={l}>Ciudad</label>
-              <input type="text" value={ciudad} onChange={e => setCiudad(e.target.value)} className={i} placeholder="Ej: Bogotá" />
+              <label className={claseEtiqueta}>Ciudad</label>
+              <input type="text" value={ciudad} onChange={e => setCiudad(e.target.value)} className={claseInput} placeholder="Ej: Bogotá" />
             </div>
             <div>
-              <label className={l}>Departamento</label>
-              <input type="text" value={departamento} onChange={e => setDepartamento(e.target.value)} className={i} placeholder="Ej: Cundinamarca" />
+              <label className={claseEtiqueta}>Departamento</label>
+              <input type="text" value={departamento} onChange={e => setDepartamento(e.target.value)} className={claseInput} placeholder="Ej: Cundinamarca" />
             </div>
           </div>
           <div>
-            <label className={l}>Descripción <span className="font-normal text-text-dim">(opcional)</span></label>
-            <textarea rows={3} value={descripcion} onChange={e => setDescripcion(e.target.value)} className={i} placeholder="Detalles del lugar, servicios generales..." />
+            <label className={claseEtiqueta}>Descripción <span className="font-normal text-text-dim">(opcional)</span></label>
+            <textarea rows={3} value={descripcion} onChange={e => setDescripcion(e.target.value)} className={claseInput} placeholder="Detalles del lugar, servicios generales..." />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={l}>Teléfono</label>
-              <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} className={i} placeholder="300 123 4567" />
+              <label className={claseEtiqueta}>Teléfono</label>
+              <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} className={claseInput} placeholder="300 123 4567" />
             </div>
             <div>
-              <label className={l}>Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={i} placeholder="complejo@email.com" />
+              <label className={claseEtiqueta}>Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={claseInput} placeholder="complejo@email.com" />
             </div>
           </div>
 

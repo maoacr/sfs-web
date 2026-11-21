@@ -9,13 +9,13 @@ import { RATE_LIMITS } from "@/lib/rate-limit";
  */
 export const GET = apiHandler<never, { q: string }>(
   async (_request, _ctx, { query }) => {
-    const q = query?.q ?? "";
-    if (q.length < 3) {
+    const direccionBuscada = query?.q ?? "";
+    if (direccionBuscada.length < 3) {
       return NextResponse.json({ error: "Dirección muy corta" }, { status: 400 });
     }
 
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=es`;
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(direccionBuscada)}&limit=1&accept-language=es`;
       const res = await fetch(url, { headers: { "User-Agent": "SFS-App/1.0 (maoacr)" } });
       if (!res.ok) throw new Error("Geocoding failed");
 

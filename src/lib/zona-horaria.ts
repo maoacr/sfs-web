@@ -45,15 +45,15 @@ function componentes(instante: Date, zona: string) {
 }
 
 function offsetMs(instante: Date, zona: string): number {
-  const c = componentes(instante, zona);
-  return Date.UTC(c.anio, c.mes - 1, c.dia, c.hora, c.minuto, c.segundo) - instante.getTime();
+  const partes = componentes(instante, zona);
+  return Date.UTC(partes.anio, partes.mes - 1, partes.dia, partes.hora, partes.minuto, partes.segundo) - instante.getTime();
 }
 
 /** Instante UTC de una fecha ("YYYY-MM-DD") y hora ("HH:MM") locales de la zona. */
 export function aInstante(fecha: string, hora: string, zona: string): Date {
   const [anio, mes, dia] = fecha.split("-").map(Number);
-  const [h, m] = hora.split(":").map(Number);
-  const comoUtc = Date.UTC(anio, mes - 1, dia, h, m);
+  const [horas, minutos] = hora.split(":").map(Number);
+  const comoUtc = Date.UTC(anio, mes - 1, dia, horas, minutos);
   // El offset depende del instante; se recalcula una vez por si cruzamos un cambio de horario.
   const primero = comoUtc - offsetMs(new Date(comoUtc), zona);
   return new Date(comoUtc - offsetMs(new Date(primero), zona));
@@ -61,11 +61,11 @@ export function aInstante(fecha: string, hora: string, zona: string): Date {
 
 /** Fecha ("YYYY-MM-DD") y hora ("HH:MM") locales de un instante en la zona. */
 export function partesEnZona(instante: Date | string, zona: string): { fecha: string; hora: string } {
-  const c = componentes(new Date(instante), zona);
+  const partes = componentes(new Date(instante), zona);
   const dos = (n: number) => String(n).padStart(2, "0");
   return {
-    fecha: `${c.anio}-${dos(c.mes)}-${dos(c.dia)}`,
-    hora: `${dos(c.hora)}:${dos(c.minuto)}`,
+    fecha: `${partes.anio}-${dos(partes.mes)}-${dos(partes.dia)}`,
+    hora: `${dos(partes.hora)}:${dos(partes.minuto)}`,
   };
 }
 

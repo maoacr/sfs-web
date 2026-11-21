@@ -67,15 +67,15 @@ function PlayerReservas() {
   const vuelta = explicarVueltaDeMp(statusDeMp);
 
   useEffect(() => {
-    fetch("/api/reservas").then(r => r.json()).then(setReservas).catch(console.error).finally(() => setLoading(false));
+    fetch("/api/reservas").then(respuesta => respuesta.json()).then(setReservas).catch(console.error).finally(() => setLoading(false));
   }, []);
 
-  async function pagarSaldo(r: Reserva) {
+  async function pagarSaldo(reserva: Reserva) {
     setError(null);
     // Sin `monto`: el saldo lo decide el servidor al momento de cobrar. Un
     // número traído en el `fetch` de hace diez minutos puede estar viejo —un
     // compañero pudo abonar, o el dueño registrar efectivo— y acá hay plata.
-    const res = await apiFetch(`/api/reservas/${r.id}/pagar-saldo`, {
+    const res = await apiFetch(`/api/reservas/${reserva.id}/pagar-saldo`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
@@ -90,10 +90,10 @@ function PlayerReservas() {
 
   async function cancelar(id: string) {
     await apiFetch(`/api/reservas/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "CANCELADA" }) });
-    setReservas(prev => prev.map(r => r.id === id ? { ...r, estado: "CANCELADA" } : r));
+    setReservas(prev => prev.map(reserva => reserva.id === id ? { ...reserva, estado: "CANCELADA" } : reserva));
   }
 
-  const fPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
+  const formatearPrecio = (monto: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
 
   // Las dos secciones quieren órdenes opuestos y por eso se ordenan acá, donde
   // se sabe qué significa cada una: en las próximas interesa la que viene
@@ -102,8 +102,8 @@ function PlayerReservas() {
   const porFecha = (dir: 1 | -1) => (a: Reserva, b: Reserva) =>
     dir * (new Date(a.slotInicio).getTime() - new Date(b.slotInicio).getTime());
 
-  const activas = reservas.filter(r => !TERMINALES.has(r.estado)).sort(porFecha(1));
-  const pasadas = reservas.filter(r => TERMINALES.has(r.estado)).sort(porFecha(-1));
+  const activas = reservas.filter(reserva => !TERMINALES.has(reserva.estado)).sort(porFecha(1));
+  const pasadas = reservas.filter(reserva => TERMINALES.has(reserva.estado)).sort(porFecha(-1));
 
   const secciones: { id: string; titulo: string; lista: Reserva[] }[] = [
     { id: "proximas", titulo: "Próximas", lista: activas },
@@ -135,11 +135,11 @@ function PlayerReservas() {
         </div>
       ) : (
         <div className="space-y-8">
-          {secciones.filter(s => s.lista.length > 0).map(seccion => (
+          {secciones.filter(seccion => seccion.lista.length > 0).map(seccion => (
             <section key={seccion.id} aria-labelledby={seccion.id}>
               <h2 id={seccion.id} className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-4">{seccion.titulo}</h2>
               <ul className="space-y-3">
-                {seccion.lista.map(r => <ReservaCard key={r.id} r={r} cancelar={cancelar} pagarSaldo={pagarSaldo} fPrecio={fPrecio} />)}
+                {seccion.lista.map(reserva => <ReservaCard key={reserva.id} reserva={reserva} cancelar={cancelar} pagarSaldo={pagarSaldo} formatearPrecio={formatearPrecio} />)}
               </ul>
             </section>
           ))}
@@ -163,20 +163,20 @@ function Aviso({ tono, children }: { tono: keyof typeof TONOS; children: React.R
   );
 }
 
-function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
-  r: Reserva; cancelar: (id: string) => void; pagarSaldo: (r: Reserva) => void;
-  fPrecio: (n: number) => string;
+function ReservaCard({ reserva, cancelar, pagarSaldo, formatearPrecio }: {
+  reserva: Reserva; cancelar: (id: string) => void; pagarSaldo: (reserva: Reserva) => void;
+  formatearPrecio: (monto: number) => string;
 }) {
   const [confirmando, setConfirmando] = useState(false);
 
-  const s = ESTADOS[r.estado];
-  const saldo = Number(r.saldoPendiente ?? 0);
-  const activa = !TERMINALES.has(r.estado);
-  const zona = r.cancha.complejo.zonaHoraria;
+  const estadoVisual = ESTADOS[reserva.estado];
+  const saldo = Number(reserva.saldoPendiente ?? 0);
+  const activa = !TERMINALES.has(reserva.estado);
+  const zona = reserva.cancha.complejo.zonaHoraria;
 
   // Sólo explicamos cuando MercadoPago dijo algo concreto. Sin `detalleEstado`
   // no hay nada honesto que contar, y un mensaje vago asusta más que ayuda.
-  const ultimo = r.ultimoPago;
+  const ultimo = reserva.ultimoPago;
   const explicacion = ultimo?.detalleEstado ? explicarPago(undefined, ultimo.detalleEstado) : null;
 
   // "El último pago no se acreditó" es la única situación donde su resultado
@@ -190,10 +190,10 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
   // dos veces o a esperar de gusto.
   const puedeReintentar = ultimoSinAcreditar ? explicacion.reintentable : true;
 
-  const cuando = `${formatearFecha(r.slotInicio, zona, { weekday: "long", day: "numeric", month: "long" })} · ${formatearHora(r.slotInicio, zona)} – ${formatearHora(r.slotFin, zona)}`;
+  const cuando = `${formatearFecha(reserva.slotInicio, zona, { weekday: "long", day: "numeric", month: "long" })} · ${formatearHora(reserva.slotInicio, zona)} – ${formatearHora(reserva.slotFin, zona)}`;
   // Los botones se leen fuera de contexto en un lector de pantalla: sin esto,
   // una lista de cinco reservas suena como cinco "Cancelar" idénticos.
-  const cual = `${r.cancha.nombre}, ${cuando}`;
+  const cual = `${reserva.cancha.nombre}, ${cuando}`;
 
   const accion = "inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-4 text-sm font-semibold transition-colors sm:flex-none";
 
@@ -203,28 +203,28 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
         <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-field/30 text-lg">⚽</span>
 
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-text">{r.cancha.nombre}</p>
-          <p className="text-sm text-text-muted">{r.cancha.complejo.nombre} — {r.cancha.tipo}</p>
+          <p className="font-semibold text-text">{reserva.cancha.nombre}</p>
+          <p className="text-sm text-text-muted">{reserva.cancha.complejo.nombre} — {reserva.cancha.tipo}</p>
           <p className="mt-1 text-sm text-text-muted">
-            <time dateTime={r.slotInicio}>{cuando}</time>
+            <time dateTime={reserva.slotInicio}>{cuando}</time>
           </p>
         </div>
 
-        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${s?.color}`}>{s?.label}</span>
+        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${estadoVisual?.color}`}>{estadoVisual?.label}</span>
       </div>
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-3 border-t border-border pt-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-text">{fPrecio(Number(r.montoTotal))}</p>
+          <p className="text-sm font-semibold text-text">{formatearPrecio(Number(reserva.montoTotal))}</p>
           {saldo > 0 && (
-            <p className="text-xs text-warning">Saldo pendiente: {fPrecio(saldo)}</p>
+            <p className="text-xs text-warning">Saldo pendiente: {formatearPrecio(saldo)}</p>
           )}
         </div>
 
         {activa && !confirmando && (
           <div className="flex w-full gap-2 sm:w-auto">
             {saldo > 0 && puedeReintentar && (
-              <button onClick={() => pagarSaldo(r)} aria-label={`Pagar saldo de ${cual}`}
+              <button onClick={() => pagarSaldo(reserva)} aria-label={`Pagar saldo de ${cual}`}
                 className={`${accion} bg-grass text-white hover:bg-grass-light`}>Pagar saldo</button>
             )}
             <button onClick={() => setConfirmando(true)} aria-label={`Cancelar la reserva de ${cual}`}
@@ -243,7 +243,7 @@ function ReservaCard({ r, cancelar, pagarSaldo, fPrecio }: {
         <div className="mt-3 rounded-xl border border-error/30 bg-error/10 p-3">
           <p className="text-sm text-text">¿Seguro que querés cancelar esta reserva?</p>
           <div className="mt-3 flex w-full gap-2">
-            <button onClick={() => { setConfirmando(false); cancelar(r.id); }}
+            <button onClick={() => { setConfirmando(false); cancelar(reserva.id); }}
               aria-label={`Sí, cancelar la reserva de ${cual}`}
               className={`${accion} bg-error text-white hover:opacity-90`}>Sí, cancelar</button>
             <button onClick={() => setConfirmando(false)}

@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const h = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
   saldoPendienteDe: vi.fn(),
   getAuthUser: vi.fn(),
   canchaFindFirst: vi.fn(),
@@ -24,17 +24,17 @@ vi.mock("drizzle-orm", () => ({
   desc: (c: unknown) => ({ desc: c }),
 }));
 
-vi.mock("@/lib/saldo", () => ({ saldoPendienteDe: h.saldoPendienteDe }));
+vi.mock("@/lib/saldo", () => ({ saldoPendienteDe: mocks.saldoPendienteDe }));
 
 vi.mock("@/lib/auth-api", async () => {
   const real = await vi.importActual<typeof import("@/lib/auth-api")>("@/lib/auth-api");
-  return { ...real, getAuthUser: h.getAuthUser };
+  return { ...real, getAuthUser: mocks.getAuthUser };
 });
 
 const tx = {
   insert: (tabla: { _nombre: string }) => ({
     values: (valores: Record<string, unknown>) => {
-      const registrar = tabla._nombre === "pagos" ? h.insertEnPagos : h.insertEnReservas;
+      const registrar = tabla._nombre === "pagos" ? mocks.insertEnPagos : mocks.insertEnReservas;
       registrar(valores);
       return { returning: async () => [{ id: "reserva-nueva", ...valores }] };
     },
@@ -44,8 +44,8 @@ const tx = {
 vi.mock("@sfs/db", () => ({
   db: {
     query: {
-      canchas: { findFirst: h.canchaFindFirst },
-      reservas: { findFirst: h.reservaFindFirst, findMany: h.reservaFindMany },
+      canchas: { findFirst: mocks.canchaFindFirst },
+      reservas: { findFirst: mocks.reservaFindFirst, findMany: mocks.reservaFindMany },
       tarifas: { findFirst: vi.fn(async () => undefined) },
     },
     transaction: async (cb: (t: typeof tx) => unknown) => cb(tx),
@@ -96,15 +96,15 @@ function peticion(cuerpo: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.saldoPendienteDe.mockResolvedValue(0);
-  h.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
+  mocks.saldoPendienteDe.mockResolvedValue(0);
+  mocks.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
   // La cancha no existe: alcanza para probar que la request pasó la puerta del saldo.
-  h.canchaFindFirst.mockResolvedValue(undefined);
+  mocks.canchaFindFirst.mockResolvedValue(undefined);
 });
 
 describe("POST /api/reservas — bloqueo por saldo pendiente", () => {
   it("bloquea al jugador que debe plata", async () => {
-    h.saldoPendienteDe.mockResolvedValue(80000);
+    mocks.saldoPendienteDe.mockResolvedValue(80000);
 
     const res = await POST(peticion({}));
 
@@ -116,21 +116,21 @@ describe("POST /api/reservas — bloqueo por saldo pendiente", () => {
     const res = await POST(peticion({}));
 
     expect(res.status).not.toBe(403);
-    expect(h.saldoPendienteDe).toHaveBeenCalledWith(JUGADOR);
+    expect(mocks.saldoPendienteDe).toHaveBeenCalledWith(JUGADOR);
   });
 
   it("mira el saldo DEL JUGADOR cuando el dueño reserva a su nombre", async () => {
-    h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
 
     await POST(peticion({ playerId: JUGADOR }));
 
-    expect(h.saldoPendienteDe).toHaveBeenCalledWith(JUGADOR);
-    expect(h.saldoPendienteDe).not.toHaveBeenCalledWith(DUENO);
+    expect(mocks.saldoPendienteDe).toHaveBeenCalledWith(JUGADOR);
+    expect(mocks.saldoPendienteDe).not.toHaveBeenCalledWith(DUENO);
   });
 
   it("el dueño tampoco puede agendarle a alguien con saldo", async () => {
-    h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
-    h.saldoPendienteDe.mockResolvedValue(50000);
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.saldoPendienteDe.mockResolvedValue(50000);
 
     const res = await POST(peticion({ playerId: JUGADOR }));
 
@@ -138,8 +138,8 @@ describe("POST /api/reservas — bloqueo por saldo pendiente", () => {
   });
 
   it("al dueño le habla del jugador, no de él", async () => {
-    h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
-    h.saldoPendienteDe.mockResolvedValue(50000);
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.saldoPendienteDe.mockResolvedValue(50000);
 
     const res = await POST(peticion({ playerId: JUGADOR }));
 
@@ -147,29 +147,29 @@ describe("POST /api/reservas — bloqueo por saldo pendiente", () => {
   });
 
   it("el dueño que reserva para sí mismo se mide con su propio saldo", async () => {
-    h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
 
     await POST(peticion({}));
 
-    expect(h.saldoPendienteDe).toHaveBeenCalledWith(DUENO);
+    expect(mocks.saldoPendienteDe).toHaveBeenCalledWith(DUENO);
   });
 });
 
 describe("POST /api/reservas — el dueño agenda y cobra en el mostrador", () => {
   beforeEach(() => {
-    h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
-    h.canchaFindFirst.mockResolvedValue({
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.canchaFindFirst.mockResolvedValue({
       id: CANCHA, tenantId: DUENO, duracionSlotMinutos: 60,
       complejo: { zonaHoraria: "America/Bogota" }, slots: [{ diaSemana: 1 }],
     });
-    h.reservaFindFirst.mockResolvedValue(undefined);
+    mocks.reservaFindFirst.mockResolvedValue(undefined);
   });
 
   it("deja fila en pagos: la plata que cobra el dueño no puede ser invisible", async () => {
     await POST(peticion({ playerId: JUGADOR }));
 
-    expect(h.insertEnPagos).toHaveBeenCalledTimes(1);
-    const pago = h.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(mocks.insertEnPagos).toHaveBeenCalledTimes(1);
+    const pago = mocks.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(pago.canal).toBe("PRESENCIAL");
     expect(pago.metodo).toBe("EFECTIVO");
     expect(pago.monto).toBe("160000.00");
@@ -179,7 +179,7 @@ describe("POST /api/reservas — el dueño agenda y cobra en el mostrador", () =
   it("guarda el método y la entidad que informó el dueño", async () => {
     await POST(peticion({ playerId: JUGADOR, metodo: "TRANSFERENCIA", entidad: "NEQUI" }));
 
-    const pago = h.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
+    const pago = mocks.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(pago.metodo).toBe("TRANSFERENCIA");
     expect(pago.entidad).toBe("NEQUI");
   });
@@ -187,43 +187,43 @@ describe("POST /api/reservas — el dueño agenda y cobra en el mostrador", () =
   it("un cobro parcial deja la reserva con saldo", async () => {
     await POST(peticion({ playerId: JUGADOR, montoPagado: 80000 }));
 
-    const reserva = h.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    const reserva = mocks.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(reserva.montoPagado).toBe("80000.00");
     expect(reserva.saldoPendiente).toBe("80000.00");
     expect(reserva.estado).toBe("PAGO_PARCIAL");
 
-    const pago = h.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
+    const pago = mocks.insertEnPagos.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(pago.monto).toBe("80000.00");
   });
 
   it("sin monto se asume que cobró todo y la reserva queda confirmada", async () => {
     await POST(peticion({ playerId: JUGADOR }));
 
-    const reserva = h.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    const reserva = mocks.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(reserva.saldoPendiente).toBe("0.00");
     expect(reserva.estado).toBe("CONFIRMADA");
   });
 
   it("el jugador que reserva por la app no genera fila de pago todavía", async () => {
-    h.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
+    mocks.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
 
     await POST(peticion({}));
 
-    expect(h.insertEnPagos).not.toHaveBeenCalled();
-    const reserva = h.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(mocks.insertEnPagos).not.toHaveBeenCalled();
+    const reserva = mocks.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(reserva.estado).toBe("PENDIENTE_PAGO");
   });
 });
 
 describe("GET /api/reservas?conSaldo=true — cuentas por cobrar", () => {
   function condiciones() {
-    const args = h.reservaFindMany.mock.calls[0]?.[0] as { where: { and: unknown[] } };
+    const args = mocks.reservaFindMany.mock.calls[0]?.[0] as { where: { and: unknown[] } };
     return args.where.and;
   }
 
   beforeEach(() => {
-    h.reservaFindMany.mockResolvedValue([]);
-    h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.reservaFindMany.mockResolvedValue([]);
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
   });
 
   function consulta(query: string) {

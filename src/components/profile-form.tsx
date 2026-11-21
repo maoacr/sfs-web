@@ -64,7 +64,7 @@ export function ProfileForm() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ primerNombre, segundoNombre: segundoNombre || null, apellidos, apodo: apodo || null, codigoPais, telefono: telefono || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      if (!res.ok) { const errorBody = await res.json(); throw new Error(errorBody.error); }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -72,8 +72,8 @@ export function ProfileForm() {
     } finally { setSaving(false); }
   }
 
-  const i = "mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass transition-colors";
-  const l = "block text-sm font-medium text-text";
+  const claseInput = "mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass transition-colors";
+  const claseEtiqueta = "block text-sm font-medium text-text";
 
   if (loading) return (
     <div className="p-6 lg:p-10">
@@ -167,23 +167,23 @@ export function ProfileForm() {
           <form id="profile-form" onSubmit={handleSave} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={l}>Primer nombre</label>
-                <input type="text" required value={primerNombre} onChange={e => setPrimerNombre(e.target.value)} className={i} />
+                <label className={claseEtiqueta}>Primer nombre</label>
+                <input type="text" required value={primerNombre} onChange={e => setPrimerNombre(e.target.value)} className={claseInput} />
               </div>
               <div>
-                <label className={l}>Segundo nombre <span className="font-normal text-text-dim">(opcional)</span></label>
-                <input type="text" value={segundoNombre} onChange={e => setSegundoNombre(e.target.value)} className={i} />
+                <label className={claseEtiqueta}>Segundo nombre <span className="font-normal text-text-dim">(opcional)</span></label>
+                <input type="text" value={segundoNombre} onChange={e => setSegundoNombre(e.target.value)} className={claseInput} />
               </div>
             </div>
 
             <div>
-              <label className={l}>Apellidos</label>
-              <input type="text" required value={apellidos} onChange={e => setApellidos(e.target.value)} className={i} />
+              <label className={claseEtiqueta}>Apellidos</label>
+              <input type="text" required value={apellidos} onChange={e => setApellidos(e.target.value)} className={claseInput} />
             </div>
 
             {/* Handle */}
             <div>
-              <label className={l}>Nombre de usuario</label>
+              <label className={claseEtiqueta}>Nombre de usuario</label>
               <div className="mt-1.5 flex rounded-xl">
                 <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-surface px-4 text-sm text-text-muted">@</span>
                 <input type="text" maxLength={30} value={apodo}
@@ -196,7 +196,7 @@ export function ProfileForm() {
 
             {/* Phone */}
             <div>
-              <label className={l}>Teléfono</label>
+              <label className={claseEtiqueta}>Teléfono</label>
               <div className="mt-1.5 flex gap-2">
                 <select value={codigoPais} onChange={e => setCodigoPais(e.target.value)}
                   className="rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
@@ -216,7 +216,7 @@ export function ProfileForm() {
 
             {/* Email — read only */}
             <div>
-              <label className={l}>Email</label>
+              <label className={claseEtiqueta}>Email</label>
               <input type="email" value={user?.email || ""} disabled
                 className="mt-1.5 block w-full rounded-xl border border-border bg-bg/30 px-4 py-3 text-sm text-text-dim cursor-not-allowed" />
               <p className="mt-1 text-xs text-text-dim">El email no se puede cambiar.</p>

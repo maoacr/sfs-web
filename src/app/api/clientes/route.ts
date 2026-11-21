@@ -22,12 +22,12 @@ import { toApiUsuario } from "@/lib/db-mappers";
 export const GET = apiHandler(
   async (request, ctx) => {
     const user = ctx.user!;
-    const q = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+    const busqueda = new URL(request.url).searchParams.get("q")?.trim() ?? "";
 
     // Con menos de dos caracteres cualquier búsqueda devuelve media base.
-    if (q.length < 2) return NextResponse.json([]);
+    if (busqueda.length < 2) return NextResponse.json([]);
 
-    const patron = `%${q}%`;
+    const patron = `%${busqueda}%`;
 
     const filas = await db
       .selectDistinct({

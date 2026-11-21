@@ -12,18 +12,18 @@ const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 function inicioSemana(fecha: Date): Date {
-  const d = new Date(fecha);
-  const dia = d.getDay();
+  const lunes = new Date(fecha);
+  const dia = lunes.getDay();
   const diff = dia === 0 ? -6 : 1 - dia;
-  d.setDate(d.getDate() + diff);
-  return d;
+  lunes.setDate(lunes.getDate() + diff);
+  return lunes;
 }
 
 function generarSemana(lunes: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(lunes);
-    d.setDate(lunes.getDate() + i);
-    return d;
+    const dia = new Date(lunes);
+    dia.setDate(lunes.getDate() + i);
+    return dia;
   });
 }
 
@@ -59,7 +59,7 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
 
   // Seleccionar hoy por defecto al montar si está en la semana actual
   useEffect(() => {
-    const hoyEstaEnSemana = semana.some(d => mismaFecha(d, hoy));
+    const hoyEstaEnSemana = semana.some(dia => mismaFecha(dia, hoy));
     if (hoyEstaEnSemana) {
       setDiaSeleccionado(new Date(hoy));
     } else {
@@ -93,8 +93,8 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
     setSemanaLunes(nueva);
   }
 
-  function seleccionarDia(d: Date) {
-    setDiaSeleccionado(new Date(d));
+  function seleccionarDia(dia: Date) {
+    setDiaSeleccionado(new Date(dia));
   }
 
   async function cancelarReserva(reservaId: string) {
@@ -112,7 +112,7 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
     finally { setCancelling(false); }
   }
 
-  const fF =(d: Date) => d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
+  const formatearFechaCorta =(dia: Date) => dia.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 
   const mesActual = MESES[semanaLunes.getMonth()];
   const añoActual = semanaLunes.getFullYear();
@@ -152,11 +152,11 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
         {/* Grilla de días - horizontal scroll con gradiente */}
         <div className="relative">
           <div ref={scrollRef} className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
-            {semana.map((d, i) => {
-              const esHoy = mismaFecha(d, hoy);
-              const seleccionado = diaSeleccionado ? mismaFecha(d, diaSeleccionado) : false;
+            {semana.map((dia, i) => {
+              const esHoy = mismaFecha(dia, hoy);
+              const seleccionado = diaSeleccionado ? mismaFecha(dia, diaSeleccionado) : false;
               return (
-                <button key={i} onClick={() => seleccionarDia(d)}
+                <button key={i} onClick={() => seleccionarDia(dia)}
                   className={`flex-shrink-0 rounded-xl border p-2.5 text-center min-w-[60px] transition-all ${seleccionado
                     ? "border-grass bg-field text-grass-light shadow-sm scale-[1.02]"
                     : esHoy
@@ -164,8 +164,8 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
                       : "border-border bg-bg text-text-muted hover:border-border-hover hover:text-text"
                   }`}>
                   <p className={`text-[11px] uppercase ${seleccionado ? "text-grass-light" : "text-text-dim"}`}>{DIAS[i]}</p>
-                  <p className={`text-lg font-bold mt-0.5 ${seleccionado ? "text-grass-light" : esHoy ? "text-grass-light" : "text-text"}`}>{d.getDate()}</p>
-                  <p className="text-[10px] text-text-dim">{fF(d)}</p>
+                  <p className={`text-lg font-bold mt-0.5 ${seleccionado ? "text-grass-light" : esHoy ? "text-grass-light" : "text-text"}`}>{dia.getDate()}</p>
+                  <p className="text-[10px] text-text-dim">{formatearFechaCorta(dia)}</p>
                 </button>
               );
             })}
