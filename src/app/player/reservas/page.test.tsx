@@ -79,6 +79,28 @@ describe("PlayerReservas", () => {
     expect(screen.getByRole("heading", { name: /^historial$/i })).toBeInTheDocument();
   });
 
+  it("en el historial, lo más reciente va arriba", async () => {
+    montarCon([
+      reserva({ id: "vieja", estado: "COMPLETADA", slotInicio: "2026-10-15T02:00:00.000Z", saldoPendiente: 0 }),
+      reserva({ id: "nueva", estado: "COMPLETADA", slotInicio: "2026-11-18T02:00:00.000Z", saldoPendiente: 0 }),
+    ]);
+
+    const filas = await screen.findAllByRole("listitem");
+    expect(filas[0]).toHaveTextContent(/noviembre/i);
+    expect(filas[1]).toHaveTextContent(/octubre/i);
+  });
+
+  it("en las próximas, lo más cercano va arriba", async () => {
+    montarCon([
+      reserva({ id: "lejana", slotInicio: "2026-12-20T02:00:00.000Z" }),
+      reserva({ id: "cercana", slotInicio: "2026-11-25T02:00:00.000Z" }),
+    ]);
+
+    const filas = await screen.findAllByRole("listitem");
+    expect(filas[0]).toHaveTextContent(/noviembre/i);
+    expect(filas[1]).toHaveTextContent(/diciembre/i);
+  });
+
   it("presenta las reservas como una lista", async () => {
     montarCon([reserva(), reserva({ id: "reserva-2", estado: "CONFIRMADA", saldoPendiente: 0 })]);
 

@@ -95,8 +95,15 @@ function PlayerReservas() {
 
   const fPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
 
-  const activas = reservas.filter(r => !TERMINALES.has(r.estado));
-  const pasadas = reservas.filter(r => TERMINALES.has(r.estado));
+  // Las dos secciones quieren órdenes opuestos y por eso se ordenan acá, donde
+  // se sabe qué significa cada una: en las próximas interesa la que viene
+  // primero, y en el historial lo último que pasó. Dejarlo librado al orden
+  // del API hacía que el historial mostrara arriba la reserva más vieja.
+  const porFecha = (dir: 1 | -1) => (a: Reserva, b: Reserva) =>
+    dir * (new Date(a.slotInicio).getTime() - new Date(b.slotInicio).getTime());
+
+  const activas = reservas.filter(r => !TERMINALES.has(r.estado)).sort(porFecha(1));
+  const pasadas = reservas.filter(r => TERMINALES.has(r.estado)).sort(porFecha(-1));
 
   const secciones: { id: string; titulo: string; lista: Reserva[] }[] = [
     { id: "proximas", titulo: "Próximas", lista: activas },
