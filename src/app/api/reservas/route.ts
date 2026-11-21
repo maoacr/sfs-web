@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, reservas, pagos, canchas, tarifas, slotConfigs, estadoReservaEnum } from "@sfs/db";
-import { and, eq, gt, inArray, isNull, lt, asc, desc, type SQL } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, asc, desc, notInArray, type SQL } from "drizzle-orm";
 import { aInstante } from "@/lib/zona-horaria";
 import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
 import { reservasDelDiaLocal, reservaOcupaElTurno } from "@/lib/consultas";
@@ -210,6 +210,15 @@ export const GET = apiHandler(
         return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
       }
       condiciones.push(eq(reservas.estado, estadoValido));
+    }
+
+    // Cuentas por cobrar. No se filtra por estado porque deber no es un
+    // estado: una reserva puede estar PENDIENTE_PAGO, PAGO_PARCIAL o incluso
+    // COMPLETADA —el partido se jugó y quedó debiendo— y en los tres casos hay
+    // plata que cobrar. Lo único que no se cobra es lo que está muerto.
+    if (searchParams.get("conSaldo") === "true") {
+      condiciones.push(gt(reservas.saldoPendiente, "0"));
+      condiciones.push(notInArray(reservas.estado, ["CANCELADA", "EXPIRADA"]));
     }
 
     const lista = await db.query.reservas.findMany({

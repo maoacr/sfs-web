@@ -3,19 +3,25 @@
 import { useEffect, useState } from "react";
 import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
+import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago";
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
   player: { primerNombre: string; apellidos: string; apodo: string | null; telefono: string | null };
-  slotInicio: string; slotFin: string; montoTotal: number; estado: string;
+  slotInicio: string; slotFin: string; montoTotal: number; saldoPendiente: number; estado: string;
 }
 
 const ESTADOS: Record<string, { label: string; color: string }> = {
   PENDIENTE_PAGO: { label: "Pendiente", color: "bg-warning/20 text-warning" },
+  PAGO_PARCIAL: { label: "Pago parcial", color: "bg-warning/20 text-warning" },
   CONFIRMADA: { label: "Confirmada", color: "bg-grass/20 text-grass-light" },
   COMPLETADA: { label: "Completada", color: "bg-text-dim/20 text-text-dim" },
   CANCELADA: { label: "Cancelada", color: "bg-error/20 text-error" },
+  EXPIRADA: { label: "Expirada", color: "bg-text-dim/20 text-text-dim" },
 };
+
+/** Sobre una reserva muerta no se cobra nada. */
+const MUERTAS = new Set(["CANCELADA", "EXPIRADA"]);
 
 interface Filter { complejoId: string; canchaId: string }
 interface ComplejoOpt { id: string; nombre: string; canchas: { id: string; nombre: string }[] }
@@ -28,6 +34,7 @@ export default function OwnerReservas() {
   const [complejos, setComplejos] = useState<ComplejoOpt[]>([]);
   const [filter, setFilter] = useState<Filter>({ complejoId: "", canchaId: "" });
   const [recargas, setRecargas] = useState(0);
+  const [cobrando, setCobrando] = useState<ReservaACobrar | null>(null);
 
   useEffect(() => {
     fetch("/api/complejos").then(r => r.json()).then(data => setComplejos(Array.isArray(data) ? data : []));
@@ -119,6 +126,17 @@ export default function OwnerReservas() {
                 {r.estado === "PENDIENTE_PAGO" && (
                   <button onClick={() => cambiarEstado(r.id, "CANCELADA")} className="text-[10px] text-text-dim hover:text-error">Cancelar</button>
                 )}
+                {Number(r.saldoPendiente) > 0 && !MUERTAS.has(r.estado) && (
+                  <button
+                    onClick={() => setCobrando({
+                      id: r.id,
+                      saldoPendiente: Number(r.saldoPendiente),
+                      titular: `${r.player.primerNombre} ${r.player.apellidos}`.trim(),
+                    })}
+                    className="rounded-lg bg-grass px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-grass-light">
+                    Cobrar {fP(Number(r.saldoPendiente))}
+                  </button>
+                )}
               </div>
             </div>
           ))
@@ -126,6 +144,14 @@ export default function OwnerReservas() {
       </div>
 
       {showNew && <NewReservaModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); setRecargas(n => n + 1); }} />}
+
+      {cobrando && (
+        <RegistrarPago
+          reserva={cobrando}
+          onCerrar={() => setCobrando(null)}
+          onRegistrado={() => { setCobrando(null); setRecargas(n => n + 1); }}
+        />
+      )}
     </div>
   );
 }

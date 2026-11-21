@@ -7,8 +7,21 @@ const h = vi.hoisted(() => ({
   getAuthUser: vi.fn(),
   canchaFindFirst: vi.fn(),
   reservaFindFirst: vi.fn(),
+  reservaFindMany: vi.fn(),
   insertEnPagos: vi.fn(),
   insertEnReservas: vi.fn(),
+}));
+
+vi.mock("drizzle-orm", () => ({
+  and: (...p: unknown[]) => ({ and: p }),
+  eq: (c: unknown, v: unknown) => ({ eq: [c, v] }),
+  gt: (c: unknown, v: unknown) => ({ gt: [c, v] }),
+  lt: (c: unknown, v: unknown) => ({ lt: [c, v] }),
+  isNull: (c: unknown) => ({ isNull: c }),
+  inArray: (c: unknown, v: unknown) => ({ inArray: [c, v] }),
+  notInArray: (c: unknown, v: unknown) => ({ notInArray: [c, v] }),
+  asc: (c: unknown) => ({ asc: c }),
+  desc: (c: unknown) => ({ desc: c }),
 }));
 
 vi.mock("@/lib/saldo", () => ({ saldoPendienteDe: h.saldoPendienteDe }));
@@ -32,13 +45,14 @@ vi.mock("@sfs/db", () => ({
   db: {
     query: {
       canchas: { findFirst: h.canchaFindFirst },
-      reservas: { findFirst: h.reservaFindFirst },
+      reservas: { findFirst: h.reservaFindFirst, findMany: h.reservaFindMany },
       tarifas: { findFirst: vi.fn(async () => undefined) },
     },
     transaction: async (cb: (t: typeof tx) => unknown) => cb(tx),
   },
   pagos: { _nombre: "pagos" },
-  reservas: { _nombre: "reservas", playerId: "player_id", estado: "estado", saldoPendiente: "saldo_pendiente", id: "id", canchaId: "cancha_id", slotInicio: "slot_inicio", slotFin: "slot_fin", tenantId: "tenant_id" },
+  reservas: { _nombre: "reservas", playerId: "player_id", estado: "estado", saldoPendiente: "saldo_pendiente", id: "id", canchaId: "cancha_id", slotInicio: "slot_inicio", slotFin: "slot_fin", tenantId: "tenant_id", createdAt: "created_at" },
+  pagosTabla: { createdAt: "created_at" },
   canchas: { id: "id", deletedAt: "deleted_at" },
   slotConfigs: { diaSemana: "dia_semana" },
   estadoReservaEnum: { enumValues: ["PENDIENTE_PAGO", "PAGO_PARCIAL", "CONFIRMADA"] },
@@ -59,7 +73,7 @@ vi.mock("@/lib/pricing", () => ({
 }));
 vi.mock("@/lib/event-listeners", () => ({ notificarReserva: vi.fn(async () => undefined) }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const DUENO = "11111111-1111-4111-8111-111111111111";
 const JUGADOR = "22222222-2222-4222-8222-222222222222";
@@ -198,5 +212,48 @@ describe("POST /api/reservas — el dueño agenda y cobra en el mostrador", () =
     expect(h.insertEnPagos).not.toHaveBeenCalled();
     const reserva = h.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(reserva.estado).toBe("PENDIENTE_PAGO");
+  });
+});
+
+describe("GET /api/reservas?conSaldo=true — cuentas por cobrar", () => {
+  function condiciones() {
+    const args = h.reservaFindMany.mock.calls[0]?.[0] as { where: { and: unknown[] } };
+    return args.where.and;
+  }
+
+  beforeEach(() => {
+    h.reservaFindMany.mockResolvedValue([]);
+    h.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+  });
+
+  function consulta(query: string) {
+    return new NextRequest(`http://localhost/api/reservas${query}`, {
+      method: "GET",
+      headers: { "x-forwarded-for": `10.8.0.${(ip += 1)}` },
+    });
+  }
+
+  it("pide sólo las que deben plata", async () => {
+    await GET(consulta("?conSaldo=true"));
+    expect(condiciones()).toContainEqual({ gt: ["saldo_pendiente", "0"] });
+  });
+
+  it("deja afuera lo que está muerto: canceladas y expiradas", async () => {
+    await GET(consulta("?conSaldo=true"));
+    expect(condiciones()).toContainEqual({ notInArray: ["estado", ["CANCELADA", "EXPIRADA"]] });
+  });
+
+  it("no filtra por estado: una COMPLETADA también puede deber", async () => {
+    await GET(consulta("?conSaldo=true"));
+    const porEstado = condiciones().filter(
+      (c): c is { eq: unknown[] } =>
+        typeof c === "object" && c !== null && "eq" in c && (c as { eq: unknown[] }).eq[0] === "estado"
+    );
+    expect(porEstado).toHaveLength(0);
+  });
+
+  it("sin el filtro no se mete con el saldo", async () => {
+    await GET(consulta(""));
+    expect(condiciones()).not.toContainEqual({ gt: ["saldo_pendiente", "0"] });
   });
 });
