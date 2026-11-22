@@ -14,10 +14,19 @@ interface ReservaDeHoy {
   player: { primerNombre: string; apellidos: string; apodo: string | null };
   slotInicio: string;
   slotFin: string;
+  estado: string;
 }
 
-/** Cuántas reservas de hoy se listan como tarjeta antes de cortar. */
+/** Cuántas reservas se listan como tarjeta antes de cortar. */
 const TARJETAS_VISIBLES = 5;
+
+/**
+ * El partido se jugó y la reserva está cerrada. Es lo único que el panel saca
+ * de la lista de tarjetas: desde el mostrador, un turno ya cerrado no es algo
+ * que haya que atender. Sigue contando en "Reservas hoy", porque jugarse no la
+ * borra del día.
+ */
+const ESTADO_CERRADO = "COMPLETADA";
 
 /** Cada cuánto se repregunta. El dueño deja el panel abierto en el mostrador. */
 const REFRESCO_MS = 10_000;
@@ -51,6 +60,11 @@ export default function OwnerDashboard() {
 
   const totalCanchas = complejos.reduce((acc, c) => acc + c.canchas.length, 0);
 
+  // Dos preguntas distintas sobre la MISMA respuesta: cuántas reservas hubo hoy
+  // (el contador) y qué falta cerrar (las tarjetas). Un segundo fetch para esto
+  // sería pedirle dos veces lo mismo al servidor para filtrar distinto.
+  const pendientesPorCompletar = reservasDeHoy.filter(r => r.estado !== ESTADO_CERRADO);
+
   return (
     <div className="p-6 lg:p-8">
       {/* Header */}
@@ -72,11 +86,11 @@ export default function OwnerDashboard() {
         <StatCard label="Reservas hoy" value={loading ? "—" : reservasDeHoy.length} icon="📅" />
       </div>
 
-      {/* Las reservas de hoy, repreguntadas cada REFRESCO_MS */}
-      {reservasDeHoy.length > 0 && (
+      {/* Lo que falta cerrar hoy, repreguntado cada REFRESCO_MS */}
+      {pendientesPorCompletar.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider">Reservas de hoy</h2>
+            <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider">Pendientes de completar</h2>
             <span className="text-xs text-grass-light flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-grass opacity-75"></span>
@@ -87,7 +101,7 @@ export default function OwnerDashboard() {
           </div>
           <div className="overflow-x-auto -mx-4 px-4">
             <div className="flex gap-3 min-w-max">
-              {reservasDeHoy.slice(0, TARJETAS_VISIBLES).map(r => (
+              {pendientesPorCompletar.slice(0, TARJETAS_VISIBLES).map(r => (
                 <div key={r.id} className="rounded-xl border border-grass/20 bg-field/10 px-4 py-3 min-w-[220px]">
                   <p className="text-sm font-semibold text-text">{r.cancha.nombre}</p>
                   <p className="text-xs text-text-dim">{r.cancha.complejo.nombre}</p>

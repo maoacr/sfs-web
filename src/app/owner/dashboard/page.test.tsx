@@ -69,7 +69,6 @@ describe("OwnerDashboard — las reservas de hoy son las de HOY", () => {
   it("cuenta lo que trajo el API, y muestra la reserva de hoy", async () => {
     montarCon([reserva()]);
 
-    expect(await screen.findByText(/reservas de hoy/i)).toBeInTheDocument();
     expect(await screen.findByText("1")).toBeInTheDocument();
     expect(await screen.findByText(/cancha 1/i)).toBeInTheDocument();
     expect(screen.getByText(/juan pérez/i)).toBeInTheDocument();
@@ -79,6 +78,47 @@ describe("OwnerDashboard — las reservas de hoy son las de HOY", () => {
     montarCon([]);
 
     await waitFor(() => expect(urlsConsultadas().length).toBeGreaterThan(1));
-    expect(screen.queryByText(/reservas de hoy/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pendientes de completar/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("OwnerDashboard — la sección lista lo que falta cerrar, no lo que ya se cerró", () => {
+  it("una reserva ya jugada no ocupa lugar en la lista", async () => {
+    montarCon([reserva({ estado: "COMPLETADA" })]);
+
+    await waitFor(() => expect(urlsConsultadas().length).toBeGreaterThan(1));
+    expect(screen.queryByText(/cancha 1/i)).not.toBeInTheDocument();
+  });
+
+  it("pero sí cuenta en 'Reservas hoy': jugarse no la borra del día", async () => {
+    montarCon([reserva({ estado: "COMPLETADA" })]);
+
+    expect(await screen.findByText("1")).toBeInTheDocument();
+  });
+
+  it("si todo lo de hoy ya se jugó, la sección no aparece", async () => {
+    montarCon([reserva({ estado: "COMPLETADA" }), reserva({ id: "r2", estado: "COMPLETADA" })]);
+
+    await waitFor(() => expect(urlsConsultadas().length).toBeGreaterThan(1));
+    expect(screen.queryByTitle(/pendientes/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pendientes de completar/i)).not.toBeInTheDocument();
+  });
+
+  it("lista la que falta cerrar aunque el turno ya haya pasado: es lo que hay que hacer", async () => {
+    montarCon([reserva({ estado: "CONFIRMADA", slotInicio: "2026-11-22T11:00:00.000Z" })]);
+
+    expect(await screen.findByText(/pendientes de completar/i)).toBeInTheDocument();
+    expect(screen.getByText(/cancha 1/i)).toBeInTheDocument();
+  });
+
+  it("conviven: cuenta dos en el día y lista sólo la que falta", async () => {
+    montarCon([
+      reserva({ id: "jugada", estado: "COMPLETADA" }),
+      reserva({ id: "por-jugar", estado: "PAGO_PARCIAL", cancha: { nombre: "Cancha 7", complejo: { nombre: "Norte", zonaHoraria: "America/Bogota" } } }),
+    ]);
+
+    expect(await screen.findByText("2")).toBeInTheDocument();
+    expect(screen.getByText(/cancha 7/i)).toBeInTheDocument();
+    expect(screen.queryByText(/cancha 1/i)).not.toBeInTheDocument();
   });
 });
