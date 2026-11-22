@@ -196,3 +196,22 @@ describe("sePuedeReintentarElPago — MP opina, pero la plata la sabemos nosotro
     }), AHORA)).toBe(true);
   });
 });
+
+describe("explicarPago — el consejo tiene que caber en el plazo del turno", () => {
+  it("ante 'llamá al banco' ofrece primero el camino rápido", () => {
+    const { mensaje, reintentable } = explicarPago(undefined, "cc_rejected_call_for_authorize");
+
+    // El turno se libera a los TTL_PAGO_MINUTOS. Mandar a llamar al banco como
+    // única salida es pedir algo que no cabe en ese plazo: pasar un menú,
+    // conseguir un humano y volver a pagar no entra en quince minutos.
+    expect(mensaje).toMatch(/otra tarjeta|otro medio/i);
+    expect(mensaje).toMatch(/minutos/i);
+    expect(reintentable).toBe(true);
+  });
+
+  it("sin dejar de decir que el banco tiene que autorizar", () => {
+    const { mensaje } = explicarPago(undefined, "cc_rejected_call_for_authorize");
+
+    expect(mensaje).toMatch(/banco/i);
+  });
+});

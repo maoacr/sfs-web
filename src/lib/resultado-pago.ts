@@ -49,7 +49,17 @@ const POR_DETALLE: Record<string, ExplicacionPago> = {
 
   // ─── Rechazos que piden otra tarjeta o hablar con el banco ───────────
   cc_rejected_insufficient_amount: { mensaje: "La tarjeta no tiene fondos suficientes. Probá con otra.", reintentable: true },
-  cc_rejected_call_for_authorize: { mensaje: "Tu banco tiene que autorizar este pago. Llamalos al número del dorso de la tarjeta y volvé a intentar.", reintentable: true },
+  // El consejo tiene que caber en el plazo del turno. Mandar a llamar al banco
+  // como ÚNICA salida es pedir algo que no entra en `TTL_PAGO_MINUTOS`: pasar
+  // un menú, conseguir un humano y volver a pagar no se hace en quince
+  // minutos, y mientras tanto el turno se libera. Así que primero va el camino
+  // rápido —otra tarjeta— y la llamada queda como alternativa, que es el mismo
+  // orden en que lo ofrece la pantalla de MercadoPago.
+  cc_rejected_call_for_authorize: {
+    mensaje:
+      "Tu banco tiene que autorizar este pago. Lo más rápido es usar otra tarjeta: el turno queda reservado sólo unos minutos. Si preferís, llamalos al número del dorso y volvé a intentar.",
+    reintentable: true,
+  },
   cc_rejected_card_disabled: { mensaje: "La tarjeta está inhabilitada. Llamá a tu banco para activarla o probá con otra.", reintentable: true },
   cc_rejected_invalid_installments: { mensaje: "Esa tarjeta no acepta esa cantidad de cuotas. Elegí otra opción.", reintentable: true },
   cc_rejected_card_error: { mensaje: "Hubo un problema con la tarjeta. Probá de nuevo o usá otra.", reintentable: true },
