@@ -5,6 +5,7 @@ import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
 import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago";
 import { ConfirmarCancelacion } from "@/components/confirmar-cancelacion";
+import { RegistrarCliente, type ClienteRegistrado } from "@/components/registrar-cliente";
 import { METODOS_DE_MOSTRADOR, requiereEntidad } from "@/lib/metodos-de-mostrador";
 import {
   sePuedeCobrar,
@@ -235,6 +236,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [entidad, setEntidad] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [registrando, setRegistrando] = useState(false);
 
   const huboPlata = cobro !== "NADA";
   const pideEntidad = huboPlata && requiereEntidad(metodo);
@@ -293,6 +295,24 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   const claseCampo = "mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
 
+  // Mientras se registra al cliente, el formulario de reserva se aparta: dos
+  // diálogos encimados dejan al teclado sin saber dónde está.
+  if (registrando) {
+    return (
+      <RegistrarCliente
+        nombreTipeado={clienteTexto}
+        onCerrar={() => setRegistrando(false)}
+        onRegistrado={(cliente: ClienteRegistrado) => {
+          setRegistrando(false);
+          // Queda elegido: la reserva se vincula a su cuenta como con
+          // cualquier cliente del sistema.
+          setElegido(cliente);
+          setSugerencias([]);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl" onClick={e => e.stopPropagation()}>
@@ -339,9 +359,16 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
             ) : elegido ? (
               <p className="mt-1 text-xs text-grass">Queda vinculada a su cuenta: la va a ver en su app.</p>
             ) : clienteTexto.trim().length >= 2 ? (
-              <p className="mt-1 text-xs text-warning">
-                No está registrado. La reserva se crea igual y queda anotada a su nombre.
-              </p>
+              <div className="mt-1">
+                <p className="text-xs text-warning">No está registrado.</p>
+                <button type="button" onClick={() => setRegistrando(true)}
+                  className="mt-1 text-xs font-semibold text-grass hover:text-grass-light">
+                  Registrar a esta persona
+                </button>
+                <p className="mt-1 text-xs text-text-dim">
+                  Con cuenta propia la reserva es suya, y lo que deba no te cae a vos.
+                </p>
+              </div>
             ) : null}
           </div>
           <div>
