@@ -4,10 +4,20 @@ name: Supabase keepalive
 # "user database activity". Los docs piden unas pocas queries por día:
 # https://supabase.com/docs/guides/platform/free-project-pausing
 #
-# Este workflow existe porque el cron de Vercel (/api/cron/liberar-expiradas)
-# sólo corre en deployments de producción. Mientras la app no esté deployada,
-# nada toca la base y el proyecto se pausa. Una vez deployado a producción,
-# ese cron ya genera actividad de sobra y este workflow se puede borrar.
+# Hay dos proyectos, y el riesgo no es el mismo en cada uno:
+#
+# - **producción** ya está deployada, así que el cron de Vercel
+#   (`/api/cron/liberar-expiradas`, diario) más el tráfico real generan
+#   actividad de sobra. Su ping quedó redundante; se mantiene como red de
+#   seguridad porque cuesta tres queries al día.
+# - **sfs-dev** no recibe tráfico: sólo lo toca `pnpm dev` cuando alguien está
+#   programando. Una semana sin tocar el proyecto y se pausa. Para esta base el
+#   workflow no es redundante — es lo único que la mantiene viva.
+#
+# Un job por entorno (matrix) y NO dos pasos en el mismo job, a propósito: con
+# `set -euo pipefail` un fallo en el primer paso aborta el job y el segundo
+# nunca corre. Dicho de otra forma, un problema en producción haría que dev se
+# pausara en silencio. Con `fail-fast: false` cada base se pingea por su cuenta.
 
 on:
   schedule:
@@ -18,21 +28,71 @@ on:
 
 jobs:
   ping:
+    name: Ping ${{ matrix.entorno }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `ref` es el project ref de Supabase, que viaja dentro del usuario
+          # de la connection string del pooler (`postgres.<ref>`). No es un
+          # secreto: aparece en la URL pública de la API del proyecto. Está acá
+          # para que el paso pueda verificar que el secret apunta a la base que
+          # dice apuntar.
+          - entorno: produccion
+            secreto: DATABASE_URL
+            ref: nbjnrpktkbrjapamdyvc
+          - entorno: sfs-dev
+            secreto: DATABASE_URL_DEV
+            ref: ivqlbqvhrhosfovkihkv
+
     steps:
       - name: Ping la base de datos
         env:
           # Usar la connection string del pooler de Supabase (Supavisor), no la
           # conexión directa: los runners de GitHub no tienen IPv6.
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets[matrix.secreto] }}
+          # El nombre del secret viaja aparte para poder nombrarlo en el error.
+          SECRETO: ${{ matrix.secreto }}
+          ENTORNO: ${{ matrix.entorno }}
+          REF: ${{ matrix.ref }}
         run: |
           set -euo pipefail
 
           if [ -z "${DATABASE_URL}" ]; then
-            echo "::error::Falta el secret DATABASE_URL en el repositorio."
+            echo "::error::Falta el secret ${SECRETO} en el repositorio."
             exit 1
           fi
+
+          # Decir a qué host se está conectando, porque la guarda de arriba
+          # sólo detecta un secret VACÍO — no uno cargado con la cadena
+          # equivocada. Pasó: `DATABASE_URL_DEV` apuntaba a producción, los dos
+          # jobs daban verde y sfs-dev se iba a pausar igual, en silencio.
+          #
+          # Las regiones distinguen los entornos: producción es us-east-1,
+          # sfs-dev es us-east-2.
+          #
+          # `##*@` corta en el ÚLTIMO arroba, así que una contraseña que
+          # contenga uno no mueve el host; `%%/*` saca la base. Nunca imprime
+          # la cadena completa: lleva la contraseña.
+          destino="${DATABASE_URL##*@}"
+          destino="${destino%%/*}"
+          echo "Entorno declarado: ${ENTORNO} — host: ${destino}"
+
+          # Y además FALLAR si el secret no apunta al proyecto que debería.
+          # Imprimir el host no alcanza: esto corre solo tres veces al día y
+          # nadie lee los logs de un job verde. Sin esta guarda, un secret
+          # cargado con la cadena del otro entorno deja la base sin pingear
+          # durante los 7 días que tarda Supabase en pausarla.
+          case "${DATABASE_URL}" in
+            *"${REF}"*) ;;
+            *)
+              echo "::error::${SECRETO} no apunta al proyecto ${REF} (${ENTORNO}). Revisá el valor del secret."
+              exit 1
+              ;;
+          esac
 
           # Lectura trivial sobre una tabla real: cuenta como query de usuario
           # y no modifica nada.
