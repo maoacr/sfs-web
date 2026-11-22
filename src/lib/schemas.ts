@@ -254,15 +254,16 @@ export const createReservaSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato YYYY-MM-DD requerido"),
   hora: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido"),
   playerId: z.string().uuid("El jugador debe estar inscrito en el sistema").optional(),
-  // Nombre de quien juega cuando no tiene cuenta. No bloquea la reserva: la
-  // deja anotada para saber de quién era.
-  invitadoNombre: z.string().min(2).max(120).optional(),
   // Sólo las usa el dueño al agendar en el mostrador: cuánto cobró y cómo.
   // Sin `montoPagado` se asume que cobró todo.
   montoPagado: z.number().nonnegative().optional(),
   metodo: metodoPagoValues.optional(),
   entidad: z.string().max(60).optional(),
-});
+})
+  // `.strict()` para que `invitadoNombre` —el camino viejo— NO se ignore en
+  // silencio. Un campo descartado sin aviso deja a quien lo manda creyendo
+  // que anotó algo, que es exactamente cómo este camino sobreviviría.
+  .strict();
 
 export const cambiarEstadoReservaSchema = z.object({
   estado: z.enum(["CANCELADA", "COMPLETADA"], { message: "Estado inválido" }),

@@ -154,12 +154,15 @@ describe("OwnerReservas — cliente de una reserva manual", () => {
     expect(screen.getByText(/va a ver en su app/i)).toBeInTheDocument();
   });
 
-  it("avisa cuando la persona no está registrada, sin bloquear", async () => {
+  it("sin cliente del sistema no deja crear: la reserva necesita un titular", async () => {
     montarModal([]);
     fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Pedro Nuevo" } });
 
     expect(await screen.findByText(/no está registrado/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
+    // El camino es registrarlo, no agendar a nombre del dueño: esa deuda le
+    // caía a él y lo bloqueaba para agendar.
+    expect(screen.getByRole("button", { name: /crear/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /registrar a esta persona/i })).toBeInTheDocument();
   });
 
   it("manda playerId cuando se eligió a alguien del sistema", async () => {
@@ -176,35 +179,42 @@ describe("OwnerReservas — cliente de una reserva manual", () => {
     expect(cuerpo.invitadoNombre).toBeUndefined();
   });
 
-  it("manda invitadoNombre cuando no está en el sistema", async () => {
+  it("nunca manda invitadoNombre: ese camino dejaba la deuda en el dueño", async () => {
     montarModal([]);
     await elegirCancha();
     fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Pedro Nuevo" } });
     fireEvent.click(screen.getByRole("button", { name: /crear/i }));
 
-    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
-    const [, opciones] = apiFetch.mock.calls[0] as unknown as [string, { body: string }];
-    const cuerpo = JSON.parse(opciones.body);
-    expect(cuerpo.invitadoNombre).toBe("Pedro Nuevo");
-    expect(cuerpo.playerId).toBeUndefined();
+    await waitFor(() => expect(apiFetch).not.toHaveBeenCalled());
   });
 });
 
 describe("OwnerReservas — cómo se cobró la reserva manual", () => {
   const CANCHA_OPT = { id: "cancha-1", nombre: "Cancha 1", tipo: "FUTBOL_5" };
 
+  const CLIENTE_AL_DIA = {
+    id: "cliente-1", primerNombre: "Ana", apellidos: "Gómez",
+    telefono: null, saldoPendiente: 0,
+  };
+
   function montarModal() {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
       ok: true,
-      json: async () => (url.includes("/api/canchas") ? [CANCHA_OPT] : []),
+      json: async () =>
+        url.includes("/api/clientes") ? [CLIENTE_AL_DIA] : url.includes("/api/canchas") ? [CANCHA_OPT] : [],
     })));
     render(<OwnerReservas />);
     fireEvent.click(screen.getByRole("button", { name: /\+ Nueva/i }));
   }
 
-  async function crearPara(cliente: string) {
+  /**
+   * Agenda eligiendo a un cliente del sistema. Hace falta elegirlo: desde que
+   * se retiró el camino del invitado, una reserva sin titular no se crea.
+   */
+  async function crearEligiendoCliente() {
     fireEvent.change(await screen.findByLabelText(/^cancha$/i), { target: { value: "cancha-1" } });
-    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: cliente } });
+    fireEvent.change(screen.getByLabelText(/^cliente/i), { target: { value: "ana" } });
+    fireEvent.click(await screen.findByRole("button", { name: /ana gómez/i }));
     fireEvent.click(screen.getByRole("button", { name: /crear/i }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     const [, opciones] = apiFetch.mock.calls[0] as unknown as [string, { body: string }];
@@ -214,7 +224,7 @@ describe("OwnerReservas — cómo se cobró la reserva manual", () => {
   it("por defecto cobra todo en efectivo: es exactamente lo que hacía antes", async () => {
     montarModal();
 
-    const cuerpo = await crearPara("Pedro Nuevo");
+    const cuerpo = await crearEligiendoCliente();
 
     expect(cuerpo.metodo).toBe("EFECTIVO");
     // Sin montoPagado el servidor asume el total, que es el precio que él
@@ -227,7 +237,7 @@ describe("OwnerReservas — cómo se cobró la reserva manual", () => {
     fireEvent.change(await screen.findByLabelText(/método/i), { target: { value: "TRANSFERENCIA" } });
     fireEvent.change(screen.getByLabelText(/entidad/i), { target: { value: "Nequi" } });
 
-    const cuerpo = await crearPara("Pedro Nuevo");
+    const cuerpo = await crearEligiendoCliente();
 
     expect(cuerpo.metodo).toBe("TRANSFERENCIA");
     expect(cuerpo.entidad).toBe("Nequi");
@@ -245,7 +255,7 @@ describe("OwnerReservas — cómo se cobró la reserva manual", () => {
     fireEvent.change(await screen.findByLabelText(/^cobro$/i), { target: { value: "ABONO" } });
     fireEvent.change(screen.getByLabelText(/monto/i), { target: { value: "80000" } });
 
-    const cuerpo = await crearPara("Pedro Nuevo");
+    const cuerpo = await crearEligiendoCliente();
 
     expect(cuerpo.montoPagado).toBe(80000);
     expect(cuerpo.metodo).toBe("EFECTIVO");
@@ -255,7 +265,7 @@ describe("OwnerReservas — cómo se cobró la reserva manual", () => {
     montarModal();
     fireEvent.change(await screen.findByLabelText(/^cobro$/i), { target: { value: "NADA" } });
 
-    const cuerpo = await crearPara("Pedro Nuevo");
+    const cuerpo = await crearEligiendoCliente();
 
     expect(cuerpo.montoPagado).toBe(0);
     expect(cuerpo.metodo).toBeUndefined();
@@ -327,21 +337,23 @@ describe("OwnerReservas — saldo pendiente del cliente, antes de llenar el form
     expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
   });
 
-  it("al invitado sin cuenta no lo bloquea: su deuda no existe en el sistema", async () => {
+  it("a quien no está en el sistema no se le inventa un saldo", async () => {
     montarModal([]);
     fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Pedro Nuevo" } });
 
     expect(await screen.findByText(/no está registrado/i)).toBeInTheDocument();
+    // No tiene cuenta, así que no puede deber nada. Que no se pueda agendar es
+    // por falta de titular, no por saldo, y lo cubre otro test.
     expect(screen.queryByText(/saldo pendiente/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
   });
 
-  it("si se borra al deudor elegido, se levanta el bloqueo", async () => {
+  it("si se borra al deudor elegido, el aviso de saldo se va solo", async () => {
     await elegir([DEUDOR]);
     fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Otro" } });
 
+    // El bloqueo por saldo es derivado del cliente elegido, no estado propio:
+    // deseleccionarlo lo levanta sin que nadie lo resetee.
     expect(screen.queryByText(/saldo pendiente/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
   });
 
   it("ni siquiera intenta el POST con un deudor elegido", async () => {
