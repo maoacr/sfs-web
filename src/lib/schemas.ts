@@ -49,6 +49,50 @@ export const restablecerSchema = z.object({
   password: passwordSchema,
 });
 
+/**
+ * Cliente que el dueño registra desde el mostrador.
+ *
+ * Es `registerSchema` menos lo que en un mostrador no se puede pedir:
+ *
+ * - **Sin `password`.** La persona no eligió ninguna, y si el dueño inventara
+ *   una estaría creando una credencial válida sobre la cuenta de otro. La
+ *   cuenta nace sin contraseña y se reclama entrando con Google, que es para
+ *   lo que `usuarios.password_hash` es nullable.
+ * - **Sin `role`.** Un cliente es siempre `PLAYER`; dejarlo en el body sería
+ *   un camino para que un dueño fabrique dueños.
+ * - **`email` opcional.** Mucha gente da el nombre y a lo sumo el teléfono.
+ *   Un campo obligatorio que no se puede llenar no produce datos, produce
+ *   basura — y en una columna única la basura explota en el segundo uso.
+ *
+ * `primerNombre` y `apellidos` siguen siendo obligatorios porque las columnas
+ * son NOT NULL, y porque sin nombre la reserva no se puede ni leer.
+ */
+export const crearClienteSchema = z.object({
+  primerNombre: z.string().min(1, "Nombre requerido").max(50),
+  segundoNombre: z.string().max(50).optional(),
+  apellidos: z.string().min(1, "Apellidos requeridos").max(100),
+  // El email es lo que después le permite reclamar la cuenta con Google, así
+  // que si viene tiene que ser válido de verdad. Vacío se trata como ausente.
+  //
+  // El `.trim()` va ANTES del `.email()` y no es cosmético: en un mostrador se
+  // tipea apurado y se pega desde cualquier lado, y " juan@gmail.com " no pasa
+  // la validación de email. Rechazarlo por un espacio sería culpar a la
+  // persona de algo que podemos arreglar solos.
+  email: z.string().trim().email("Email inválido").max(255).optional(),
+  telefono: z.string().max(15).optional(),
+  codigoPais: z.string().max(5).default("+57"),
+  apodo: z
+    .string()
+    .min(3, "El apodo debe tener al menos 3 caracteres")
+    .max(30)
+    .regex(/^[a-zA-Z0-9]+$/, "Solo letras y números")
+    .optional(),
+  instagram: z.string().max(30).optional(),
+  tiktok: z.string().max(30).optional(),
+  twitter: z.string().max(30).optional(),
+  facebook: z.string().max(50).optional(),
+});
+
 export const registerSchema = z.object({
   email: z.string().email("Email inválido").max(255),
   password: passwordSchema,
@@ -319,6 +363,7 @@ export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;
 export type RecuperarInput = z.infer<typeof recuperarSchema>;
 export type RestablecerInput = z.infer<typeof restablecerSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type CrearClienteInput = z.infer<typeof crearClienteSchema>;
 export type CreateCanchaInput = z.infer<typeof createCanchaSchema>;
 export type UpdateCanchaInput = z.infer<typeof updateCanchaSchema>;
 export type CreateComplejoInput = z.infer<typeof createComplejoSchema>;
