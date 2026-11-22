@@ -277,3 +277,77 @@ describe("OwnerReservas — cómo se cobró la reserva manual", () => {
     expect(screen.getByText(/queda debiendo/i)).toBeInTheDocument();
   });
 });
+
+describe("OwnerReservas — saldo pendiente del cliente, antes de llenar el formulario", () => {
+  const CANCHA_OPT = { id: "cancha-1", nombre: "Cancha 1", tipo: "FUTBOL_5" };
+  const DEUDOR = {
+    id: "cliente-1", primerNombre: "Ana", apellidos: "Gómez",
+    telefono: "3009999999", saldoPendiente: 50000,
+  };
+  const AL_DIA = { ...DEUDOR, saldoPendiente: 0 };
+
+  function montarModal(clientes: unknown[]) {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes("/api/clientes") ? clientes : url.includes("/api/canchas") ? [CANCHA_OPT] : [],
+    })));
+    render(<OwnerReservas />);
+    fireEvent.click(screen.getByRole("button", { name: /\+ Nueva/i }));
+  }
+
+  async function elegir(clientes: unknown[]) {
+    montarModal(clientes);
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "ana" } });
+    fireEvent.click(await screen.findByRole("button", { name: /ana gómez/i }));
+  }
+
+  it("avisa del saldo al elegir al cliente, no después de mandar el formulario", async () => {
+    await elegir([DEUDOR]);
+
+    expect(screen.getByText(/saldo pendiente/i)).toBeInTheDocument();
+  });
+
+  it("dice cuánto debe: 'tiene saldo' no le sirve a nadie en el mostrador", async () => {
+    await elegir([DEUDOR]);
+
+    expect(screen.getByText(/50\.000/)).toBeInTheDocument();
+  });
+
+  it("no deja agendarle: la regla es que deber bloquea", async () => {
+    await elegir([DEUDOR]);
+
+    expect(screen.getByRole("button", { name: /crear/i })).toBeDisabled();
+  });
+
+  it("al cliente al día no le dice nada y lo deja agendar", async () => {
+    await elegir([AL_DIA]);
+
+    expect(screen.queryByText(/saldo pendiente/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
+  });
+
+  it("al invitado sin cuenta no lo bloquea: su deuda no existe en el sistema", async () => {
+    montarModal([]);
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Pedro Nuevo" } });
+
+    expect(await screen.findByText(/no está registrado/i)).toBeInTheDocument();
+    expect(screen.queryByText(/saldo pendiente/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
+  });
+
+  it("si se borra al deudor elegido, se levanta el bloqueo", async () => {
+    await elegir([DEUDOR]);
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: "Otro" } });
+
+    expect(screen.queryByText(/saldo pendiente/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /crear/i })).not.toBeDisabled();
+  });
+
+  it("ni siquiera intenta el POST con un deudor elegido", async () => {
+    await elegir([DEUDOR]);
+    fireEvent.click(screen.getByRole("button", { name: /crear/i }));
+
+    await waitFor(() => expect(apiFetch).not.toHaveBeenCalled());
+  });
+});

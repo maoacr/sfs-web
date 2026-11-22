@@ -3,6 +3,7 @@ import { db, reservas, usuarios } from "@sfs/db";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { toApiUsuario } from "@/lib/db-mappers";
+import { saldosPendientesDe } from "@/lib/saldo";
 
 /**
  * GET /api/clientes?q=juan
@@ -18,6 +19,12 @@ import { toApiUsuario } from "@/lib/db-mappers";
  *
  * La contracara es que un cliente nuevo no aparece acá, y está bien: para ese
  * caso existe `invitadoNombre`, que deja la reserva anotada sin bloquear nada.
+ *
+ * Cada cliente viaja con su `saldoPendiente` porque deber bloquea reservar, y
+ * el mostrador necesita saberlo AL ELEGIR a la persona. Sin esto el dueño se
+ * entera recién cuando manda el formulario entero y come un 403, con la cancha,
+ * la hora y el cobro ya elegidos. El 403 sigue existiendo: esto es el aviso
+ * temprano, no la defensa.
  */
 export const GET = apiHandler(
   async (request, ctx) => {
@@ -52,7 +59,18 @@ export const GET = apiHandler(
       )
       .limit(10);
 
-    return NextResponse.json(filas.map(toApiUsuario));
+    // El saldo se pregunta por el lote completo: una consulta para los diez
+    // resultados, no una por cliente.
+    const saldos = await saldosPendientesDe(filas.map((fila) => fila.id));
+
+    return NextResponse.json(
+      filas.map((fila) => ({
+        ...toApiUsuario(fila),
+        // Quien no debe nada no viene en el Map. Mandar 0 explícito le ahorra
+        // a la UI tener que distinguir "no debe" de "no sé".
+        saldoPendiente: saldos.get(fila.id) ?? 0,
+      }))
+    );
   },
   { requireAuth: true, requiredRole: "OWNER" }
 );
