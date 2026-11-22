@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { METODOS_DE_MOSTRADOR, requiereEntidad } from "@/lib/metodos-de-mostrador";
+import { seOfreceCerrarAlCobrar } from "@/lib/acciones-de-reserva";
 
 export interface ReservaACobrar {
   id: string;
   saldoPendiente: number;
   titular: string;
+  /** Hace falta para saber si además hay que ofrecer cerrar el turno. */
+  estado: string;
 }
 
-const fPrecio = (n: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
+const formatearPrecio = (monto: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
 
 export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
   reserva: ReservaACobrar;
@@ -23,8 +26,14 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
   const [entidad, setEntidad] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // Arranca sin marcar a propósito. El cobro también pasa ANTES del partido
+  // —el jugador llega y completa—, así que darlo por cerrado por default
+  // escribiría un hecho que nadie afirmó.
+  const [yaTermino, setYaTermino] = useState(false);
 
   const pideEntidad = requiereEntidad(metodo);
+  const ofreceCerrar = seOfreceCerrarAlCobrar(reserva);
+  const saldoQueQueda = reserva.saldoPendiente - monto;
 
   async function registrar() {
     setError(null);
@@ -35,7 +44,7 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
       return setError("El monto tiene que ser mayor a cero.");
     }
     if (monto > reserva.saldoPendiente) {
-      return setError(`No podés cobrar más que el saldo pendiente (${fPrecio(reserva.saldoPendiente)}).`);
+      return setError(`No podés cobrar más que el saldo pendiente (${formatearPrecio(reserva.saldoPendiente)}).`);
     }
 
     setEnviando(true);
@@ -54,6 +63,29 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
     if (!res.ok) {
       return setError(data?.error ?? "No pudimos registrar el cobro. Intentá de nuevo.");
     }
+
+    // La plata se registra PRIMERO y el cierre después, nunca al revés: si
+    // este segundo paso falla, el cobro ya quedó asentado y lo único que falta
+    // es volver a marcar el partido. Al revés habría un partido cerrado con
+    // plata que nunca se registró.
+    if (ofreceCerrar && yaTermino) {
+      setEnviando(true);
+      const cierre = await apiFetch(`/api/reservas/${reserva.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "COMPLETADA" }),
+      });
+      setEnviando(false);
+
+      if (!cierre.ok) {
+        const detalle = await cierre.json().catch(() => null);
+        return setError(
+          detalle?.error ??
+            "Cobramos el saldo, pero no pudimos cerrar el turno. Marcalo como jugado desde la lista."
+        );
+      }
+    }
+
     onRegistrado();
   }
 
@@ -65,7 +97,7 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
         className="w-full max-w-md rounded-t-2xl border border-border bg-bg p-5 sm:rounded-2xl">
         <h2 id="titulo-cobro" className="text-lg font-bold text-text">Registrar pago</h2>
         <p className="mt-1 text-sm text-text-muted">
-          {reserva.titular} · debe {fPrecio(reserva.saldoPendiente)}
+          {reserva.titular} · debe {formatearPrecio(reserva.saldoPendiente)}
         </p>
 
         {error && (
@@ -101,6 +133,29 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
             </div>
           )}
         </div>
+
+        {ofreceCerrar && (
+          <div className="mt-4 rounded-xl border border-border bg-surface p-3">
+            <label htmlFor="ya-termino" className="flex items-start gap-2.5 text-sm text-text">
+              <input id="ya-termino" type="checkbox" checked={yaTermino}
+                onChange={e => setYaTermino(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-grass" />
+              <span>
+                Ya terminó el partido
+                <span className="mt-0.5 block text-xs text-text-dim">
+                  Lo marca como jugado además de registrar el cobro.
+                </span>
+              </span>
+            </label>
+
+            {yaTermino && saldoQueQueda > 0 && (
+              <p className="mt-2 text-xs text-warning">
+                Queda jugado y debiendo {formatearPrecio(saldoQueQueda)}. Esa deuda sigue en
+                cuentas por cobrar y le bloquea reservar.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-6 flex gap-2">
           <button onClick={onCerrar} type="button"

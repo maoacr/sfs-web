@@ -5,7 +5,7 @@ import { RegistrarPago } from "@/components/registrar-pago";
 const apiFetch = vi.fn();
 vi.mock("@/lib/api-client", () => ({ apiFetch: (...a: unknown[]) => apiFetch(...(a as [])) }));
 
-const RESERVA = { id: "reserva-1", saldoPendiente: 80000, titular: "Juan Pérez" };
+const RESERVA = { id: "reserva-1", saldoPendiente: 80000, titular: "Juan Pérez", estado: "PAGO_PARCIAL" };
 
 function montar(over: Partial<typeof RESERVA> = {}) {
   const onRegistrado = vi.fn();
@@ -123,5 +123,69 @@ describe("RegistrarPago", () => {
   it("dice de quién es la deuda que se está cobrando", () => {
     montar();
     expect(screen.getByText(/juan pérez/i)).toBeInTheDocument();
+  });
+});
+
+describe("RegistrarPago — cobrar y cerrar el turno en un gesto", () => {
+  const marcarJugada = () => screen.getByLabelText(/ya terminó el partido/i);
+
+  it("ofrece cerrar el turno: cobrar y terminar son el mismo momento real", () => {
+    montar();
+
+    expect(marcarJugada()).toBeInTheDocument();
+  });
+
+  it("sobre una COMPLETADA no lo ofrece: ya está cerrada", () => {
+    montar({ estado: "COMPLETADA" });
+
+    expect(screen.queryByLabelText(/ya terminó el partido/i)).not.toBeInTheDocument();
+  });
+
+  it("arranca SIN marcar: el dueño declara el hecho, no lo asume un default", async () => {
+    montar();
+    expect(marcarJugada()).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: /registrar pago/i }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(1));
+    expect(apiFetch.mock.calls[0][0]).toContain("/confirmar-pago");
+  });
+
+  it("al marcarlo, cierra el turno además de cobrar", async () => {
+    montar();
+    fireEvent.click(marcarJugada());
+    fireEvent.click(screen.getByRole("button", { name: /registrar pago/i }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(2));
+    const [rutaCierre, opciones] = apiFetch.mock.calls[1] as unknown as [string, { body: string }];
+    expect(rutaCierre).toBe("/api/reservas/reserva-1");
+    expect(JSON.parse(opciones.body)).toEqual({ estado: "COMPLETADA" });
+  });
+
+  it("la plata se registra PRIMERO: si falla el cierre, el cobro ya quedó", async () => {
+    montar();
+    fireEvent.click(marcarJugada());
+    fireEvent.click(screen.getByRole("button", { name: /registrar pago/i }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(2));
+    expect(apiFetch.mock.calls[0][0]).toContain("/confirmar-pago");
+  });
+
+  it("si el cobro falla, el partido NO se marca jugado", async () => {
+    apiFetch.mockResolvedValue({ ok: false, json: async () => ({ error: "No se puede cobrar una reserva cancelada" }) });
+    montar();
+    fireEvent.click(marcarJugada());
+    fireEvent.click(screen.getByRole("button", { name: /registrar pago/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("avisa que un cobro parcial deja el partido jugado y debiendo", async () => {
+    montar();
+    fireEvent.change(screen.getByLabelText(/monto recibido/i), { target: { value: "30000" } });
+    fireEvent.click(marcarJugada());
+
+    expect(screen.getByText(/queda.*debiendo/i)).toBeInTheDocument();
   });
 });

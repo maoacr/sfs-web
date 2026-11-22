@@ -131,6 +131,7 @@ export default function OwnerCobros() {
                     id: d.id,
                     saldoPendiente: Number(d.saldoPendiente),
                     titular: nombreDe(d.player),
+                    estado: d.estado,
                   })}
                   className="mt-4 min-h-11 w-full rounded-xl bg-grass px-4 text-sm font-semibold text-white hover:bg-grass-light sm:w-auto">
                   Registrar pago
