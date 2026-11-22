@@ -110,3 +110,90 @@ describe("RegistrarCliente", () => {
     expect(screen.getByLabelText(/instagram/i)).toBeInTheDocument();
   });
 });
+
+describe("RegistrarCliente — el email ya tiene cuenta", () => {
+  const CONFLICTO = {
+    ok: false,
+    json: async () => ({
+      error: "Ese email ya tiene una cuenta en SFS.",
+      clienteExistente: { id: "ya-existe", primerNombre: "Pedro", saldoPendiente: 0 },
+    }),
+  };
+
+  async function chocarConCuentaExistente() {
+    apiFetch.mockResolvedValue(CONFLICTO);
+    const handlers = montar("Pedro Gómez");
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "pedro@gmail.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /^registrar$/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    return handlers;
+  }
+
+  it("ofrece usar esa cuenta en vez de dejar un error muerto", async () => {
+    await chocarConCuentaExistente();
+
+    expect(screen.getByRole("button", { name: /usar esa cuenta/i })).toBeInTheDocument();
+  });
+
+  it("muestra el email y el primer nombre, para confirmar que es quien está enfrente", async () => {
+    await chocarConCuentaExistente();
+
+    const aviso = screen.getByRole("alert");
+    expect(aviso).toHaveTextContent(/pedro/i);
+    expect(aviso).toHaveTextContent(/pedro@gmail\.com/);
+  });
+
+  it("al aceptar, la reserva se vincula a ESA cuenta y no se crea una segunda", async () => {
+    const { onRegistrado } = await chocarConCuentaExistente();
+
+    fireEvent.click(screen.getByRole("button", { name: /usar esa cuenta/i }));
+
+    expect(onRegistrado).toHaveBeenCalledTimes(1);
+    expect(onRegistrado.mock.calls[0][0]).toMatchObject({ id: "ya-existe", primerNombre: "Pedro" });
+    // Un solo POST: el del intento que chocó. No se insiste ni se duplica.
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("si esa cuenta debe plata, lo dice antes de vincularla", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        error: "Ese email ya tiene una cuenta en SFS.",
+        clienteExistente: { id: "ya-existe", primerNombre: "Pedro", saldoPendiente: 40000 },
+      }),
+    });
+    montar("Pedro Gómez");
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "pedro@gmail.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /^registrar$/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/40\.000/));
+  });
+
+  it("y el saldo viaja al modal, que es quien bloquea la reserva", async () => {
+    apiFetch.mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        error: "Ese email ya tiene una cuenta en SFS.",
+        clienteExistente: { id: "ya-existe", primerNombre: "Pedro", saldoPendiente: 40000 },
+      }),
+    });
+    const { onRegistrado } = montar("Pedro Gómez");
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "pedro@gmail.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /^registrar$/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /usar esa cuenta/i }));
+
+    expect(onRegistrado.mock.calls[0][0].saldoPendiente).toBe(40000);
+  });
+
+  it("un error común sigue siendo un error, sin ofrecer cuentas", async () => {
+    apiFetch.mockResolvedValue({ ok: false, json: async () => ({ error: "Apodo inválido" }) });
+    montar("Pedro Gómez");
+
+    fireEvent.click(screen.getByRole("button", { name: /^registrar$/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/apodo inválido/i));
+    expect(screen.queryByRole("button", { name: /usar esa cuenta/i })).not.toBeInTheDocument();
+  });
+});

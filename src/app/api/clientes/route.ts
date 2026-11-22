@@ -106,16 +106,32 @@ export const POST = apiHandler<CrearClienteInput>(
     if (email) {
       const yaRegistrado = await db.query.usuarios.findFirst({
         where: eq(usuarios.email, email),
-        columns: { id: true },
+        columns: { id: true, nombre: true },
       });
 
-      // No se pisa la cuenta de otro ni se dice de quién es. El dueño tipeó ese
-      // email, así que confirmarle que existe no le revela nada que no sepa.
+      // No se crea una segunda cuenta para la misma persona —eso partiría su
+      // historial Y su saldo, y la regla del bloqueo contaría de menos— pero
+      // tampoco se deja al mostrador sin salida: se ofrece ESA cuenta para
+      // vincular la reserva.
+      //
+      // Del titular sólo viaja el PRIMER NOMBRE, y es deliberado: alcanza para
+      // que el dueño confirme que es la persona que tiene enfrente, y no le
+      // entrega la ficha de alguien que nunca pisó su cancha. El apellido y el
+      // teléfono se quedan acá.
       if (yaRegistrado) {
+        // El saldo se manda junto: si esa cuenta debe, el bloqueo va a cortar
+        // la reserva igual, y enterarse ahora es mejor que al mandar el
+        // formulario entero.
+        const saldos = await saldosPendientesDe([yaRegistrado.id]);
+
         return NextResponse.json(
           {
-            error:
-              "Ese email ya tiene una cuenta en SFS. Buscalo por nombre, o registralo sin email y agregáselo después.",
+            error: "Ese email ya tiene una cuenta en SFS.",
+            clienteExistente: {
+              id: yaRegistrado.id,
+              primerNombre: yaRegistrado.nombre.split(" ")[0],
+              saldoPendiente: saldos.get(yaRegistrado.id) ?? 0,
+            },
           },
           { status: 409 }
         );

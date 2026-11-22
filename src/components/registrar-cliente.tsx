@@ -3,12 +3,26 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 
-/** Lo que el modal de reserva necesita del cliente recién creado. */
+const formatearPrecio = (monto: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
+
+/** Lo que el modal de reserva necesita del cliente, creado o vinculado. */
 export interface ClienteRegistrado {
   id: string;
   primerNombre: string;
   apellidos: string;
   telefono: string | null;
+  saldoPendiente: number;
+}
+
+/**
+ * La cuenta que ya existía con ese email. Del titular sólo llega el primer
+ * nombre: alcanza para confirmar que es quien está enfrente, y no entrega la
+ * ficha de alguien que nunca pisó la cancha.
+ */
+interface CuentaExistente {
+  id: string;
+  primerNombre: string;
   saldoPendiente: number;
 }
 
@@ -43,6 +57,9 @@ export function RegistrarCliente({ nombreTipeado, onCerrar, onRegistrado }: {
   const [verMas, setVerMas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // Cuando el email ya tiene cuenta, el camino NO es crear una segunda —eso
+  // partiría el historial y el saldo de la misma persona— sino vincular esa.
+  const [cuentaExistente, setCuentaExistente] = useState<CuentaExistente | null>(null);
 
   async function registrar() {
     setError(null);
@@ -72,6 +89,11 @@ export function RegistrarCliente({ nombreTipeado, onCerrar, onRegistrado }: {
     setEnviando(false);
 
     if (!res.ok) {
+      // El 409 del email repetido no es un error muerto: trae la cuenta que ya
+      // existe para poder usarla.
+      if (data?.clienteExistente) {
+        setCuentaExistente(data.clienteExistente as CuentaExistente);
+      }
       return setError(data?.error ?? "No pudimos registrar al cliente. Intentá de nuevo.");
     }
     onRegistrado(data as ClienteRegistrado);
@@ -91,9 +113,41 @@ export function RegistrarCliente({ nombreTipeado, onCerrar, onRegistrado }: {
         </p>
 
         {error && (
-          <p role="alert" className="mt-4 rounded-xl border border-error/30 bg-error/10 p-3 text-sm text-text">
-            {error}
-          </p>
+          <div role="alert" className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-text">
+            <p>{error}</p>
+
+            {cuentaExistente && (
+              <>
+                <p className="mt-2 text-text-muted">
+                  Es la cuenta de <strong className="text-text">{cuentaExistente.primerNombre}</strong>,
+                  con el email {email.trim()}. Si es la persona que tenés enfrente, agendale a
+                  esa cuenta: así la reserva le queda en su historial en vez de crear una
+                  segunda cuenta para la misma persona.
+                </p>
+
+                {cuentaExistente.saldoPendiente > 0 && (
+                  <p className="mt-2 text-error">
+                    Ojo: esa cuenta debe {formatearPrecio(cuentaExistente.saldoPendiente)}, así que
+                    no vas a poder agendarle hasta que pague o registres el cobro.
+                  </p>
+                )}
+
+                <button type="button"
+                  onClick={() => onRegistrado({
+                    id: cuentaExistente.id,
+                    primerNombre: cuentaExistente.primerNombre,
+                    // El apellido y el teléfono no viajan a propósito. Se
+                    // completan solos la primera vez que la persona entre.
+                    apellidos: "",
+                    telefono: null,
+                    saldoPendiente: cuentaExistente.saldoPendiente,
+                  })}
+                  className="mt-3 min-h-11 w-full rounded-xl bg-grass px-4 text-sm font-semibold text-white hover:bg-grass-light">
+                  Usar esa cuenta
+                </button>
+              </>
+            )}
+          </div>
         )}
 
         <div className="mt-4 space-y-3">
@@ -115,7 +169,8 @@ export function RegistrarCliente({ nombreTipeado, onCerrar, onRegistrado }: {
               Email <span className="font-normal text-text-dim">(opcional)</span>
             </label>
             <input id="cliente-email" type="email" inputMode="email" value={email}
-              onChange={e => setEmail(e.target.value)} className={campo}
+              onChange={e => { setEmail(e.target.value); setCuentaExistente(null); setError(null); }}
+              className={campo}
               placeholder="para que pueda reclamar su cuenta" />
             <p className="mt-1 text-xs text-text-dim">
               Si lo dejás, el día que entre con Google el sistema lo reconoce y le entrega

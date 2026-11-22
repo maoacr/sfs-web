@@ -189,12 +189,55 @@ describe("POST /api/clientes — registro rápido desde el mostrador", () => {
   });
 
   it("un email ya registrado no se pisa: la cuenta de otro no se toca", async () => {
-    mocks.usuarioFindFirst.mockResolvedValue({ id: "ya-existe" });
+    mocks.usuarioFindFirst.mockResolvedValue({ id: "ya-existe", nombre: "Pedro Luis" });
 
     const respuesta = await POST(alta({ ...MINIMO, email: "pedro@gmail.com" }));
 
     expect(respuesta.status).toBe(409);
     expect(mocks.insertado).not.toHaveBeenCalled();
+  });
+
+  it("y ofrece esa cuenta para vincular, en vez de dejar al mostrador sin salida", async () => {
+    mocks.usuarioFindFirst.mockResolvedValue({ id: "ya-existe", nombre: "Pedro Luis" });
+
+    const respuesta = await POST(alta({ ...MINIMO, email: "pedro@gmail.com" }));
+    const cuerpo = await respuesta.json();
+
+    expect(cuerpo.clienteExistente).toMatchObject({ id: "ya-existe" });
+  });
+
+  it("del titular existente sólo dice el primer nombre, nada más", async () => {
+    mocks.usuarioFindFirst.mockResolvedValue({
+      id: "ya-existe", nombre: "Pedro Luis", apellido: "Ramírez", telefono: "3001112233",
+    });
+
+    const respuesta = await POST(alta({ ...MINIMO, email: "pedro@gmail.com" }));
+    const { clienteExistente } = await respuesta.json();
+
+    expect(clienteExistente.primerNombre).toBe("Pedro");
+    // Apellido y teléfono NO viajan: el dueño tipeó un email, no se ganó la
+    // ficha completa de una persona que nunca pisó su cancha.
+    expect(clienteExistente.apellidos).toBeUndefined();
+    expect(clienteExistente.telefono).toBeUndefined();
+  });
+
+  it("avisa si esa cuenta debe plata, que es lo que va a bloquear la reserva", async () => {
+    mocks.usuarioFindFirst.mockResolvedValue({ id: "ya-existe", nombre: "Pedro" });
+    mocks.saldosPendientesDe.mockResolvedValue(new Map([["ya-existe", 40000]]));
+
+    const respuesta = await POST(alta({ ...MINIMO, email: "pedro@gmail.com" }));
+    const { clienteExistente } = await respuesta.json();
+
+    expect(clienteExistente.saldoPendiente).toBe(40000);
+  });
+
+  it("y si no debe nada, cero explícito", async () => {
+    mocks.usuarioFindFirst.mockResolvedValue({ id: "ya-existe", nombre: "Pedro" });
+
+    const respuesta = await POST(alta({ ...MINIMO, email: "pedro@gmail.com" }));
+    const { clienteExistente } = await respuesta.json();
+
+    expect(clienteExistente.saldoPendiente).toBe(0);
   });
 
   it("sin email no pregunta por duplicados: varios nulos conviven", async () => {
