@@ -132,6 +132,23 @@ describe("POST /api/reservas/:id/confirmar-pago", () => {
     expect(reservaActualizada.saldoPendiente).toBe("0.00");
   });
 
+  it("un partido jugado sigue jugado aunque el cobro sea PARCIAL", async () => {
+    // "Se jugó" y "se pagó" son ejes distintos: un abono no des-juega nada.
+    // El saldo lo lleva `saldo_pendiente`, no el estado — por eso una
+    // COMPLETADA puede deber plata y aparecer en cuentas por cobrar.
+    //
+    // Escribir PAGO_PARCIAL acá además metía la fila DENTRO del predicado de
+    // `reservas_sin_doble_booking` viniendo de afuera, que es el único camino
+    // por el que un UPDATE podía reventar con un 23P01.
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ estado: "COMPLETADA" }));
+
+    await POST(peticion({ metodo: "EFECTIVO", monto: 30000 }), params);
+
+    const reservaActualizada = mocks.updateDeReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(reservaActualizada.estado).toBe("COMPLETADA");
+    expect(reservaActualizada.saldoPendiente).toBe("50000.00");
+  });
+
   it("una reserva sin saldo no se puede volver a cobrar", async () => {
     mocks.reservaFindFirst.mockResolvedValue(reserva({ montoPagado: "160000.00", estado: "CONFIRMADA" }));
 

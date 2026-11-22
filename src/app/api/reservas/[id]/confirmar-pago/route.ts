@@ -77,12 +77,20 @@ export const POST = apiHandler<ConfirmarPagoBody>(
           montoPagado: pagadoTotal.toFixed(2),
           saldoPendiente: saldoNuevo.toFixed(2),
           // Cobrar no "des-juega" un partido: si ya estaba COMPLETADA se
-          // queda así. Sólo cambia el eje del dinero.
+          // queda así, deba o no deba. Sólo cambia el eje del dinero, y ese
+          // eje lo lleva `saldoPendiente` — por eso una COMPLETADA puede
+          // aparecer en cuentas por cobrar sin dejar de estar jugada.
+          //
+          // La pregunta "¿se jugó?" va PRIMERO a propósito. Al revés, un
+          // abono parcial sobre un partido jugado escribía PAGO_PARCIAL y
+          // borraba el hecho de que se jugó; de paso metía la fila dentro del
+          // predicado de `reservas_sin_doble_booking` viniendo de afuera, el
+          // único camino por el que un UPDATE podía morir con un 23P01.
           estado:
-            saldoNuevo > 0
-              ? "PAGO_PARCIAL"
-              : reserva.estado === "COMPLETADA"
-                ? "COMPLETADA"
+            reserva.estado === "COMPLETADA"
+              ? "COMPLETADA"
+              : saldoNuevo > 0
+                ? "PAGO_PARCIAL"
                 : "CONFIRMADA",
         })
         .where(eq(reservas.id, reserva.id));
