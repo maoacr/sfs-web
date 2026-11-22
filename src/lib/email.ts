@@ -15,13 +15,11 @@ interface ReservaEvent {
   tenantId: string;
   tenantEmail: string;
   /**
-   * Montos que muestran las plantillas de pago. Son opcionales porque hoy
-   * `notificarCambioReserva` NO los envía, así que esas plantillas caen en
-   * "—" siempre. Estaban escondidos detrás de un `as any`, que es justamente
-   * lo que impedía ver el hueco.
+   * Montos que muestran las plantillas de pago. Opcionales porque no todos
+   * los eventos los traen; cuando faltan, la plantilla cae en "—".
    */
-  saldoPendiente?: string | number;
-  montoTotal?: string | number;
+  saldoPendiente?: string | number | null;
+  montoTotal?: string | number | null;
 }
 
 const resend = process.env.RESEND_API_KEY
