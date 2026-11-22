@@ -351,3 +351,73 @@ describe("OwnerReservas — saldo pendiente del cliente, antes de llenar el form
     await waitFor(() => expect(apiFetch).not.toHaveBeenCalled());
   });
 });
+
+describe("OwnerReservas — registrar en el momento a quien no está en el sistema", () => {
+  const CANCHA_OPT = { id: "cancha-1", nombre: "Cancha 1", tipo: "FUTBOL_5" };
+
+  function montarModal(clientes: unknown[] = []) {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        url.includes("/api/clientes") ? clientes : url.includes("/api/canchas") ? [CANCHA_OPT] : [],
+    })));
+    render(<OwnerReservas />);
+    fireEvent.click(screen.getByRole("button", { name: /\+ Nueva/i }));
+  }
+
+  async function buscarDesconocido() {
+    montarModal([]);
+    fireEvent.change(screen.getByLabelText(/^cliente/i), { target: { value: "Pedro Gómez" } });
+    return screen.findByRole("button", { name: /registrar a esta persona/i });
+  }
+
+  it("ofrece registrarlo en vez de dejar la reserva colgada de un nombre", async () => {
+    expect(await buscarDesconocido()).toBeInTheDocument();
+  });
+
+  it("al registrarlo, el formulario llega con lo que ya se tipeó", async () => {
+    fireEvent.click(await buscarDesconocido());
+
+    expect(screen.getByLabelText(/^nombre/i)).toHaveValue("Pedro");
+    expect(screen.getByLabelText(/apellidos/i)).toHaveValue("Gómez");
+  });
+
+  it("el cliente registrado queda elegido y la reserva se vincula a su cuenta", async () => {
+    apiFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "cliente-nuevo", primerNombre: "Pedro", apellidos: "Gómez",
+        telefono: null, saldoPendiente: 0,
+      }),
+    });
+
+    fireEvent.click(await buscarDesconocido());
+    fireEvent.click(screen.getByRole("button", { name: /^registrar$/i }));
+
+    await waitFor(() => expect(screen.getByText(/va a ver en su app/i)).toBeInTheDocument());
+
+    await elegirCanchaEnModal();
+    fireEvent.click(screen.getByRole("button", { name: /crear/i }));
+
+    await waitFor(() => {
+      const alta = apiFetch.mock.calls.find(([url]) => String(url) === "/api/reservas");
+      expect(alta).toBeTruthy();
+    });
+    const [, opciones] = apiFetch.mock.calls.find(([url]) => String(url) === "/api/reservas") as unknown as [string, { body: string }];
+    const cuerpo = JSON.parse(opciones.body);
+    expect(cuerpo.playerId).toBe("cliente-nuevo");
+    expect(cuerpo.invitadoNombre).toBeUndefined();
+  });
+
+  it("se puede volver sin registrar a nadie", async () => {
+    fireEvent.click(await buscarDesconocido());
+    fireEvent.click(screen.getByRole("button", { name: /volver/i }));
+
+    expect(await screen.findByRole("button", { name: /registrar a esta persona/i })).toBeInTheDocument();
+  });
+
+  async function elegirCanchaEnModal() {
+    const select = await screen.findByLabelText(/cancha/i);
+    fireEvent.change(select, { target: { value: "cancha-1" } });
+  }
+});
