@@ -4,6 +4,7 @@ import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { METODOS_DE_MOSTRADOR, requiereEntidad } from "@/lib/metodos-de-mostrador";
 import { seOfreceCerrarAlCobrar } from "@/lib/acciones-de-reserva";
+import { formatearPrecio } from "@/lib/moneda";
 
 export interface ReservaACobrar {
   id: string;
@@ -12,9 +13,6 @@ export interface ReservaACobrar {
   /** Hace falta para saber si además hay que ofrecer cerrar el turno. */
   estado: string;
 }
-
-const formatearPrecio = (monto: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
 
 export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
   reserva: ReservaACobrar;

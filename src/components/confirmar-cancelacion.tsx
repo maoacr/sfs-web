@@ -1,5 +1,7 @@
 "use client";
 
+import { formatearPrecio } from "@/lib/moneda";
+
 /**
  * Cancelar no es "sacar de la lista": dispara la política de reembolso del
  * complejo y le devuelve plata al jugador. Antes era una `✕` de diez píxeles
@@ -18,9 +20,6 @@ export interface ReservaACancelar {
   horario: string;
   montoPagado: number;
 }
-
-const formatearPrecio = (monto: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
 
 export function ConfirmarCancelacion({ reserva, onCerrar, onConfirmar }: {
   reserva: ReservaACancelar;

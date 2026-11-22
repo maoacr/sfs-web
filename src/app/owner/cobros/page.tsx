@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
 import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago";
+import { formatearPrecio } from "@/lib/moneda";
 
 interface Deuda {
   id: string;
@@ -21,9 +22,6 @@ interface Deuda {
   saldoPendiente: number;
   estado: string;
 }
-
-const fPrecio = (n: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
 
 const nombreDe = (p: Deuda["player"]) => `${p.primerNombre} ${p.apellidos}`.trim();
 
@@ -74,7 +72,7 @@ export default function OwnerCobros() {
       {!loading && deudas.length > 0 && (
         <div className="mb-6 rounded-2xl border border-warning/30 bg-warning/10 p-4">
           <p className="text-xs uppercase tracking-wider text-text-muted">Total por cobrar</p>
-          <p className="mt-1 text-2xl font-bold text-text">{fPrecio(total)}</p>
+          <p className="mt-1 text-2xl font-bold text-text">{formatearPrecio(total)}</p>
           <p className="mt-1 text-xs text-text-muted">
             {deudas.length} {deudas.length === 1 ? "reserva" : "reservas"}
           </p>
@@ -119,9 +117,9 @@ export default function OwnerCobros() {
 
                   <div className="text-right">
                     <p className="text-xs text-text-muted">Debe</p>
-                    <p className="text-lg font-bold text-warning">{fPrecio(Number(d.saldoPendiente))}</p>
+                    <p className="text-lg font-bold text-warning">{formatearPrecio(Number(d.saldoPendiente))}</p>
                     <p className="text-xs text-text-dim">
-                      de {fPrecio(Number(d.montoTotal))}
+                      de {formatearPrecio(Number(d.montoTotal))}
                     </p>
                   </div>
                 </div>

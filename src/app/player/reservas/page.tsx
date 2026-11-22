@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
 import { explicarPago, explicarVueltaDeMp, sePuedeReintentarElPago } from "@/lib/resultado-pago";
+import { formatearPrecio } from "@/lib/moneda";
 
 interface UltimoPago {
   estadoPago: string;
@@ -95,7 +96,6 @@ function PlayerReservas() {
     setReservas(prev => prev.map(reserva => reserva.id === id ? { ...reserva, estado: "CANCELADA" } : reserva));
   }
 
-  const formatearPrecio = (monto: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
 
   // Las dos secciones quieren órdenes opuestos y por eso se ordenan acá, donde
   // se sabe qué significa cada una: en las próximas interesa la que viene

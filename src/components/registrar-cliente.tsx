@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-
-const formatearPrecio = (monto: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
+import { formatearPrecio } from "@/lib/moneda";
 
 /** Lo que el modal de reserva necesita del cliente, creado o vinculado. */
 export interface ClienteRegistrado {
