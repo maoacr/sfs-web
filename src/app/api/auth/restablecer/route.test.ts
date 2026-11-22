@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const h = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   valoresDelUpdate: vi.fn(),
   hash: vi.fn(),
@@ -14,10 +14,10 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@sfs/db", () => ({
   db: {
-    query: { usuarios: { findFirst: h.findFirst } },
+    query: { usuarios: { findFirst: mocks.findFirst } },
     update: () => ({
       set: (valores: Record<string, unknown>) => {
-        h.valoresDelUpdate(valores);
+        mocks.valoresDelUpdate(valores);
         return { where: () => Promise.resolve(undefined) };
       },
     }),
@@ -28,7 +28,7 @@ vi.mock("@sfs/db", () => ({
 // bcrypt real son ~300ms por hash. Lo que importa verificar es NUESTRO
 // contrato: que se hashee, con los mismos rounds que usa el registro, y que
 // se guarde el resultado y nunca el texto plano.
-vi.mock("bcryptjs", () => ({ default: { hash: h.hash } }));
+vi.mock("bcryptjs", () => ({ default: { hash: mocks.hash } }));
 
 import { POST } from "./route";
 import { firmarTokenReset } from "@/lib/reset-token";
@@ -57,8 +57,8 @@ function peticion(cuerpo: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_SECRET = "secreto-de-sesion-para-tests";
-  h.findFirst.mockResolvedValue(fila());
-  h.hash.mockResolvedValue("$2b$12$hash-nuevo");
+  mocks.findFirst.mockResolvedValue(fila());
+  mocks.hash.mockResolvedValue("$2b$12$hash-nuevo");
 });
 
 describe("POST /api/auth/restablecer", () => {
@@ -68,7 +68,7 @@ describe("POST /api/auth/restablecer", () => {
     const res = await POST(peticion({ token, password: "corta" }));
 
     expect(res.status).toBe(400);
-    expect(h.valoresDelUpdate).not.toHaveBeenCalled();
+    expect(mocks.valoresDelUpdate).not.toHaveBeenCalled();
   });
 
   it("guarda el hash y nunca el texto plano", async () => {
@@ -77,8 +77,8 @@ describe("POST /api/auth/restablecer", () => {
     const res = await POST(peticion({ token, password: NUEVA }));
 
     expect(res.status).toBe(200);
-    expect(h.hash).toHaveBeenCalledWith(NUEVA, 12);
-    expect(h.valoresDelUpdate).toHaveBeenCalledWith(
+    expect(mocks.hash).toHaveBeenCalledWith(NUEVA, 12);
+    expect(mocks.valoresDelUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ passwordHash: "$2b$12$hash-nuevo" })
     );
   });
@@ -92,7 +92,7 @@ describe("POST /api/auth/restablecer", () => {
 
     await POST(peticion({ token, password: NUEVA }));
 
-    expect(h.valoresDelUpdate).toHaveBeenCalledWith(
+    expect(mocks.valoresDelUpdate).toHaveBeenCalledWith(
       expect.not.objectContaining({ googleSub: expect.anything() })
     );
   });
@@ -101,7 +101,7 @@ describe("POST /api/auth/restablecer", () => {
     const res = await POST(peticion({ token: "no-es-un-token", password: NUEVA }));
 
     expect(res.status).toBe(400);
-    expect(h.valoresDelUpdate).not.toHaveBeenCalled();
+    expect(mocks.valoresDelUpdate).not.toHaveBeenCalled();
   });
 
   /**
@@ -114,32 +114,32 @@ describe("POST /api/auth/restablecer", () => {
     expect((await POST(peticion({ token, password: NUEVA }))).status).toBe(200);
 
     // Segundo intento: la cuenta ya tiene el hash nuevo.
-    h.findFirst.mockResolvedValue(fila({ passwordHash: "$2b$12$hash-nuevo" }));
-    h.valoresDelUpdate.mockClear();
+    mocks.findFirst.mockResolvedValue(fila({ passwordHash: "$2b$12$hash-nuevo" }));
+    mocks.valoresDelUpdate.mockClear();
 
     expect((await POST(peticion({ token, password: NUEVA }))).status).toBe(400);
-    expect(h.valoresDelUpdate).not.toHaveBeenCalled();
+    expect(mocks.valoresDelUpdate).not.toHaveBeenCalled();
   });
 
   it("rechaza un token de una cuenta que ya no existe", async () => {
     const token = await firmarTokenReset(ID, HASH_ACTUAL);
-    h.findFirst.mockResolvedValue(null);
+    mocks.findFirst.mockResolvedValue(null);
 
     expect((await POST(peticion({ token, password: NUEVA }))).status).toBe(400);
-    expect(h.valoresDelUpdate).not.toHaveBeenCalled();
+    expect(mocks.valoresDelUpdate).not.toHaveBeenCalled();
   });
 
   it("no restablece una cuenta ADMIN", async () => {
     const token = await firmarTokenReset(ID, HASH_ACTUAL);
-    h.findFirst.mockResolvedValue(fila({ rol: "ADMIN" }));
+    mocks.findFirst.mockResolvedValue(fila({ rol: "ADMIN" }));
 
     expect((await POST(peticion({ token, password: NUEVA }))).status).toBe(400);
-    expect(h.valoresDelUpdate).not.toHaveBeenCalled();
+    expect(mocks.valoresDelUpdate).not.toHaveBeenCalled();
   });
 
   it("da el mismo mensaje para todos los rechazos", async () => {
     const tokenBueno = await firmarTokenReset(ID, HASH_ACTUAL);
-    h.findFirst.mockResolvedValue(null);
+    mocks.findFirst.mockResolvedValue(null);
     const porCuentaAusente = await (await POST(peticion({ token: tokenBueno, password: NUEVA }))).json();
     const porTokenRoto = await (await POST(peticion({ token: "roto", password: NUEVA }))).json();
 

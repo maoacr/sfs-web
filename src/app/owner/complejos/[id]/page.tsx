@@ -42,18 +42,18 @@ export default function EditarComplejo() {
   const [showDelete, setShowDelete] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/complejos/${id}`).then(r => r.json()).then(c => {
-      setNombre(c.nombre);
-      setTipoVia(c.tipoVia || "Calle"); setNumeroVia(c.numeroVia || "");
-      setNumeroSec(c.numeroSec || ""); setComplemento(c.complemento || "");
-      setCiudad(c.ciudad || ""); setDepartamento(c.departamento || "");
-      setDescripcion(c.descripcion || ""); setTelefono(c.telefono || "");
-      setEmail(c.email || "");
-      setInstagram(c.instagram || ""); setTiktok(c.tiktok || "");
-      setTwitter(c.twitter || ""); setFacebook(c.facebook || "");
-      setLat(c.lat || null); setLng(c.lng || null);
-      setCanchas(c.canchas || []);
-      setImagenes(c.imagenes || []);
+    fetch(`/api/complejos/${id}`).then(r => r.json()).then(complejo => {
+      setNombre(complejo.nombre);
+      setTipoVia(complejo.tipoVia || "Calle"); setNumeroVia(complejo.numeroVia || "");
+      setNumeroSec(complejo.numeroSec || ""); setComplemento(complejo.complemento || "");
+      setCiudad(complejo.ciudad || ""); setDepartamento(complejo.departamento || "");
+      setDescripcion(complejo.descripcion || ""); setTelefono(complejo.telefono || "");
+      setEmail(complejo.email || "");
+      setInstagram(complejo.instagram || ""); setTiktok(complejo.tiktok || "");
+      setTwitter(complejo.twitter || ""); setFacebook(complejo.facebook || "");
+      setLat(complejo.lat || null); setLng(complejo.lng || null);
+      setCanchas(complejo.canchas || []);
+      setImagenes(complejo.imagenes || []);
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
   }, [id]);
 
@@ -85,7 +85,7 @@ export default function EditarComplejo() {
   }
 
   const i = "mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass";
-  const l = "block text-sm font-medium text-text";
+  const claseEtiqueta = "block text-sm font-medium text-text";
 
   if (loading) return (
     <div className="p-6 lg:p-8">
@@ -131,11 +131,11 @@ export default function EditarComplejo() {
 
           <form onSubmit={handleSave} className="space-y-5">
             <div>
-              <label className={l}>Nombre del complejo</label>
+              <label className={claseEtiqueta}>Nombre del complejo</label>
               <input type="text" required value={nombre} onChange={e => setNombre(e.target.value)} className={i} />
             </div>
             <div>
-              <label className={l}>Dirección</label>
+              <label className={claseEtiqueta}>Dirección</label>
               <div className="grid grid-cols-[auto_1fr] gap-2 mt-1.5">
                 <select value={tipoVia} onChange={e => setTipoVia(e.target.value)}
                   className="rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
@@ -162,25 +162,25 @@ export default function EditarComplejo() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={l}>Ciudad</label>
+                <label className={claseEtiqueta}>Ciudad</label>
                 <input type="text" value={ciudad} onChange={e => setCiudad(e.target.value)} className={i} placeholder="Ej: Bogotá" />
               </div>
               <div>
-                <label className={l}>Departamento</label>
+                <label className={claseEtiqueta}>Departamento</label>
                 <input type="text" value={departamento} onChange={e => setDepartamento(e.target.value)} className={i} placeholder="Ej: Cundinamarca" />
               </div>
             </div>
             <div>
-              <label className={l}>Descripción</label>
+              <label className={claseEtiqueta}>Descripción</label>
               <textarea rows={3} value={descripcion} onChange={e => setDescripcion(e.target.value)} className={i} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={l}>Teléfono</label>
+                <label className={claseEtiqueta}>Teléfono</label>
                 <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} className={i} />
               </div>
               <div>
-                <label className={l}>Email</label>
+                <label className={claseEtiqueta}>Email</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={i} />
               </div>
             </div>
@@ -245,18 +245,18 @@ export default function EditarComplejo() {
               <p className="text-text-muted text-sm">Este complejo no tiene canchas.</p>
             </div>
           ) : (
-            canchas.map(c => (
-              <Link key={c.id} href={`/owner/canchas/${c.id}`}
+            canchas.map(cancha => (
+              <Link key={cancha.id} href={`/owner/canchas/${cancha.id}`}
                 className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 hover:border-border-hover hover:shadow-sm transition-all duration-150">
                 <div className="flex items-center gap-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-field/30 text-base">⚽</div>
                   <div>
-                    <p className="text-sm font-semibold text-text">{c.nombre}</p>
-                    <p className="text-xs text-text-dim">{c.tipo} · {c.capacidad} jugadores</p>
+                    <p className="text-sm font-semibold text-text">{cancha.nombre}</p>
+                    <p className="text-xs text-text-dim">{cancha.tipo} · {cancha.capacidad} jugadores</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {c._count && <span className="text-xs text-text-dim">{c._count.reservas} reservas</span>}
+                  {cancha._count && <span className="text-xs text-text-dim">{cancha._count.reservas} reservas</span>}
                   <span className="text-text-dim text-sm">Gestionar →</span>
                 </div>
               </Link>
@@ -273,8 +273,8 @@ export default function EditarComplejo() {
             uploadUrl={`/api/complejos/${id}/imagenes`}
             onRefresh={async () => {
               const res = await fetch(`/api/complejos/${id}`);
-              const c = await res.json();
-              setImagenes(c.imagenes || []);
+              const respuestaImagenes = await res.json();
+              setImagenes(respuestaImagenes.imagenes || []);
             }}
           />
         </div>

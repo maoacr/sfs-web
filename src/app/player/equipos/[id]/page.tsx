@@ -31,7 +31,7 @@ export default function EquipoDetailPage() {
   const [invitando, setInvitando] = useState(false);
   const [userId, setUserId] = useState("");
 
-  const load = () => {
+  const cargarEquipo = () => {
     fetch(`/api/equipos/${id}`)
       .then((r) => r.json())
       .then((d) => setEquipo(d))
@@ -39,7 +39,7 @@ export default function EquipoDetailPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { cargarEquipo(); }, [id]);
 
   const invitar = async () => {
     if (!userId.trim()) return;
@@ -51,12 +51,12 @@ export default function EquipoDetailPage() {
     });
     setUserId("");
     setInvitando(false);
-    load();
+    cargarEquipo();
   };
 
   const remover = async (userId: string) => {
     await apiFetch(`/api/equipos/${id}/miembros?userId=${userId}`, { method: "DELETE" });
-    load();
+    cargarEquipo();
   };
 
   if (loading) return (

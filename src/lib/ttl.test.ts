@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const h = vi.hoisted(() => ({ set: vi.fn(), where: vi.fn() }));
+const mocks = vi.hoisted(() => ({ set: vi.fn(), where: vi.fn() }));
 
 vi.mock("drizzle-orm", () => ({
   and: (...partes: unknown[]) => ({ and: partes }),
@@ -14,10 +14,10 @@ vi.mock("@sfs/db", () => ({
   db: {
     update: (tabla: { _nombre: string }) => ({
       set: (valores: Record<string, unknown>) => {
-        h.set(tabla._nombre, valores);
+        mocks.set(tabla._nombre, valores);
         return {
           where: (condicion: unknown) => {
-            h.where(condicion);
+            mocks.where(condicion);
             return { returning: async () => [] };
           },
         };
@@ -40,7 +40,7 @@ import { expirarPagosAbandonados } from "@/lib/ttl";
 import { TTL_PAGO_MINUTOS } from "@/lib/disponibilidad";
 
 function condiciones() {
-  const llamada = h.where.mock.calls[0]?.[0] as { and: unknown[] };
+  const llamada = mocks.where.mock.calls[0]?.[0] as { and: unknown[] };
   return llamada.and;
 }
 
@@ -75,7 +75,7 @@ describe("expirarPagosAbandonados", () => {
   it("los marca EXPIRADO, no RECHAZADO: el banco no dijo que no", async () => {
     await expirarPagosAbandonados();
 
-    const [tabla, valores] = h.set.mock.calls[0] as [string, Record<string, unknown>];
+    const [tabla, valores] = mocks.set.mock.calls[0] as [string, Record<string, unknown>];
     expect(tabla).toBe("pagos");
     expect(valores.estadoPago).toBe("EXPIRADO");
     expect(valores.detalleEstado).toBeTruthy();

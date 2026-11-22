@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NotificationBell } from "@/components/notification-bell";
+import type { UsuarioDeSesion } from "@/lib/usuario-de-sesion";
 
 interface NavItem { label: string; href: string; icon: string }
 
-export function AppSidebar({ role, nav }: { role: "OWNER" | "PLAYER"; nav: NavItem[] }) {
+export function AppSidebar({ role, nav, usuario }: {
+  role: "OWNER" | "PLAYER";
+  nav: NavItem[];
+  /** Null si no se pudo resolver la sesión: el sidebar degrada, no corta. */
+  usuario: UsuarioDeSesion | null;
+}) {
   const pathname = usePathname();
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
@@ -53,11 +59,18 @@ export function AppSidebar({ role, nav }: { role: "OWNER" | "PLAYER"; nav: NavIt
             <div className="flex items-center justify-between mb-3">
               <Link href={role === "OWNER" ? "/owner/perfil" : "/player/perfil"}
                 className="flex items-center gap-3 px-1 py-1.5 rounded-lg hover:bg-surface-hover transition-colors">
-                <div className="h-8 w-8 rounded-full bg-field flex items-center justify-center text-xs font-bold text-grass-light">
-                  {role === "OWNER" ? "D" : "J"}
+                <div className="h-8 w-8 shrink-0 rounded-full bg-field flex items-center justify-center overflow-hidden text-xs font-bold text-grass-light">
+                  {usuario?.avatarUrl ? (
+                    /* `<img>` y no `next/image`: la URL está firmada y vence,
+                       y el optimizador de Next cachea por URL. */
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={usuario.avatarUrl} alt={usuario.nombre} className="h-full w-full object-cover" />
+                  ) : (
+                    usuario?.iniciales ?? (role === "OWNER" ? "D" : "J")
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-text truncate">Mi cuenta</p>
+                  <p className="text-sm font-medium text-text truncate">{usuario?.nombre ?? "Mi cuenta"}</p>
                   <p className="text-[11px] text-text-dim">{role === "OWNER" ? "Dueño" : "Jugador"}</p>
                 </div>
               </Link>

@@ -125,13 +125,13 @@ export function parseHoraToMinutes(hora: string | Date): number {
   if (typeof hora === "string") {
     // Si viene en formato ISO o con T
     if (hora.includes("T")) {
-      const d = new Date(hora);
-      return d.getUTCHours() * 60 + d.getUTCMinutes();
+      const instante = new Date(hora);
+      return instante.getUTCHours() * 60 + instante.getUTCMinutes();
     }
     const [hStr, mStr] = hora.split(":");
-    const h = parseInt(hStr || "0", 10);
-    const m = parseInt(mStr || "0", 10);
-    return h * 60 + m;
+    const horas = parseInt(hStr || "0", 10);
+    const minutos = parseInt(mStr || "0", 10);
+    return horas * 60 + minutos;
   }
   return 0;
 }
@@ -140,9 +140,9 @@ export function parseHoraToMinutes(hora: string | Date): number {
  * Formatea minutos del día a string "HH:MM".
  */
 export function formatMinutesToHora(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const horas = Math.floor(totalMinutes / 60);
+  const minutos = totalMinutes % 60;
+  return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`;
 }
 
 /**

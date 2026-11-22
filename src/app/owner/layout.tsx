@@ -1,4 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar";
+import { usuarioDeSesion } from "@/lib/usuario-de-sesion";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
 import { NotificationBell } from "@/components/notification-bell";
 
@@ -14,10 +15,12 @@ const NAV = [
 const MAIN_TABS = NAV.slice(0, 3);
 const OVERFLOW = NAV.slice(3);
 
-export default function OwnerLayout({ children }: { children: React.ReactNode }) {
+export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
+  const usuario = await usuarioDeSesion();
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar role="OWNER" nav={NAV} />
+      <AppSidebar usuario={usuario} role="OWNER" nav={NAV} />
       <main className="flex-1 overflow-y-auto flex flex-col relative">
         {/* Mobile header: solo campanita */}
         <div className="md:hidden absolute top-0 right-0 z-30 p-4">
@@ -25,7 +28,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
         </div>
         {/* Desktop: campanita en sidebar ya incluida */}
         <div className="flex-1">{children}</div>
-        <BottomTabBar role="OWNER" tabs={MAIN_TABS} overflow={OVERFLOW} />
+        <BottomTabBar usuario={usuario} role="OWNER" tabs={MAIN_TABS} overflow={OVERFLOW} />
       </main>
     </div>
   );

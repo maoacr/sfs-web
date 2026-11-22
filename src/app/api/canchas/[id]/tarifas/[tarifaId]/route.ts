@@ -15,13 +15,13 @@ export const PUT = apiHandler<UpdateTarifaInput>(
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });
     }
 
-    const b = body ?? {};
+    const datos = body ?? {};
     const data: Partial<typeof tarifas.$inferInsert> = {};
-    if (b.precioBase !== undefined) data.precioBase = String(b.precioBase);
-    if (b.factor !== undefined) data.factor = String(b.factor);
-    if (b.diaSemana !== undefined) data.diaSemana = b.diaSemana;
-    if (b.horaInicio !== undefined) data.horaInicio = b.horaInicio;
-    if (b.horaFin !== undefined) data.horaFin = b.horaFin;
+    if (datos.precioBase !== undefined) data.precioBase = String(datos.precioBase);
+    if (datos.factor !== undefined) data.factor = String(datos.factor);
+    if (datos.diaSemana !== undefined) data.diaSemana = datos.diaSemana;
+    if (datos.horaInicio !== undefined) data.horaInicio = datos.horaInicio;
+    if (datos.horaFin !== undefined) data.horaFin = datos.horaFin;
 
     const [tarifa] = await db
       .update(tarifas)

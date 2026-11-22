@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
+import { TAMANO_MAXIMO_DE_IMAGEN_BYTES, TAMANO_MAXIMO_DE_IMAGEN_MB } from "@/lib/imagenes";
 
 interface UserData {
   id: string; email: string; primerNombre: string; segundoNombre: string | null;
   apellidos: string; apodo: string | null; telefono: string | null;
   codigoPais: string; role: "OWNER" | "PLAYER";
   instagram: string | null; tiktok: string | null; twitter: string | null; facebook: string | null;
+  /** URL firmada que vence, no la ruta del storage. La firma el servidor. */
+  avatarUrl: string | null;
 }
 
 type Estadisticas = { canchas: number; clientes: number } | { reservas: number; partidos: number };
@@ -34,6 +37,10 @@ export function ProfileForm() {
   const [twitter, setTwitter] = useState("");
   const [facebook, setFacebook] = useState("");
 
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorDeFoto, setErrorDeFoto] = useState("");
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(({ user: u }: { user?: UserData }) => {
       if (!u) throw new Error("Sin sesión");
@@ -48,6 +55,7 @@ export function ProfileForm() {
       setTiktok(u.tiktok || "");
       setTwitter(u.twitter || "");
       setFacebook(u.facebook || "");
+      setAvatarUrl(u.avatarUrl ?? null);
     }).catch(() => setError("Error al cargar")).finally(() => setLoading(false));
 
     fetch("/api/me/estadisticas")
@@ -64,7 +72,7 @@ export function ProfileForm() {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ primerNombre, segundoNombre: segundoNombre || null, apellidos, apodo: apodo || null, codigoPais, telefono: telefono || null, instagram: instagram || null, tiktok: tiktok || null, twitter: twitter || null, facebook: facebook || null }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      if (!res.ok) { const errorBody = await res.json(); throw new Error(errorBody.error); }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -72,8 +80,47 @@ export function ProfileForm() {
     } finally { setSaving(false); }
   }
 
-  const i = "mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass transition-colors";
-  const l = "block text-sm font-medium text-text";
+  /**
+   * La foto se sube sola al elegirla, sin pasar por el submit del formulario:
+   * son dos endpoints distintos y mezclarlas obligaría a guardar el perfil
+   * entero para cambiar un avatar.
+   */
+  async function handleFotoSeleccionada(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorDeFoto("Solo se permiten imágenes");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > TAMANO_MAXIMO_DE_IMAGEN_BYTES) {
+      setErrorDeFoto(`La imagen no debe superar ${TAMANO_MAXIMO_DE_IMAGEN_MB}MB`);
+      e.target.value = "";
+      return;
+    }
+
+    setSubiendoFoto(true); setErrorDeFoto("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch("/api/auth/me/avatar", { method: "POST", body: formData });
+      const cuerpo = await res.json();
+      if (!res.ok) throw new Error(cuerpo.error || "Error al subir la foto");
+      setAvatarUrl(cuerpo.avatarUrl);
+      // El avatar del sidebar lo pinta un server component, así que no se
+      // enteraría de este cambio hasta una recarga completa.
+      router.refresh();
+    } catch (err) {
+      setErrorDeFoto(err instanceof Error ? err.message : "Error al subir la foto");
+    } finally {
+      setSubiendoFoto(false);
+      e.target.value = "";
+    }
+  }
+
+  const claseInput ="mt-1.5 block w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text placeholder:text-text-dim focus:border-grass focus:ring-1 focus:ring-grass transition-colors";
+  const claseEtiqueta = "block text-sm font-medium text-text";
 
   if (loading) return (
     <div className="p-6 lg:p-10">
@@ -116,19 +163,40 @@ export function ProfileForm() {
           {/* Avatar — large, with gradient ring */}
           <div className="relative mb-5">
             <div className="h-28 w-28 rounded-full bg-gradient-to-br from-field via-grass to-grass-light p-[3px] shadow-glow">
-              <div className="h-full w-full rounded-full bg-surface flex items-center justify-center">
-                <span className="text-3xl font-bold text-text">{iniciales}</span>
+              <div className="h-full w-full rounded-full bg-surface flex items-center justify-center overflow-hidden">
+                {avatarUrl ? (
+                  /* `<img>` y no `next/image` a propósito: esta URL está firmada
+                     y vence. El optimizador de Next cachea por URL, así que
+                     guardaría una respuesta con un token ya vencido. */
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-3xl font-bold text-text">{iniciales}</span>
+                )}
               </div>
             </div>
-            {/* Camera badge — future photo upload */}
-            <div className="absolute -bottom-1 -right-1 h-9 w-9 rounded-full bg-grass border-2 border-surface flex items-center justify-center shadow-md cursor-pointer hover:bg-grass-light transition-colors"
-              title="Foto de perfil — próximamente">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
-            </div>
+            {/* El label ES el botón: así el input file queda accesible por
+                teclado y lector de pantalla sin JavaScript de por medio. */}
+            <label htmlFor="foto-de-perfil"
+              title="Cambiar la foto"
+              className="absolute -bottom-1 -right-1 h-9 w-9 rounded-full bg-grass border-2 border-surface flex items-center justify-center shadow-md cursor-pointer hover:bg-grass-light transition-colors">
+              <span className="sr-only">Foto de perfil</span>
+              {subiendoFoto ? (
+                <span className="text-xs" aria-hidden="true">⏳</span>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+              )}
+            </label>
+            <input id="foto-de-perfil" type="file" accept="image/*" className="sr-only"
+              onChange={handleFotoSeleccionada} disabled={subiendoFoto} />
           </div>
+
+          {errorDeFoto && (
+            <p role="alert" className="mb-3 rounded-lg bg-error-bg px-3 py-2 text-xs text-error">{errorDeFoto}</p>
+          )}
 
           {/* Name */}
           <h2 className="text-xl font-bold text-text mb-0.5">{nombreCompleto || "Sin nombre"}</h2>
@@ -167,23 +235,23 @@ export function ProfileForm() {
           <form id="profile-form" onSubmit={handleSave} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={l}>Primer nombre</label>
-                <input type="text" required value={primerNombre} onChange={e => setPrimerNombre(e.target.value)} className={i} />
+                <label className={claseEtiqueta}>Primer nombre</label>
+                <input type="text" required value={primerNombre} onChange={e => setPrimerNombre(e.target.value)} className={claseInput} />
               </div>
               <div>
-                <label className={l}>Segundo nombre <span className="font-normal text-text-dim">(opcional)</span></label>
-                <input type="text" value={segundoNombre} onChange={e => setSegundoNombre(e.target.value)} className={i} />
+                <label className={claseEtiqueta}>Segundo nombre <span className="font-normal text-text-dim">(opcional)</span></label>
+                <input type="text" value={segundoNombre} onChange={e => setSegundoNombre(e.target.value)} className={claseInput} />
               </div>
             </div>
 
             <div>
-              <label className={l}>Apellidos</label>
-              <input type="text" required value={apellidos} onChange={e => setApellidos(e.target.value)} className={i} />
+              <label className={claseEtiqueta}>Apellidos</label>
+              <input type="text" required value={apellidos} onChange={e => setApellidos(e.target.value)} className={claseInput} />
             </div>
 
             {/* Handle */}
             <div>
-              <label className={l}>Nombre de usuario</label>
+              <label className={claseEtiqueta}>Nombre de usuario</label>
               <div className="mt-1.5 flex rounded-xl">
                 <span className="inline-flex items-center rounded-l-xl border border-r-0 border-border bg-surface px-4 text-sm text-text-muted">@</span>
                 <input type="text" maxLength={30} value={apodo}
@@ -196,7 +264,7 @@ export function ProfileForm() {
 
             {/* Phone */}
             <div>
-              <label className={l}>Teléfono</label>
+              <label className={claseEtiqueta}>Teléfono</label>
               <div className="mt-1.5 flex gap-2">
                 <select value={codigoPais} onChange={e => setCodigoPais(e.target.value)}
                   className="rounded-xl border border-border bg-surface px-3 py-3 text-sm text-text focus:border-grass focus:ring-1 focus:ring-grass">
@@ -216,7 +284,7 @@ export function ProfileForm() {
 
             {/* Email — read only */}
             <div>
-              <label className={l}>Email</label>
+              <label className={claseEtiqueta}>Email</label>
               <input type="email" value={user?.email || ""} disabled
                 className="mt-1.5 block w-full rounded-xl border border-border bg-bg/30 px-4 py-3 text-sm text-text-dim cursor-not-allowed" />
               <p className="mt-1 text-xs text-text-dim">El email no se puede cambiar.</p>

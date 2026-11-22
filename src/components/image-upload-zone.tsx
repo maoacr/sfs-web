@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { TAMANO_MAXIMO_DE_IMAGEN_BYTES, TAMANO_MAXIMO_DE_IMAGEN_MB } from "@/lib/imagenes";
 
 interface ImagenInfo {
   id: string;
@@ -28,8 +29,8 @@ export function ImageUploadZone({ imagenes, uploadUrl, onRefresh }: Props) {
       setError("Solo se permiten imágenes");
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("La imagen no debe superar 10MB");
+    if (file.size > TAMANO_MAXIMO_DE_IMAGEN_BYTES) {
+      setError(`La imagen no debe superar ${TAMANO_MAXIMO_DE_IMAGEN_MB}MB`);
       return;
     }
     setUploading(true); setError("");
@@ -104,7 +105,7 @@ export function ImageUploadZone({ imagenes, uploadUrl, onRefresh }: Props) {
             <div className="space-y-2">
               <div className="text-3xl">📷</div>
               <p className="text-sm font-medium text-text-muted">Arrastrá una imagen o hacé clic para subir</p>
-              <p className="text-xs text-text-dim">JPG, PNG, WebP · máx 10MB</p>
+              <p className="text-xs text-text-dim">JPG, PNG, HEIC o WebP · máx {TAMANO_MAXIMO_DE_IMAGEN_MB}MB</p>
             </div>
           )}
         </div>

@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const h = vi.hoisted(() => ({
+const mocks = vi.hoisted(() => ({
   getAuthUser: vi.fn(),
   reservaFindFirst: vi.fn(),
   iniciarPagoMp: vi.fn(),
@@ -10,17 +10,17 @@ const h = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth-api", async () => {
   const real = await vi.importActual<typeof import("@/lib/auth-api")>("@/lib/auth-api");
-  return { ...real, getAuthUser: h.getAuthUser };
+  return { ...real, getAuthUser: mocks.getAuthUser };
 });
 
 vi.mock("@sfs/db", () => ({
-  db: { query: { reservas: { findFirst: h.reservaFindFirst } } },
+  db: { query: { reservas: { findFirst: mocks.reservaFindFirst } } },
   reservas: { id: "id" },
 }));
 
 vi.mock("drizzle-orm", () => ({ eq: (c: unknown, v: unknown) => ({ eq: [c, v] }) }));
 vi.mock("@/lib/mercadopago", () => ({ isMercadoPagoConfigured: () => true }));
-vi.mock("@/lib/pagos", () => ({ iniciarPagoMp: h.iniciarPagoMp }));
+vi.mock("@/lib/pagos", () => ({ iniciarPagoMp: mocks.iniciarPagoMp }));
 
 import { POST } from "./route";
 
@@ -55,9 +55,9 @@ function reserva(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
-  h.reservaFindFirst.mockResolvedValue(reserva());
-  h.iniciarPagoMp.mockResolvedValue({ pagoId: "pago-1", checkoutUrl: "https://mp/checkout" });
+  mocks.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
+  mocks.reservaFindFirst.mockResolvedValue(reserva());
+  mocks.iniciarPagoMp.mockResolvedValue({ pagoId: "pago-1", checkoutUrl: "https://mp/checkout" });
 });
 
 describe("POST /api/reservas/:id/pagar-saldo", () => {
@@ -65,46 +65,46 @@ describe("POST /api/reservas/:id/pagar-saldo", () => {
     const res = await POST(peticion({}), { params: Promise.resolve({ id: RESERVA }) });
 
     expect(res.status).toBe(200);
-    expect(h.iniciarPagoMp).toHaveBeenCalledWith(expect.objectContaining({ monto: 80000 }));
+    expect(mocks.iniciarPagoMp).toHaveBeenCalledWith(expect.objectContaining({ monto: 80000 }));
   });
 
   it("ignora un saldo viejo del cliente y usa el de la base", async () => {
     // El cliente cree que son 80.000, pero un compañero ya abonó parte.
-    h.reservaFindFirst.mockResolvedValue(reserva({ saldoPendiente: "30000.00" }));
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ saldoPendiente: "30000.00" }));
 
     await POST(peticion({}), { params: Promise.resolve({ id: RESERVA }) });
 
-    expect(h.iniciarPagoMp).toHaveBeenCalledWith(expect.objectContaining({ monto: 30000 }));
+    expect(mocks.iniciarPagoMp).toHaveBeenCalledWith(expect.objectContaining({ monto: 30000 }));
   });
 
   it("acepta un abono parcial explícito", async () => {
     await POST(peticion({ monto: 20000 }), { params: Promise.resolve({ id: RESERVA }) });
 
-    expect(h.iniciarPagoMp).toHaveBeenCalledWith(expect.objectContaining({ monto: 20000 }));
+    expect(mocks.iniciarPagoMp).toHaveBeenCalledWith(expect.objectContaining({ monto: 20000 }));
   });
 
   it("no deja cobrar más que el saldo", async () => {
     const res = await POST(peticion({ monto: 200000 }), { params: Promise.resolve({ id: RESERVA }) });
 
     expect(res.status).toBe(400);
-    expect(h.iniciarPagoMp).not.toHaveBeenCalled();
+    expect(mocks.iniciarPagoMp).not.toHaveBeenCalled();
   });
 
   it("no cobra nada si la reserva ya no debe", async () => {
-    h.reservaFindFirst.mockResolvedValue(reserva({ saldoPendiente: "0.00" }));
+    mocks.reservaFindFirst.mockResolvedValue(reserva({ saldoPendiente: "0.00" }));
 
     const res = await POST(peticion({}), { params: Promise.resolve({ id: RESERVA }) });
 
     expect(res.status).toBe(400);
-    expect(h.iniciarPagoMp).not.toHaveBeenCalled();
+    expect(mocks.iniciarPagoMp).not.toHaveBeenCalled();
   });
 
   it("sólo el titular o un jugador del partido pueden pagar", async () => {
-    h.getAuthUser.mockResolvedValue({ sub: "otro-usuario", email: "x@sfs.test", role: "PLAYER" });
+    mocks.getAuthUser.mockResolvedValue({ sub: "otro-usuario", email: "x@sfs.test", role: "PLAYER" });
 
     const res = await POST(peticion({}), { params: Promise.resolve({ id: RESERVA }) });
 
     expect(res.status).toBe(403);
-    expect(h.iniciarPagoMp).not.toHaveBeenCalled();
+    expect(mocks.iniciarPagoMp).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,9 @@ import { fechaDeCalendario } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
 
 interface ReservaInfo { id: string; estado: string; player: string; apodo: string | null; telefono: string | null }
+/** Lo que devuelve /api/disponibilidad: una cancha con sus slots del día. */
+interface CanchaConSlots { id: string; slots: Slot[] }
+
 interface Slot { inicio: string; fin: string; horaInicio: string; horaFin: string; disponible: boolean; reserva?: ReservaInfo }
 interface CanchaAgenda { id: string; nombre: string; tipo: string; duracionSlotMinutos: number; complejo: { nombre: string; direccion: string } }
 
@@ -12,18 +15,18 @@ const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 function inicioSemana(fecha: Date): Date {
-  const d = new Date(fecha);
-  const dia = d.getDay();
+  const lunes = new Date(fecha);
+  const dia = lunes.getDay();
   const diff = dia === 0 ? -6 : 1 - dia;
-  d.setDate(d.getDate() + diff);
-  return d;
+  lunes.setDate(lunes.getDate() + diff);
+  return lunes;
 }
 
 function generarSemana(lunes: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(lunes);
-    d.setDate(lunes.getDate() + i);
-    return d;
+    const dia = new Date(lunes);
+    dia.setDate(lunes.getDate() + i);
+    return dia;
   });
 }
 
@@ -34,9 +37,16 @@ function mismaFecha(a: Date, b: Date): boolean {
 export function AgendaView({ canchaId }: { canchaId: string }) {
   const [cancha, setCancha] = useState<CanchaAgenda | null>(null);
   const [semanaLunes, setSemanaLunes] = useState(() => inicioSemana(new Date()));
-  const [diaSeleccionado, setDiaSeleccionado] = useState<Date | null>(null);
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Arranca en hoy. La semana inicial es la de hoy, así que esto antes se
+  // seteaba desde un efecto al montar: un render extra en cascada para
+  // llegar al mismo valor que ya se conoce acá.
+  const [diaSeleccionado, setDiaSeleccionado] = useState<Date>(() => new Date());
+  // Los slots se guardan junto al día al que pertenecen. De ahí se derivan
+  // `slots` y `loading` en vez de sincronizarlos con setState dentro del
+  // efecto, que disparaba renders en cascada. De paso arregla una condición
+  // de carrera: si el usuario cambiaba de día rápido, la respuesta lenta del
+  // día anterior sobreescribía la del día nuevo.
+  const [slotsCargados, setSlotsCargados] = useState<{ dia: string; slots: Slot[] } | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -51,35 +61,29 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
     });
   }, [canchaId]);
 
-  // Auto-seleccionar hoy si está en la semana visible y no hay selección
-  useEffect(() => {
-    if (!diaSeleccionado) return;
-    cargarSlots(diaSeleccionado);
-  }, [diaSeleccionado, canchaId]);
+  const diaPedido = fechaDeCalendario(diaSeleccionado);
+  const slots = slotsCargados?.slots ?? [];
+  // Está cargando mientras lo que tenemos en mano no sea del día pedido.
+  const loading = slotsCargados?.dia !== diaPedido;
 
-  // Seleccionar hoy por defecto al montar si está en la semana actual
   useEffect(() => {
-    const hoyEstaEnSemana = semana.some(d => mismaFecha(d, hoy));
-    if (hoyEstaEnSemana) {
-      setDiaSeleccionado(new Date(hoy));
-    } else {
-      setDiaSeleccionado(new Date(semana[0]));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let vigente = true;
+    const guardar = (slotsDelDia: Slot[]) => {
+      if (vigente) setSlotsCargados({ dia: diaPedido, slots: slotsDelDia });
+    };
 
-  function cargarSlots(fecha: Date) {
-    setLoading(true);
-    const day = fechaDeCalendario(fecha);
-    fetch(`/api/disponibilidad?fecha=${day}`)
+    fetch(`/api/disponibilidad?fecha=${diaPedido}`)
       .then(r => r.json())
       .then(data => {
-        const encontrado = Array.isArray(data) ? data.find((c: any) => c.id === canchaId) : null;
-        setSlots(encontrado?.slots || []);
+        const encontrado = Array.isArray(data)
+          ? (data as CanchaConSlots[]).find(cancha => cancha.id === canchaId)
+          : null;
+        guardar(encontrado?.slots ?? []);
       })
-      .catch(() => setSlots([]))
-      .finally(() => setLoading(false));
-  }
+      .catch(() => guardar([]));
+
+    return () => { vigente = false; };
+  }, [diaPedido, canchaId]);
 
   function irSemanaAnterior() {
     const nueva = new Date(semanaLunes);
@@ -93,8 +97,8 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
     setSemanaLunes(nueva);
   }
 
-  function seleccionarDia(d: Date) {
-    setDiaSeleccionado(new Date(d));
+  function seleccionarDia(dia: Date) {
+    setDiaSeleccionado(new Date(dia));
   }
 
   async function cancelarReserva(reservaId: string) {
@@ -104,15 +108,15 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ estado: "CANCELADA" }),
       });
-      setSlots(prev => prev.map(s =>
+      setSlotsCargados(prev => prev && { ...prev, slots: prev.slots.map(s =>
         s.reserva?.id === reservaId ? { ...s, disponible: true, reserva: undefined } : s
-      ));
+      ) });
       setSelectedSlot(null);
     } catch {} 
     finally { setCancelling(false); }
   }
 
-  const fF =(d: Date) => d.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
+  const formatearFechaCorta =(dia: Date) => dia.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 
   const mesActual = MESES[semanaLunes.getMonth()];
   const añoActual = semanaLunes.getFullYear();
@@ -152,11 +156,11 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
         {/* Grilla de días - horizontal scroll con gradiente */}
         <div className="relative">
           <div ref={scrollRef} className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
-            {semana.map((d, i) => {
-              const esHoy = mismaFecha(d, hoy);
-              const seleccionado = diaSeleccionado ? mismaFecha(d, diaSeleccionado) : false;
+            {semana.map((dia, i) => {
+              const esHoy = mismaFecha(dia, hoy);
+              const seleccionado = diaSeleccionado ? mismaFecha(dia, diaSeleccionado) : false;
               return (
-                <button key={i} onClick={() => seleccionarDia(d)}
+                <button key={i} onClick={() => seleccionarDia(dia)}
                   className={`flex-shrink-0 rounded-xl border p-2.5 text-center min-w-[60px] transition-all ${seleccionado
                     ? "border-grass bg-field text-grass-light shadow-sm scale-[1.02]"
                     : esHoy
@@ -164,8 +168,8 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
                       : "border-border bg-bg text-text-muted hover:border-border-hover hover:text-text"
                   }`}>
                   <p className={`text-[11px] uppercase ${seleccionado ? "text-grass-light" : "text-text-dim"}`}>{DIAS[i]}</p>
-                  <p className={`text-lg font-bold mt-0.5 ${seleccionado ? "text-grass-light" : esHoy ? "text-grass-light" : "text-text"}`}>{d.getDate()}</p>
-                  <p className="text-[10px] text-text-dim">{fF(d)}</p>
+                  <p className={`text-lg font-bold mt-0.5 ${seleccionado ? "text-grass-light" : esHoy ? "text-grass-light" : "text-text"}`}>{dia.getDate()}</p>
+                  <p className="text-[10px] text-text-dim">{formatearFechaCorta(dia)}</p>
                 </button>
               );
             })}

@@ -23,7 +23,7 @@ export default function EquiposPage() {
   const [descripcion, setDescripcion] = useState("");
   const [creando, setCreando] = useState(false);
 
-  const load = () => {
+  const cargarEquipos = () => {
     fetch("/api/equipos")
       .then((r) => r.json())
       .then((d) => setEquipos(Array.isArray(d) ? d : []))
@@ -31,7 +31,7 @@ export default function EquiposPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { cargarEquipos(); }, []);
 
   const crearEquipo = async () => {
     if (!nombre.trim()) return;
@@ -45,7 +45,7 @@ export default function EquiposPage() {
       setShowCreate(false);
       setNombre("");
       setDescripcion("");
-      load();
+      cargarEquipos();
     }
     setCreando(false);
   };

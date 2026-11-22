@@ -71,6 +71,13 @@
       "when": 1795287086209,
       "tag": "0009_invitado_en_reserva",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795323669398,
+      "tag": "0010_limites_bucket_sfs",
+      "breakpoints": true
     }
   ]
 }
