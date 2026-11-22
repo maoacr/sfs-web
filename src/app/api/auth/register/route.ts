@@ -70,7 +70,7 @@ export const POST = apiHandler<RegisterInput>(
 
     const tokenPayload = {
       sub: user.id,
-      email: user.email,
+      email: emailClean,
       role,
     };
 

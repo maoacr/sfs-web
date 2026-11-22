@@ -1,0 +1,28 @@
+-- El email de `usuarios` pasa a ser opcional.
+--
+-- POR QUÉ
+-- El dueño registra clientes desde el mostrador con los datos que la persona
+-- le quiera dar, y muchas veces no hay email. Hasta ahora esos clientes no
+-- podían tener cuenta, así que la reserva quedaba a nombre del DUEÑO con el
+-- nombre del invitado en una columna aparte — y si el invitado quedaba
+-- debiendo, la deuda era del dueño y lo bloqueaba para agendar.
+--
+-- Con el email opcional, cada cliente del mostrador tiene cuenta propia: la
+-- reserva tiene un titular de verdad y la deuda cae donde corresponde.
+--
+-- QUÉ NO HACE FALTA TOCAR
+-- El índice `usuarios_email_unique` sigue como está. En Postgres los NULL no
+-- colisionan entre sí en un índice único, así que varios clientes sin email
+-- conviven sin problema y los emails reales siguen siendo únicos. Es el mismo
+-- arreglo que ya tenía `google_sub` en esta misma tabla.
+--
+-- Verificado contra una tabla de descarte antes de escribir esto: tres NULL
+-- entraron y el duplicado real fue rechazado con `unique_violation`.
+--
+-- QUÉ SIGNIFICA PARA AUTH
+-- Una cuenta sin email no puede entrar: login y recuperar buscan con
+-- `eq(usuarios.email, ...)`, y un `eq` nunca matchea NULL. La cuenta existe,
+-- pero todavía no es de nadie. El email es lo que después le permite
+-- RECLAMARLA: al entrar con Google, `decidirVinculo` la encuentra por email y
+-- le entrega la cuenta con su historial.
+ALTER TABLE "usuarios" ALTER COLUMN "email" DROP NOT NULL;
