@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { explicarPago, explicarVueltaDeMp } from "@/lib/resultado-pago";
+import {
+  explicarPago,
+  explicarVueltaDeMp,
+  sePuedeReintentarElPago,
+  ESPERA_TRAS_DUPLICADO_MS,
+} from "@/lib/resultado-pago";
 
 describe("explicarPago — rechazos de tarjeta", () => {
   it("dice qué dato revisar cuando el rechazo es por datos mal cargados", () => {
@@ -115,5 +120,79 @@ describe("explicarVueltaDeMp — el `status` de la redirección", () => {
     // la tarjeta ya muestra la verdad que vino de la base.
     expect(explicarVueltaDeMp("null")).toBeNull();
     expect(explicarVueltaDeMp("algo_que_mp_invente")).toBeNull();
+  });
+});
+
+describe("sePuedeReintentarElPago — MP opina, pero la plata la sabemos nosotros", () => {
+  const AHORA = new Date("2026-11-22T18:00:00.000Z").getTime();
+  const haceMinutos = (minutos: number) =>
+    new Date(AHORA - minutos * 60_000).toISOString();
+
+  const reserva = (over: Record<string, unknown> = {}) => ({
+    montoPagado: 0,
+    ultimoPago: {
+      estadoPago: "RECHAZADO",
+      detalleEstado: "cc_rejected_duplicated_payment",
+      createdAt: haceMinutos(10),
+    },
+    ...over,
+  });
+
+  it("sin intentos previos se puede pagar: nada dice lo contrario", () => {
+    expect(sePuedeReintentarElPago({ montoPagado: 0, ultimoPago: null }, AHORA)).toBe(true);
+  });
+
+  it("un pago aprobado no dice nada sobre el saldo que queda", () => {
+    expect(sePuedeReintentarElPago(reserva({
+      montoPagado: 50000,
+      ultimoPago: { estadoPago: "APROBADO", detalleEstado: "accredited", createdAt: haceMinutos(10) },
+    }), AHORA)).toBe(true);
+  });
+
+  it("un rechazo normal se puede reintentar, como siempre", () => {
+    expect(sePuedeReintentarElPago(reserva({
+      ultimoPago: { estadoPago: "RECHAZADO", detalleEstado: "cc_rejected_insufficient_amount", createdAt: haceMinutos(1) },
+    }), AHORA)).toBe(true);
+  });
+
+  it("un pago en curso NO se reintenta: puede acreditarse solo", () => {
+    expect(sePuedeReintentarElPago(reserva({
+      ultimoPago: { estadoPago: "PENDIENTE", detalleEstado: "pending_capture", createdAt: haceMinutos(30) },
+    }), AHORA)).toBe(false);
+  });
+
+  // ── El caso del duplicado ─────────────────────────────────────────────────
+
+  it("recién duplicado NO se reintenta: puede estar entrando plata que no vimos", () => {
+    expect(sePuedeReintentarElPago(reserva({ ultimoPago: {
+      estadoPago: "RECHAZADO",
+      detalleEstado: "cc_rejected_duplicated_payment",
+      createdAt: haceMinutos(1),
+    } }), AHORA)).toBe(false);
+  });
+
+  it("pasada la espera y con la reserva en cero, SÍ se reintenta", () => {
+    // El duplicado de MP es contra SUS operaciones. Si en esta reserva no entró
+    // nada, no hay nada que pagar dos veces — y sin el botón la reserva expira.
+    expect(sePuedeReintentarElPago(reserva(), AHORA)).toBe(true);
+  });
+
+  it("pero si entró plata en ESTA reserva, no: ahí sí se pagaría dos veces", () => {
+    expect(sePuedeReintentarElPago(reserva({ montoPagado: 50000 }), AHORA)).toBe(false);
+  });
+
+  it("la espera se respeta al minuto: no se habilita un segundo antes", () => {
+    const justoAntes = AHORA - (ESPERA_TRAS_DUPLICADO_MS - 1000);
+    expect(sePuedeReintentarElPago(reserva({ ultimoPago: {
+      estadoPago: "RECHAZADO",
+      detalleEstado: "cc_rejected_duplicated_payment",
+      createdAt: new Date(justoAntes).toISOString(),
+    } }), AHORA)).toBe(false);
+  });
+
+  it("sin detalle de MP no se bloquea nada", () => {
+    expect(sePuedeReintentarElPago(reserva({
+      ultimoPago: { estadoPago: "RECHAZADO", detalleEstado: null, createdAt: haceMinutos(10) },
+    }), AHORA)).toBe(true);
   });
 });

@@ -5,16 +5,18 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { formatearFecha, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
-import { explicarPago, explicarVueltaDeMp } from "@/lib/resultado-pago";
+import { explicarPago, explicarVueltaDeMp, sePuedeReintentarElPago } from "@/lib/resultado-pago";
 
 interface UltimoPago {
   estadoPago: string;
   detalleEstado: string | null;
+  /** Hace falta para medir la espera tras un rechazo por duplicado. */
+  createdAt: string;
 }
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
-  slotInicio: string; slotFin: string; montoTotal: number; saldoPendiente: number; estado: string;
+  slotInicio: string; slotFin: string; montoTotal: number; montoPagado: number; saldoPendiente: number; estado: string;
   ultimoPago?: UltimoPago | null;
 }
 
@@ -179,16 +181,14 @@ function ReservaCard({ reserva, cancelar, pagarSaldo, formatearPrecio }: {
   const ultimo = reserva.ultimoPago;
   const explicacion = ultimo?.detalleEstado ? explicarPago(undefined, ultimo.detalleEstado) : null;
 
-  // "El último pago no se acreditó" es la única situación donde su resultado
-  // dice algo sobre el próximo. Un abono exitoso del 50% deja la reserva en
-  // PAGO_PARCIAL: que no se reintente ESE pago no tiene nada que ver con poder
-  // pagar el saldo que queda, y confundirlo deja a la persona sin forma de
-  // terminar de pagar.
-  const ultimoSinAcreditar = explicacion !== null && ultimo?.estadoPago !== "APROBADO";
-
-  // Ante un duplicado o un pago en curso, ofrecer el botón es invitar a pagar
-  // dos veces o a esperar de gusto.
-  const puedeReintentar = ultimoSinAcreditar ? explicacion.reintentable : true;
+  // La decisión vive en `resultado-pago.ts` porque necesita dos cosas a la vez:
+  // lo que dijo MercadoPago y cuánta plata entró en ESTA reserva. Calcularla
+  // acá fue lo que dejó que un "duplicado" de MP —que mide entre sus
+  // operaciones, no por reserva— escondiera el botón de una reserva en cero.
+  const puedeReintentar = sePuedeReintentarElPago({
+    montoPagado: Number(reserva.montoPagado),
+    ultimoPago: ultimo ?? null,
+  });
 
   const cuando = `${formatearFecha(reserva.slotInicio, zona, { weekday: "long", day: "numeric", month: "long" })} · ${formatearHora(reserva.slotInicio, zona)} – ${formatearHora(reserva.slotFin, zona)}`;
   // Los botones se leen fuera de contexto en un lector de pantalla: sin esto,
@@ -233,7 +233,7 @@ function ReservaCard({ reserva, cancelar, pagarSaldo, formatearPrecio }: {
         )}
       </div>
 
-      {ultimoSinAcreditar && (
+      {explicacion && ultimo?.estadoPago !== "APROBADO" && (
         <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-text">
           {explicacion.mensaje}
         </p>

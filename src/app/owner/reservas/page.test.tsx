@@ -433,3 +433,42 @@ describe("OwnerReservas — registrar en el momento a quien no está en el siste
     fireEvent.change(select, { target: { value: "cancha-1" } });
   }
 });
+
+describe("OwnerReservas — el dueño ve qué pasó con el pago del jugador", () => {
+  const RECHAZADO = {
+    estadoPago: "RECHAZADO",
+    detalleEstado: "cc_rejected_duplicated_payment",
+    monto: 50000,
+    createdAt: "2026-11-22T17:28:57.000Z",
+  };
+
+  it("avisa que el último intento de pago no se acreditó", async () => {
+    montarCon([reserva({ estado: "PENDIENTE_PAGO", montoPagado: 0, saldoPendiente: 100000, ultimoPago: RECHAZADO })]);
+
+    expect(await screen.findByText(/rechazado/i)).toBeInTheDocument();
+  });
+
+  it("muestra lo que vio el jugador, para poder hablar con él", async () => {
+    montarCon([reserva({ estado: "PENDIENTE_PAGO", montoPagado: 0, saldoPendiente: 100000, ultimoPago: RECHAZADO })]);
+
+    // Es el mensaje de `explicarPago`, el mismo que leyó en su teléfono: el
+    // mostrador no tiene que adivinar qué le dijo MercadoPago.
+    expect(await screen.findByText(/ya hiciste un pago por ese monto/i)).toBeInTheDocument();
+  });
+
+  it("un pago acreditado no ensucia la fila: no hay nada que explicar", async () => {
+    montarCon([reserva({
+      ultimoPago: { estadoPago: "APROBADO", detalleEstado: "accredited", monto: 160000, createdAt: "2026-11-22T17:00:00.000Z" },
+    })]);
+
+    await waitFor(() => expect(screen.getByText(/cancha 1/i)).toBeInTheDocument());
+    expect(screen.queryByText(/acreditó/i)).not.toBeInTheDocument();
+  });
+
+  it("sin intentos de pago tampoco", async () => {
+    montarCon([reserva({ ultimoPago: null })]);
+
+    await waitFor(() => expect(screen.getByText(/cancha 1/i)).toBeInTheDocument());
+    expect(screen.queryByText(/rechazado/i)).not.toBeInTheDocument();
+  });
+});

@@ -159,3 +159,71 @@ export function explicarVueltaDeMp(
 
   return { ...explicacion, tono: TONO_VUELTA[normalizado] ?? "espera" };
 }
+
+/**
+ * Cuánto se espera antes de volver a ofrecer el pago tras un rechazo por
+ * duplicado.
+ *
+ * MercadoPago rechaza como duplicado un cobro parecido hecho con la misma
+ * tarjeta en pocos minutos. Si ese cobro "parecido" fue sobre ESTA reserva y su
+ * webhook todavía no llegó, nuestro `montoPagado` dice cero por un rato aunque
+ * la plata haya entrado. La espera convierte esa carrera en un dato: pasados
+ * estos minutos, si seguimos en cero es porque de verdad no entró nada.
+ *
+ * Son tres minutos contra un TTL de quince, así que queda tiempo de sobra para
+ * pagar.
+ */
+export const ESPERA_TRAS_DUPLICADO_MS = 3 * 60 * 1000;
+
+const DUPLICADO = "cc_rejected_duplicated_payment";
+
+/**
+ * ¿Se le puede ofrecer pagar de nuevo?
+ *
+ * `explicarPago` traduce lo que dijo MercadoPago. Esto DECIDE, y para decidir
+ * hace falta algo que MP no sabe: cuánta plata entró en esta reserva.
+ *
+ * ── Por qué el duplicado necesita un caso aparte ──────────────────────────
+ *
+ * MP marca el duplicado como no reintentable y tiene razón en su mundo: su
+ * ventana compara tarjeta y monto entre TODAS sus operaciones, no por reserva.
+ * Un jugador que pagó otra cancha hace un rato y reserva otra por el mismo
+ * monto se come un "duplicado" sobre una reserva donde nunca entró un peso.
+ *
+ * Esconder el botón ahí deja la reserva en `PENDIENTE_PAGO` con cero pagado y
+ * el TTL corriendo: **la persona pierde la cancha sin haber pagado y sin forma
+ * de pagar**. El riesgo de pagar dos veces existe sólo si en ESTA reserva ya
+ * entró plata, y eso lo dice `montoPagado`, que es el eje donde vive el dinero.
+ *
+ * Los pendientes siguen sin reintentarse pase lo que pase: ahí hay un cobro en
+ * vuelo que puede acreditarse solo, y eso sí sería pagar dos veces.
+ */
+export function sePuedeReintentarElPago(
+  reserva: {
+    montoPagado: number;
+    ultimoPago: { estadoPago: string; detalleEstado: string | null; createdAt: string | Date } | null;
+  },
+  ahora: number = Date.now()
+): boolean {
+  const ultimo = reserva.ultimoPago;
+
+  // Sin intento previo, o sin que MP haya dicho nada concreto, no hay motivo
+  // para esconder nada.
+  if (!ultimo?.detalleEstado) return true;
+
+  // Que un pago se haya acreditado no dice nada sobre el saldo que queda.
+  // Confundirlo es lo que una vez dejó a un jugador sin poder pagar su saldo.
+  if (ultimo.estadoPago === "APROBADO") return true;
+
+  const explicacion = explicarPago(undefined, ultimo.detalleEstado);
+  if (explicacion.reintentable) return true;
+
+  // No reintentable según MP. El duplicado es el único caso donde su contexto
+  // y el nuestro pueden discrepar.
+  if (ultimo.detalleEstado.toLowerCase() !== DUPLICADO) return false;
+
+  // Si en esta reserva ya entró plata, reintentar sí sería pagar dos veces.
+  if (reserva.montoPagado > 0) return false;
+
+  return ahora - new Date(ultimo.createdAt).getTime() >= ESPERA_TRAS_DUPLICADO_MS;
+}
