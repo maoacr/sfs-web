@@ -4,6 +4,14 @@ import { and, eq, gt, inArray, lt } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { syncSchema, type SyncInput } from "@/lib/schemas";
 import { canchaDelDueno } from "@/lib/consultas";
+import { esDobleBooking } from "@/lib/errores-db";
+
+/**
+ * Lo mismo pasó en los dos casos —alguien tomó el turno mientras esta reserva
+ * viajaba— así que el mensaje sale de un solo lugar: uno lo detecta el
+ * chequeo previo, el otro el constraint, y para el dueño es el mismo hecho.
+ */
+const CONFLICTO = "Conflicto: el slot ya fue reservado mientras estabas offline";
 
 /**
  * POST /api/sync
@@ -41,7 +49,7 @@ export const POST = apiHandler<SyncInput>(
     if (conflicto) {
       return NextResponse.json(
         {
-          error: "Conflicto: el slot ya fue reservado mientras estabas offline",
+          error: CONFLICTO,
           conflicto: {
             reservaId: conflicto.id,
             playerId: conflicto.playerId,
@@ -54,19 +62,32 @@ export const POST = apiHandler<SyncInput>(
     }
 
     // El dueño registra la reserva a su nombre en representación del cliente.
-    const [reserva] = await db
-      .insert(reservas)
-      .values({
-        tenantId: user.sub,
-        canchaId,
-        playerId: user.sub,
-        slotInicio: inicio,
-        slotFin: fin,
-        montoTotal: montoTotal.toFixed(2),
-        montoPagado: montoTotal.toFixed(2),
-        estado: "CONFIRMADA",
-      })
-      .returning({ id: reservas.id });
+    //
+    // El chequeo de arriba no alcanza: esta reserva viene de un dispositivo que
+    // estuvo offline, así que es el caso donde la carrera es MÁS probable, no
+    // menos. Quien garantiza el turno es `reservas_sin_doble_booking`, y su
+    // rechazo se traduce al mismo 409: el cliente lo saca de la cola en el
+    // primer intento en lugar de reintentar tres veces contra un 500.
+    let reserva: { id: string };
+
+    try {
+      [reserva] = await db
+        .insert(reservas)
+        .values({
+          tenantId: user.sub,
+          canchaId,
+          playerId: user.sub,
+          slotInicio: inicio,
+          slotFin: fin,
+          montoTotal: montoTotal.toFixed(2),
+          montoPagado: montoTotal.toFixed(2),
+          estado: "CONFIRMADA",
+        })
+        .returning({ id: reservas.id });
+    } catch (error) {
+      if (!esDobleBooking(error)) throw error;
+      return NextResponse.json({ error: CONFLICTO }, { status: 409 });
+    }
 
     return NextResponse.json({ serverId: reserva.id, localId: body.data.id });
   },
