@@ -2,34 +2,13 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { METODOS_DE_MOSTRADOR, requiereEntidad } from "@/lib/metodos-de-mostrador";
 
 export interface ReservaACobrar {
   id: string;
   saldoPendiente: number;
   titular: string;
 }
-
-/**
- * Lo que de verdad pasa en un mostrador.
- *
- * El enum de la base tiene más valores —PSE, BILLETERA— porque guarda también
- * lo que reporta MercadoPago, donde esa distinción existe y sirve. Pero acá
- * nadie te paga "por PSE": te transfiere, y el carril lo elige la persona en
- * su banco. Ofrecer PSE y Billetera al lado de Transferencia es pedirle al
- * dueño que clasifique algo que desde su lado es un solo hecho: entró plata a
- * la cuenta.
- *
- * Nequi, Daviplata y Bancolombia son todos TRANSFERENCIA y se distinguen por
- * `entidad`. El efectivo es el único que no la pide: no hay institución
- * detrás.
- */
-const METODOS = [
-  { valor: "EFECTIVO", label: "Efectivo" },
-  { valor: "TRANSFERENCIA", label: "Transferencia o billetera" },
-  { valor: "TARJETA_DEBITO", label: "Tarjeta débito" },
-  { valor: "TARJETA_CREDITO", label: "Tarjeta crédito" },
-  { valor: "OTRO", label: "Otro" },
-] as const;
 
 const fPrecio = (n: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
@@ -45,7 +24,7 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
-  const pideEntidad = metodo !== "EFECTIVO";
+  const pideEntidad = requiereEntidad(metodo);
 
   async function registrar() {
     setError(null);
@@ -106,7 +85,11 @@ export function RegistrarPago({ reserva, onCerrar, onRegistrado }: {
           <div>
             <label htmlFor="metodo" className="mb-1.5 block text-sm font-medium text-text">Método</label>
             <select id="metodo" value={metodo} onChange={e => setMetodo(e.target.value)} className={campo}>
-              {METODOS.map(m => <option key={m.valor} value={m.valor}>{m.label}</option>)}
+              {METODOS_DE_MOSTRADOR.map(metodoDisponible => (
+                <option key={metodoDisponible.valor} value={metodoDisponible.valor}>
+                  {metodoDisponible.label}
+                </option>
+              ))}
             </select>
           </div>
 

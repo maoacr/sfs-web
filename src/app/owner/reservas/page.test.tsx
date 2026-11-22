@@ -189,3 +189,91 @@ describe("OwnerReservas — cliente de una reserva manual", () => {
     expect(cuerpo.playerId).toBeUndefined();
   });
 });
+
+describe("OwnerReservas — cómo se cobró la reserva manual", () => {
+  const CANCHA_OPT = { id: "cancha-1", nombre: "Cancha 1", tipo: "FUTBOL_5" };
+
+  function montarModal() {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => (url.includes("/api/canchas") ? [CANCHA_OPT] : []),
+    })));
+    render(<OwnerReservas />);
+    fireEvent.click(screen.getByRole("button", { name: /\+ Nueva/i }));
+  }
+
+  async function crearPara(cliente: string) {
+    fireEvent.change(await screen.findByLabelText(/^cancha$/i), { target: { value: "cancha-1" } });
+    fireEvent.change(screen.getByLabelText(/cliente/i), { target: { value: cliente } });
+    fireEvent.click(screen.getByRole("button", { name: /crear/i }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const [, opciones] = apiFetch.mock.calls[0] as unknown as [string, { body: string }];
+    return JSON.parse(opciones.body);
+  }
+
+  it("por defecto cobra todo en efectivo: es exactamente lo que hacía antes", async () => {
+    montarModal();
+
+    const cuerpo = await crearPara("Pedro Nuevo");
+
+    expect(cuerpo.metodo).toBe("EFECTIVO");
+    // Sin montoPagado el servidor asume el total, que es el precio que él
+    // calcula y el navegador no conoce.
+    expect(cuerpo.montoPagado).toBeUndefined();
+  });
+
+  it("deja elegir el método y anotar la entidad", async () => {
+    montarModal();
+    fireEvent.change(await screen.findByLabelText(/método/i), { target: { value: "TRANSFERENCIA" } });
+    fireEvent.change(screen.getByLabelText(/entidad/i), { target: { value: "Nequi" } });
+
+    const cuerpo = await crearPara("Pedro Nuevo");
+
+    expect(cuerpo.metodo).toBe("TRANSFERENCIA");
+    expect(cuerpo.entidad).toBe("Nequi");
+  });
+
+  it("el efectivo no pide entidad: no hay institución detrás", async () => {
+    montarModal();
+    await screen.findByLabelText(/método/i);
+
+    expect(screen.queryByLabelText(/entidad/i)).not.toBeInTheDocument();
+  });
+
+  it("un abono manda el monto que entró", async () => {
+    montarModal();
+    fireEvent.change(await screen.findByLabelText(/^cobro$/i), { target: { value: "ABONO" } });
+    fireEvent.change(screen.getByLabelText(/monto/i), { target: { value: "80000" } });
+
+    const cuerpo = await crearPara("Pedro Nuevo");
+
+    expect(cuerpo.montoPagado).toBe(80000);
+    expect(cuerpo.metodo).toBe("EFECTIVO");
+  });
+
+  it("sin cobrar manda cero y NINGÚN método: no hubo plata que clasificar", async () => {
+    montarModal();
+    fireEvent.change(await screen.findByLabelText(/^cobro$/i), { target: { value: "NADA" } });
+
+    const cuerpo = await crearPara("Pedro Nuevo");
+
+    expect(cuerpo.montoPagado).toBe(0);
+    expect(cuerpo.metodo).toBeUndefined();
+    expect(cuerpo.entidad).toBeUndefined();
+  });
+
+  it("sin cobrar no pregunta cómo se cobró", async () => {
+    montarModal();
+    fireEvent.change(await screen.findByLabelText(/^cobro$/i), { target: { value: "NADA" } });
+
+    expect(screen.queryByLabelText(/método/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/monto/i)).not.toBeInTheDocument();
+  });
+
+  it("avisa que la reserva queda debiendo, que es lo que va a pasar", async () => {
+    montarModal();
+    fireEvent.change(await screen.findByLabelText(/^cobro$/i), { target: { value: "NADA" } });
+
+    expect(screen.getByText(/queda debiendo/i)).toBeInTheDocument();
+  });
+});

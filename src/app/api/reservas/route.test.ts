@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   insertEnPagos: vi.fn(),
   insertEnReservas: vi.fn(),
   liberarTurnoVencido: vi.fn(async () => []),
+  notificarReserva: vi.fn(async () => undefined),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -75,7 +76,7 @@ vi.mock("@/lib/pricing", () => ({
   calcularPrecio: async () => ({ success: true, data: { precioFinal: 160000, promocionAplicada: null } }),
   usarPromocion: vi.fn(),
 }));
-vi.mock("@/lib/event-listeners", () => ({ notificarReserva: vi.fn(async () => undefined) }));
+vi.mock("@/lib/event-listeners", () => ({ notificarReserva: mocks.notificarReserva }));
 
 import { GET, POST } from "./route";
 import { CONSTRAINT_SIN_DOBLE_BOOKING } from "@/lib/errores-db";
@@ -331,5 +332,47 @@ describe("POST /api/reservas — la base como última palabra sobre el turno", (
     const res = await POST(peticion({}));
 
     expect(res.status).toBe(500);
+  });
+});
+
+describe("POST /api/reservas — el dueño agenda sin cobrar", () => {
+  beforeEach(() => {
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.canchaFindFirst.mockResolvedValue({
+      id: CANCHA, tenantId: DUENO, duracionSlotMinutos: 60,
+      complejo: { zonaHoraria: "America/Bogota" }, slots: [{ diaSemana: 1 }],
+    });
+    mocks.reservaFindFirst.mockResolvedValue(undefined);
+  });
+
+  it("queda CONFIRMADA debiendo todo: el dueño garantiza el turno", async () => {
+    // Un PAGO_PARCIAL con cero pagado sería un turno ocupado para siempre
+    // —PAGO_PARCIAL no expira— afirmando un pago que no existió.
+    await POST(peticion({ playerId: JUGADOR, montoPagado: 0 }));
+
+    const reserva = mocks.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(reserva.estado).toBe("CONFIRMADA");
+    expect(reserva.montoPagado).toBe("0.00");
+    expect(reserva.saldoPendiente).toBe("160000.00");
+  });
+
+  it("no deja fila en pagos: no entró plata", async () => {
+    await POST(peticion({ playerId: JUGADOR, montoPagado: 0 }));
+
+    expect(mocks.insertEnPagos).not.toHaveBeenCalled();
+  });
+
+  it("no avisa de un abono que nadie recibió", async () => {
+    await POST(peticion({ playerId: JUGADOR, montoPagado: 0 }));
+
+    expect(mocks.notificarReserva).toHaveBeenCalledWith("reserva-nueva", "RESERVA_CONFIRMADA");
+  });
+
+  it("un abono de verdad sí queda PAGO_PARCIAL", async () => {
+    await POST(peticion({ playerId: JUGADOR, montoPagado: 80000 }));
+
+    const reserva = mocks.insertEnReservas.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(reserva.estado).toBe("PAGO_PARCIAL");
+    expect(mocks.notificarReserva).toHaveBeenCalledWith("reserva-nueva", "PAGO_PARCIAL_RECIBIDO");
   });
 });
