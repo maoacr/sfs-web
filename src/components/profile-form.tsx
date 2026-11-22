@@ -108,6 +108,9 @@ export function ProfileForm() {
       const cuerpo = await res.json();
       if (!res.ok) throw new Error(cuerpo.error || "Error al subir la foto");
       setAvatarUrl(cuerpo.avatarUrl);
+      // El avatar del sidebar lo pinta un server component, así que no se
+      // enteraría de este cambio hasta una recarga completa.
+      router.refresh();
     } catch (err) {
       setErrorDeFoto(err instanceof Error ? err.message : "Error al subir la foto");
     } finally {

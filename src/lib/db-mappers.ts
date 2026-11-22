@@ -67,3 +67,15 @@ export function toApiUsuario<T extends NombreUsuario>(usuario: T) {
 export function nombreCompleto(usuario: NombreUsuario): string {
   return `${usuario.nombre} ${usuario.apellido}`.trim();
 }
+
+/**
+ * Iniciales para el avatar cuando el usuario no subió foto.
+ *
+ * Vive acá porque las muestran varios lugares —el perfil, el sidebar, la barra
+ * de abajo— y tres copias de la misma cuenta se desincronizan solas.
+ */
+export function inicialesDe(usuario: NombreUsuario): string {
+  const inicial = (parte: string) => parte.trim().split(" ")[0]?.[0] ?? "";
+  const iniciales = `${inicial(usuario.nombre)}${inicial(usuario.apellido)}`.toUpperCase();
+  return iniciales || "?";
+}

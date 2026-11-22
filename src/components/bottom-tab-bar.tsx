@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
+import type { UsuarioDeSesion } from "@/lib/usuario-de-sesion";
 
 interface TabItem {
   label: string;
@@ -17,10 +18,12 @@ interface OverflowItem {
   icon: string;
 }
 
-export function BottomTabBar({ tabs, overflow, role }: {
+export function BottomTabBar({ tabs, overflow, role, usuario }: {
   tabs: TabItem[];
   overflow?: OverflowItem[];
   role: "OWNER" | "PLAYER";
+  /** Null si no se pudo resolver la sesión: degrada al ícono genérico. */
+  usuario: UsuarioDeSesion | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -81,7 +84,15 @@ export function BottomTabBar({ tabs, overflow, role }: {
                   className={`w-full flex items-center gap-3.5 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
                     isActive(`/${role.toLowerCase()}/perfil`) ? "bg-field/40 text-grass-light" : "text-text-muted hover:bg-surface-hover hover:text-text"
                   }`}>
-                  <span className="text-lg">👤</span> Mi perfil
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-field text-[10px] font-bold text-grass-light">
+                    {usuario?.avatarUrl ? (
+                      /* `<img>` y no `next/image`: URL firmada que vence. */
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={usuario.avatarUrl} alt={usuario.nombre} className="h-full w-full object-cover" />
+                    ) : (
+                      usuario?.iniciales ?? "👤"
+                    )}
+                  </span> Mi perfil
                 </button>
 
                 {overflow.filter(o => !o.href.includes("/perfil")).map(item => (

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-const mocks = vi.hoisted(() => ({ apiFetch: vi.fn(), push: vi.fn() }));
+const mocks = vi.hoisted(() => ({ apiFetch: vi.fn(), push: vi.fn(), refresh: vi.fn() }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }));
 vi.mock("@/lib/api-client", () => ({ apiFetch: mocks.apiFetch }));
 
 import { ProfileForm } from "@/components/profile-form";
@@ -46,7 +46,11 @@ const inputDeFoto = () => screen.getByLabelText(/foto de perfil/i) as HTMLInputE
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  // Los mocks de vi.hoisted sobreviven a restoreAllMocks: sin resetearlos, un
+  // test ve las llamadas del anterior.
   mocks.apiFetch.mockReset();
+  mocks.refresh.mockReset();
+  mocks.push.mockReset();
   stubDeCarga(USUARIO);
 });
 
@@ -97,6 +101,32 @@ describe("ProfileForm — foto de perfil", () => {
 
     const foto = await screen.findByRole("img", { name: /foto de perfil/i });
     expect(foto).toHaveAttribute("src", "https://cdn.sfs.test/nueva?token=xyz");
+  });
+
+  it("refresca el layout para que el avatar del sidebar deje de estar viejo", async () => {
+    mocks.apiFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ avatarUrl: "https://cdn.sfs.test/nueva?token=xyz" }),
+    });
+    render(<ProfileForm />);
+    await screen.findByText("MC");
+
+    fireEvent.change(inputDeFoto(), { target: { files: [archivoDeImagen()] } });
+
+    // El sidebar lo pinta un server component: sin refresh sigue mostrando la
+    // foto anterior hasta una recarga completa.
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalled());
+  });
+
+  it("no refresca el layout si la subida falló", async () => {
+    mocks.apiFetch.mockResolvedValue({ ok: false, json: async () => ({ error: "falló" }) });
+    render(<ProfileForm />);
+    await screen.findByText("MC");
+
+    fireEvent.change(inputDeFoto(), { target: { files: [archivoDeImagen()] } });
+
+    await screen.findByText(/falló/i);
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   it("avisa al usuario cuando el servidor rechaza la imagen", async () => {
