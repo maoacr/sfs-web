@@ -154,6 +154,16 @@ export const POST = apiHandler<CreateReservaInput>(
     const cobrado = esOwner ? Math.min(montoPagado ?? montoTotal, montoTotal) : 0;
     const saldoReserva = montoTotal - cobrado;
 
+    // Un abono es plata que entró y no alcanzó. Sin plata no hay abono.
+    //
+    // La diferencia importa porque `PAGO_PARCIAL` significa "pagó al menos el
+    // mínimo" y NUNCA expira: usarlo con cero cobrado dejaría el turno ocupado
+    // para siempre afirmando un pago que no existió. El dueño que agenda sin
+    // cobrar garantiza el turno —queda CONFIRMADA— y la deuda la lleva
+    // `saldoPendiente`, que es el eje donde vive el dinero y lo que la pone en
+    // cuentas por cobrar.
+    const esAbono = cobrado > 0 && saldoReserva > 0;
+
     // El chequeo de arriba no puede ser suficiente, y no por estar mal escrito:
     // entre el SELECT y el INSERT hay una ventana, y dos requests simultáneos
     // la atraviesan los dos. La unicidad del turno la garantiza el constraint
@@ -178,7 +188,7 @@ export const POST = apiHandler<CreateReservaInput>(
             invitadoNombre: esOwner && !playerId ? (invitadoNombre ?? null) : null,
             montoPagado: cobrado.toFixed(2),
             saldoPendiente: saldoReserva.toFixed(2),
-            estado: esOwner ? (saldoReserva > 0 ? "PAGO_PARCIAL" : "CONFIRMADA") : "PENDIENTE_PAGO",
+            estado: esOwner ? (esAbono ? "PAGO_PARCIAL" : "CONFIRMADA") : "PENDIENTE_PAGO",
           })
           .returning();
 
@@ -207,7 +217,7 @@ export const POST = apiHandler<CreateReservaInput>(
 
     await notificarReserva(
       reserva.id,
-      !esOwner ? "RESERVA_CREADA" : saldoReserva > 0 ? "PAGO_PARCIAL_RECIBIDO" : "RESERVA_CONFIRMADA"
+      !esOwner ? "RESERVA_CREADA" : esAbono ? "PAGO_PARCIAL_RECIBIDO" : "RESERVA_CONFIRMADA"
     );
 
     return NextResponse.json(reserva, { status: 201 });
