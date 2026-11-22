@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
+import { explicarPago } from "@/lib/resultado-pago";
 import { apiFetch } from "@/lib/api-client";
 import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago";
 import { ConfirmarCancelacion } from "@/components/confirmar-cancelacion";
@@ -18,6 +19,12 @@ interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
   player: { primerNombre: string; apellidos: string; apodo: string | null; telefono: string | null };
   slotInicio: string; slotFin: string; montoTotal: number; montoPagado: number; saldoPendiente: number; estado: string;
+  /**
+   * El último intento de pago. El API ya lo mandaba y esta pantalla lo
+   * ignoraba, así que el mostrador no sabía por qué una reserva seguía sin
+   * pagar: el jugador decía "ya pagué" y el dueño no tenía con qué responderle.
+   */
+  ultimoPago?: { estadoPago: string; detalleEstado: string | null; monto: number; createdAt: string } | null;
 }
 
 const ESTADOS: Record<string, { label: string; color: string }> = {
@@ -41,6 +48,30 @@ const accionable = (r: Reserva): ReservaAccionable => ({
 
 interface Filter { complejoId: string; canchaId: string }
 interface ComplejoOpt { id: string; nombre: string; canchas: { id: string; nombre: string }[] }
+
+/**
+ * Qué pasó con el último intento de pago, cuando no se acreditó.
+ *
+ * Muestra **el mismo mensaje que vio el jugador** en vez de una traducción
+ * propia: así el mostrador sabe exactamente qué leyó la persona que tiene
+ * enfrente, y no hay dos vocabularios que se desincronicen.
+ */
+function IntentoDePago({ ultimoPago }: {
+  ultimoPago?: { estadoPago: string; detalleEstado: string | null } | null;
+}) {
+  if (!ultimoPago || ultimoPago.estadoPago === "APROBADO") return null;
+
+  const explicacion = ultimoPago.detalleEstado
+    ? explicarPago(undefined, ultimoPago.detalleEstado)
+    : null;
+
+  return (
+    <p className="mt-0.5 text-[10px] text-warning">
+      Último pago: {ultimoPago.estadoPago.toLowerCase()}
+      {explicacion && <span className="text-text-dim"> · {explicacion.mensaje}</span>}
+    </p>
+  );
+}
 
 const formatearPrecio = (monto: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
@@ -134,6 +165,7 @@ export default function OwnerReservas() {
                     {r.player.telefono && <span className="ml-1 text-text-dim">📞 {r.player.telefono}</span>}
                   </p>
                   <p className="text-[10px] text-text-dim">{r.cancha.complejo.nombre} · {formatearPrecio(Number(r.montoTotal))}</p>
+                  <IntentoDePago ultimoPago={r.ultimoPago} />
                 </div>
               </div>
               <div className="flex items-center gap-2">
