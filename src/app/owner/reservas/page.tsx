@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
 import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago";
+import { METODOS_DE_MOSTRADOR, requiereEntidad } from "@/lib/metodos-de-mostrador";
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
@@ -217,6 +218,22 @@ function ConfirmarCancelacion({ reserva, onCerrar, onConfirmar }: {
   );
 }
 
+/**
+ * Qué pasó con la plata al agendar en el mostrador.
+ *
+ * Son tres hechos distintos, no un monto con casos borde. `TODO` es el default
+ * porque es lo que venía haciendo el formulario —y lo más común—, pero antes
+ * era implícito: toda reserva manual dejaba una fila de pago en efectivo por
+ * el total, cobrara el dueño o no.
+ */
+type TipoDeCobro = "TODO" | "ABONO" | "NADA";
+
+const COBROS = [
+  { valor: "TODO", label: "Cobré todo" },
+  { valor: "ABONO", label: "Cobré un abono" },
+  { valor: "NADA", label: "No cobré nada" },
+] as const satisfies readonly { valor: TipoDeCobro; label: string }[];
+
 interface CanchaOpt { id: string; nombre: string; tipo: string }
 interface ClienteOpt { id: string; primerNombre: string; apellidos: string; telefono: string | null }
 
@@ -228,8 +245,15 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const [clienteTexto, setClienteTexto] = useState("");
   const [sugerencias, setSugerencias] = useState<ClienteOpt[]>([]);
   const [elegido, setElegido] = useState<ClienteOpt | null>(null);
+  const [cobro, setCobro] = useState<TipoDeCobro>("TODO");
+  const [montoAbonado, setMontoAbonado] = useState(0);
+  const [metodo, setMetodo] = useState<string>("EFECTIVO");
+  const [entidad, setEntidad] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const huboPlata = cobro !== "NADA";
+  const pideEntidad = huboPlata && requiereEntidad(metodo);
 
   useEffect(() => { fetch("/api/canchas?activas=true")
       .then(r => r.json())
@@ -260,6 +284,15 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
           // Con cliente elegido la reserva queda vinculada a su cuenta y la ve
           // en su app. Sin elegir, se anota el nombre y no se bloquea nada.
           ...(elegido ? { playerId: elegido.id } : { invitadoNombre: clienteTexto.trim() }),
+          // «Cobré todo» NO manda monto: el precio lo calcula el servidor con
+          // el motor de tarifas y el navegador no lo conoce. Mandar un número
+          // adivinado acá sería inventar el total.
+          ...(cobro === "ABONO" ? { montoPagado: montoAbonado } : {}),
+          ...(cobro === "NADA" ? { montoPagado: 0 } : {}),
+          // Sin plata no hay nada que clasificar: mandar un método sería
+          // registrar la forma de un pago que no existió.
+          ...(huboPlata ? { metodo } : {}),
+          ...(pideEntidad && entidad.trim() ? { entidad: entidad.trim() } : {}),
         }) });
       if (!res.ok) { const errorBody = await res.json(); throw new Error(errorBody.error); }
       onCreated();
@@ -315,6 +348,59 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
               </p>
             ) : null}
           </div>
+          <div>
+            <label htmlFor="cobro" className="block text-sm font-medium text-text">Cobro</label>
+            <select id="cobro" value={cobro}
+              onChange={e => setCobro(e.target.value as TipoDeCobro)} className={i}>
+              {COBROS.map(opcion => (
+                <option key={opcion.valor} value={opcion.valor}>{opcion.label}</option>
+              ))}
+            </select>
+            {cobro === "NADA" && (
+              <p className="mt-1 text-xs text-warning">
+                La reserva queda debiendo todo. Aparece en Cobros, y el saldo le bloquea
+                reservar de nuevo hasta que pague.
+              </p>
+            )}
+          </div>
+
+          {cobro === "ABONO" && (
+            <div>
+              <label htmlFor="monto-abonado" className="block text-sm font-medium text-text">
+                Monto cobrado
+              </label>
+              <input id="monto-abonado" type="number" inputMode="numeric" min={0}
+                value={montoAbonado} onChange={e => setMontoAbonado(Number(e.target.value))}
+                className={i} />
+              <p className="mt-1 text-xs text-text-dim">
+                Si te pasás del precio del turno, se registra el total y la reserva queda sin saldo.
+              </p>
+            </div>
+          )}
+
+          {huboPlata && (
+            <div>
+              <label htmlFor="metodo" className="block text-sm font-medium text-text">Método</label>
+              <select id="metodo" value={metodo} onChange={e => setMetodo(e.target.value)} className={i}>
+                {METODOS_DE_MOSTRADOR.map(metodoDisponible => (
+                  <option key={metodoDisponible.valor} value={metodoDisponible.valor}>
+                    {metodoDisponible.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {pideEntidad && (
+            <div>
+              <label htmlFor="entidad" className="block text-sm font-medium text-text">
+                Entidad o banco
+              </label>
+              <input id="entidad" type="text" value={entidad} onChange={e => setEntidad(e.target.value)}
+                placeholder="Nequi, Daviplata, Bancolombia, Davivienda…" className={i} />
+            </div>
+          )}
+
           {error && <p className="text-sm text-error">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm text-text-muted hover:bg-surface-hover">Cancelar</button>
