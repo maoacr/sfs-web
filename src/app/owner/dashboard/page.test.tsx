@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import OwnerDashboard from "./page";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
+const apiFetch = vi.fn();
+vi.mock("@/lib/api-client", () => ({ apiFetch: (...a: unknown[]) => apiFetch(...(a as [])) }));
 
 function reserva(over: Record<string, unknown> = {}) {
   return {
@@ -12,6 +15,11 @@ function reserva(over: Record<string, unknown> = {}) {
     slotInicio: "2026-11-22T14:00:00.000Z",
     slotFin: "2026-11-22T15:00:00.000Z",
     estado: "PAGO_PARCIAL",
+    montoTotal: 100000,
+    montoPagado: 50000,
+    saldoPendiente: 50000,
+    invitadoNombre: null,
+    ultimoPago: null,
     ...over,
   };
 }
@@ -31,6 +39,8 @@ function montarCon(lista: unknown[]) {
 }
 
 beforeEach(() => {
+  apiFetch.mockReset();
+  apiFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
   vi.useFakeTimers({ shouldAdvanceTime: true });
   // Hoy es el 2026-11-22 en Bogotá. Sin fijarlo, el test se rompería mañana.
   vi.setSystemTime(new Date("2026-11-22T17:00:00.000Z"));
@@ -120,5 +130,101 @@ describe("OwnerDashboard — la sección lista lo que falta cerrar, no lo que ya
     expect(await screen.findByText("2")).toBeInTheDocument();
     expect(screen.getByText(/cancha 7/i)).toBeInTheDocument();
     expect(screen.queryByText(/cancha 1/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("OwnerDashboard — el detalle de la reserva", () => {
+  async function abrirDetalle(over: Record<string, unknown> = {}) {
+    montarCon([reserva(over)]);
+    fireEvent.click(await screen.findByRole("button", { name: /cancha 1/i }));
+  }
+
+  it("la tarjeta se puede abrir: es un botón, no un div decorativo", async () => {
+    montarCon([reserva()]);
+
+    expect(await screen.findByRole("button", { name: /cancha 1/i })).toBeInTheDocument();
+  });
+
+  it("al abrirla muestra de qué reserva se trata", async () => {
+    await abrirDetalle();
+
+    const detalle = screen.getByRole("dialog");
+    expect(within(detalle).getByText(/cancha 1/i)).toBeInTheDocument();
+    expect(within(detalle).getByText(/norte/i)).toBeInTheDocument();
+    expect(within(detalle).getByText(/juan pérez/i)).toBeInTheDocument();
+  });
+
+  it("muestra la plata desglosada: total, pagado y saldo", async () => {
+    await abrirDetalle();
+
+    const detalle = screen.getByRole("dialog");
+    expect(within(detalle).getByText(/100\.000/)).toBeInTheDocument();
+    expect(within(detalle).getAllByText(/50\.000/).length).toBeGreaterThan(0);
+    expect(within(detalle).getByText(/saldo/i)).toBeInTheDocument();
+  });
+
+  it("dice que la reserva es de un invitado, no del dueño a cuya cuenta apunta", async () => {
+    await abrirDetalle({ invitadoNombre: "Pedro Sin Cuenta" });
+
+    expect(within(screen.getByRole("dialog")).getByText(/pedro sin cuenta/i)).toBeInTheDocument();
+  });
+
+  it("muestra el último intento de pago, que explica por qué no se acreditó", async () => {
+    await abrirDetalle({
+      ultimoPago: { estadoPago: "RECHAZADO", detalleEstado: "cc_rejected_insufficient_amount", monto: 50000, createdAt: "2026-11-22T13:30:00.000Z" },
+    });
+
+    const detalle = screen.getByRole("dialog");
+    expect(within(detalle).getByText(/rechazado/i)).toBeInTheDocument();
+    expect(within(detalle).getByText(/insufficient/i)).toBeInTheDocument();
+  });
+
+  it("con saldo ofrece cobrarlo", async () => {
+    await abrirDetalle();
+
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: /cobrar/i })).toBeInTheDocument();
+  });
+
+  it("sin saldo no ofrece cobrar lo que no se debe", async () => {
+    await abrirDetalle({ saldoPendiente: 0, montoPagado: 100000 });
+
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: /cobrar/i })).not.toBeInTheDocument();
+  });
+
+  it("marcar jugada cierra el turno y no pide confirmación: no es destructivo", async () => {
+    await abrirDetalle();
+
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /marcar.*jugada/i }));
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const [ruta, opciones] = apiFetch.mock.calls[0] as unknown as [string, { body: string }];
+    expect(ruta).toBe("/api/reservas/reserva-1");
+    expect(JSON.parse(opciones.body)).toEqual({ estado: "COMPLETADA" });
+  });
+
+  it("cancelar SÍ pide confirmación antes de tocar nada", async () => {
+    await abrirDetalle();
+
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /cancelar la reserva/i }));
+
+    expect(apiFetch).not.toHaveBeenCalled();
+    expect(screen.getByText(/¿cancelar esta reserva\?/i)).toBeInTheDocument();
+  });
+
+  it("la confirmación de cancelar avisa de la plata ya pagada", async () => {
+    await abrirDetalle();
+
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /cancelar la reserva/i }));
+
+    expect(screen.getByText(/política de reembolso/i)).toBeInTheDocument();
+  });
+
+  it("se puede cerrar el detalle sin hacer nada", async () => {
+    await abrirDetalle();
+
+    fireEvent.click(screen.getByRole("button", { name: /cerrar el detalle/i }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(apiFetch).not.toHaveBeenCalled();
   });
 });

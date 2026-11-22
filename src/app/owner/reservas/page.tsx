@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
 import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago";
+import { ConfirmarCancelacion } from "@/components/confirmar-cancelacion";
 import { METODOS_DE_MOSTRADOR, requiereEntidad } from "@/lib/metodos-de-mostrador";
 import {
   sePuedeCobrar,
@@ -172,7 +173,12 @@ export default function OwnerReservas() {
 
       {cancelando && (
         <ConfirmarCancelacion
-          reserva={cancelando}
+          reserva={{
+            titular: nombreDe(cancelando.player),
+            cancha: cancelando.cancha.nombre,
+            horario: formatearHora(cancelando.slotInicio, cancelando.cancha.complejo.zonaHoraria),
+            montoPagado: Number(cancelando.montoPagado ?? 0),
+          }}
           onCerrar={() => setCancelando(null)}
           onConfirmar={() => { const id = cancelando.id; setCancelando(null); cambiarEstado(id, "CANCELADA"); }}
         />
@@ -185,49 +191,6 @@ export default function OwnerReservas() {
           onRegistrado={() => { setCobrando(null); setRecargas(n => n + 1); }}
         />
       )}
-    </div>
-  );
-}
-
-/**
- * Cancelar no es "sacar de la lista": dispara la política de reembolso del
- * complejo y le devuelve plata al jugador. Antes era una `✕` de diez píxeles
- * sin etiqueta ni confirmación, al lado de un `✓` que hacía algo
- * completamente distinto.
- */
-function ConfirmarCancelacion({ reserva, onCerrar, onConfirmar }: {
-  reserva: Reserva; onCerrar: () => void; onConfirmar: () => void;
-}) {
-  const pagado = Number(reserva.montoPagado ?? 0);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4">
-      <div role="dialog" aria-labelledby="titulo-cancelar"
-        className="w-full max-w-md rounded-t-2xl border border-border bg-bg p-5 sm:rounded-2xl">
-        <h2 id="titulo-cancelar" className="text-lg font-bold text-text">¿Cancelar esta reserva?</h2>
-        <p className="mt-2 text-sm text-text-muted">
-          {reserva.cancha.nombre} · {nombreDe(reserva.player)} ·{" "}
-          {formatearHora(reserva.slotInicio, reserva.cancha.complejo.zonaHoraria)}
-        </p>
-
-        {pagado > 0 && (
-          <p className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-text">
-            Ya pagó {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(pagado)}.
-            Al cancelar se le aplica la política de reembolso del complejo.
-          </p>
-        )}
-
-        <div className="mt-6 flex gap-2">
-          <button onClick={onCerrar} type="button"
-            className="min-h-11 flex-1 rounded-xl border border-border px-4 text-sm font-medium text-text-muted hover:bg-surface-hover">
-            No, dejarla
-          </button>
-          <button onClick={onConfirmar} type="button"
-            className="min-h-11 flex-1 rounded-xl bg-error px-4 text-sm font-semibold text-white hover:opacity-90">
-            Sí, cancelar
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
