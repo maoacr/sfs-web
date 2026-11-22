@@ -8,29 +8,44 @@ import { fechaHoy, formatearHora } from "@/lib/zona-horaria";
 
 interface Complejo { id: string; nombre: string; direccion: string; canchas: { id: string; nombre: string; tipo: string }[]; }
 
+interface ReservaDeHoy {
+  id: string;
+  cancha: { nombre: string; complejo: { nombre: string; zonaHoraria: string } };
+  player: { primerNombre: string; apellidos: string; apodo: string | null };
+  slotInicio: string;
+  slotFin: string;
+}
+
+/** Cuántas reservas de hoy se listan como tarjeta antes de cortar. */
+const TARJETAS_VISIBLES = 5;
+
+/** Cada cuánto se repregunta. El dueño deja el panel abierto en el mostrador. */
+const REFRESCO_MS = 10_000;
+
 export default function OwnerDashboard() {
   const router = useRouter();
   const [complejos, setComplejos] = useState<Complejo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [reservasHoy, setReservasHoy] = useState(0);
-
-  const [reservasActivas, setReservasActivas] = useState<any[]>([]);
+  const [reservasDeHoy, setReservasDeHoy] = useState<ReservaDeHoy[]>([]);
 
   useEffect(() => {
     const load = () => {
       Promise.all([
         fetch("/api/complejos").then(r => r.json()),
-        fetch(`/api/reservas?fecha=&estado=CONFIRMADA`).then(r => r.json()),
+        // `fecha` se manda SIEMPRE con el día de hoy: el API lee la fecha vacía
+        // como "no filtres" y devolvía la historia entera, así que la sección
+        // "hoy" mostraba reservas de cualquier día. Y `efectivas` en vez de un
+        // estado suelto, porque una reserva con abono también es una reserva:
+        // pedir sólo CONFIRMADA escondía las de PAGO_PARCIAL.
+        fetch(`/api/reservas?fecha=${fechaHoy()}&efectivas=true`).then(r => r.json()),
       ]).then(([complejosData, reservasData]) => {
         setComplejos(Array.isArray(complejosData) ? complejosData : []);
-        setReservasHoy(Array.isArray(reservasData) ? reservasData.length : 0);
-        setReservasActivas(Array.isArray(reservasData) ? reservasData.slice(0, 5) : []);
+        setReservasDeHoy(Array.isArray(reservasData) ? reservasData : []);
       }).catch(console.error).finally(() => setLoading(false));
     };
     load();
-    // Auto-refresh cada 30 segundos
-    const interval = setInterval(load, 10000);
+    const interval = setInterval(load, REFRESCO_MS);
     return () => clearInterval(interval);
   }, []);
 
@@ -54,14 +69,14 @@ export default function OwnerDashboard() {
       <div className="grid gap-4 sm:grid-cols-3 mb-10">
         <StatCard label="Complejos" value={loading ? "—" : complejos.length} icon="🏟️" />
         <StatCard label="Canchas" value={loading ? "—" : totalCanchas} icon="⚽" />
-        <StatCard label="Reservas hoy" value={loading ? "—" : reservasHoy} icon="📅" />
+        <StatCard label="Reservas hoy" value={loading ? "—" : reservasDeHoy.length} icon="📅" />
       </div>
 
-      {/* Reservas activas en tiempo real */}
-      {reservasActivas.length > 0 && (
+      {/* Las reservas de hoy, repreguntadas cada REFRESCO_MS */}
+      {reservasDeHoy.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider">Reservas activas hoy</h2>
+            <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider">Reservas de hoy</h2>
             <span className="text-xs text-grass-light flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-grass opacity-75"></span>
@@ -72,7 +87,7 @@ export default function OwnerDashboard() {
           </div>
           <div className="overflow-x-auto -mx-4 px-4">
             <div className="flex gap-3 min-w-max">
-              {reservasActivas.map((r: any) => (
+              {reservasDeHoy.slice(0, TARJETAS_VISIBLES).map(r => (
                 <div key={r.id} className="rounded-xl border border-grass/20 bg-field/10 px-4 py-3 min-w-[220px]">
                   <p className="text-sm font-semibold text-text">{r.cancha.nombre}</p>
                   <p className="text-xs text-text-dim">{r.cancha.complejo.nombre}</p>

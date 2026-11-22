@@ -12,7 +12,7 @@ import {
 import { and, eq, gt, inArray, isNull, lt, asc, desc, notInArray, type SQL } from "drizzle-orm";
 import { aInstante } from "@/lib/zona-horaria";
 import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
-import { reservasDelDiaLocal, reservaOcupaElTurno } from "@/lib/consultas";
+import { ESTADOS_EFECTIVOS, reservasDelDiaLocal, reservaOcupaElTurno } from "@/lib/consultas";
 import { apiHandler } from "@/lib/api-handler";
 import { createReservaSchema, type CreateReservaInput } from "@/lib/schemas";
 import { notificarReserva } from "@/lib/event-listeners";
@@ -256,6 +256,15 @@ export const GET = apiHandler(
         return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
       }
       condiciones.push(eq(reservas.estado, estadoValido));
+    }
+
+    // Las reservas que valen: el turno se vendió y la plata entró, o el partido
+    // ya se jugó. Es un filtro propio y no una lista de estados en la query a
+    // propósito: qué estados cuentan es una regla de negocio, y si el cliente
+    // los enumera, cada pantalla termina con su propia versión de la regla.
+    // Mismo criterio que `conSaldo`, abajo.
+    if (searchParams.get("efectivas") === "true") {
+      condiciones.push(inArray(reservas.estado, [...ESTADOS_EFECTIVOS]));
     }
 
     // Cuentas por cobrar. No se filtra por estado porque deber no es un
