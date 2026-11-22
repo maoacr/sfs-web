@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { apiHandler } from "@/lib/api-handler";
 import { updateProfileSchema } from "@/lib/schemas";
 import { setCsrfCookie } from "@/lib/csrf";
+import { signedUrlFor, AVATAR_URL_TTL_SEGUNDOS } from "@/lib/storage";
 
 /**
  * GET /api/auth/me
@@ -26,6 +27,7 @@ export const GET = apiHandler(
         tiktok: true,
         twitter: true,
         facebook: true,
+        avatarUrl: true,
         createdAt: true,
       },
     });
@@ -49,6 +51,9 @@ export const GET = apiHandler(
         tiktok: user.tiktok,
         twitter: user.twitter,
         facebook: user.facebook,
+        // En la columna vive la ruta del objeto privado; al cliente solo le
+        // viaja una URL firmada que vence.
+        avatarUrl: await signedUrlFor(user.avatarUrl ?? "", AVATAR_URL_TTL_SEGUNDOS),
         createdAt: user.createdAt,
       },
     });
