@@ -14,6 +14,7 @@ import {
   sePuedeCancelar,
   type ReservaAccionable,
 } from "@/lib/acciones-de-reserva";
+import { formatearPrecio } from "@/lib/moneda";
 
 interface Reserva {
   id: string; cancha: { nombre: string; tipo: string; complejo: { nombre: string; zonaHoraria: string } };
@@ -72,9 +73,6 @@ function IntentoDePago({ ultimoPago }: {
     </p>
   );
 }
-
-const formatearPrecio = (monto: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
 
 export default function OwnerReservas() {
   const [reservas, setReservas] = useState<Reserva[]>([]);

@@ -10,6 +10,7 @@ import { formatAddress } from "@/lib/address";
 import { fechaHoy } from "@/lib/zona-horaria";
 import "swiper/css";
 import "swiper/css/pagination";
+import { formatearPrecio } from "@/lib/moneda";
 
 interface Slot { inicio: string; fin: string; horaInicio: string; horaFin: string; disponible: boolean }
 interface CanchaSlot { id: string; nombre: string; tipo: string; capacidad: number; descripcion: string | null; servicios: string[]; duracionSlotMinutos: number; precioBase: number | null; imagen: string | null; imagenes: string[]; slots: Slot[] }
@@ -76,7 +77,6 @@ export default function PlayerBuscar() {
     } finally { setBooking(null); }
   }
 
-  const formatearPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
   const fechaLarga = (f: string) => new Date(f + "T00:00:00").toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
 
   return (
@@ -124,7 +124,7 @@ export default function PlayerBuscar() {
         >
           {complejos.map(comp => (
             <SwiperSlide key={comp.id} className="!flex !flex-col" style={{ height: "100%" }}>
-              <ComplejoCard complejo={comp} formatearPrecio={formatearPrecio} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} isMobile />
+              <ComplejoCard complejo={comp} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} isMobile />
             </SwiperSlide>
           ))}
         </Swiper>
@@ -133,7 +133,7 @@ export default function PlayerBuscar() {
         <div className="hidden md:block flex-1 overflow-y-auto p-4 space-y-6">
           {complejos.map(comp => (
               <div key={comp.id} className="rounded-2xl border border-border bg-surface overflow-hidden h-[28rem] lg:h-[32rem]">
-              <ComplejoCard complejo={comp} formatearPrecio={formatearPrecio} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
+              <ComplejoCard complejo={comp} onSelect={(c) => setSelectedCancha({...c, complejoNombre: comp.nombre, complejoDireccion: comp.direccion, complejoLat: comp.lat, complejoLng: comp.lng})} />
             </div>
           ))}
         </div>
@@ -146,7 +146,7 @@ export default function PlayerBuscar() {
           cancha={selectedCancha} complejoNombre={selectedCancha.complejoNombre}
           complejoDireccion={selectedCancha.complejoDireccion}
           complejoLat={selectedCancha.complejoLat} complejoLng={selectedCancha.complejoLng}
-          formatearPrecio={formatearPrecio} booking={booking}
+          booking={booking}
           onReservar={reservar} onClose={() => setSelectedCancha(null)}
         />
       )}
@@ -174,9 +174,8 @@ export function admiteLoop(count: number, slidesPerView: number): boolean {
   return count >= slidesPerView * 2 + 1;
 }
 
-function ComplejoCard({ complejo, formatearPrecio, onSelect, isMobile }: {
+function ComplejoCard({ complejo, onSelect, isMobile }: {
   complejo: ComplejoSlot;
-  formatearPrecio: (n: number) => string;
   onSelect: (cancha: CanchaSlot) => void;
   isMobile?: boolean;
 }) {
@@ -308,10 +307,9 @@ function ComplejoCard({ complejo, formatearPrecio, onSelect, isMobile }: {
    Cancha Detail Sheet
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, formatearPrecio, booking, onReservar, onClose }: {
+function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejoLat, complejoLng, booking, onReservar, onClose }: {
   cancha: CanchaSlot; complejoNombre: string; complejoDireccion: string;
   complejoLat: number | null; complejoLng: number | null;
-  formatearPrecio: (n: number) => string;
   booking: string | null; onReservar: (canchaId: string, slot: Slot) => void; onClose: () => void;
 }) {
   const slotsLibres = cancha.slots.filter(s => s.disponible);
@@ -338,7 +336,7 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-10 h-1 rounded-full bg-border" />
           </div>
-          <DetailImage cancha={cancha} formatearPrecio={formatearPrecio} onClose={onClose} />
+          <DetailImage cancha={cancha} onClose={onClose} />
           <DetailContent cancha={cancha} complejoNombre={complejoNombre} complejoDireccion={complejoDireccion}
             complejoLat={complejoLat} complejoLng={complejoLng} slotsLibres={slotsLibres}
             booking={booking} onReservar={onReservar} />
@@ -408,8 +406,8 @@ function CanchaDetailSheet({ cancha, complejoNombre, complejoDireccion, complejo
   );
 }
 
-function DetailImage({ cancha, formatearPrecio, onClose, className = "" }: {
-  cancha: CanchaSlot; formatearPrecio: (n: number) => string; onClose: () => void; className?: string;
+function DetailImage({ cancha, onClose, className = "" }: {
+  cancha: CanchaSlot; onClose: () => void; className?: string;
 }) {
   return (
     <div className={`relative bg-surface-hover overflow-hidden ${className || "h-48 lg:h-56"}`}>

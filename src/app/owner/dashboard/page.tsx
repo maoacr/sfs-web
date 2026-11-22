@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api-client";
 import { RegistrarPago, type ReservaACobrar } from "@/components/registrar-pago";
 import { ConfirmarCancelacion } from "@/components/confirmar-cancelacion";
 import { sePuedeCobrar, sePuedeMarcarJugada, sePuedeCancelar } from "@/lib/acciones-de-reserva";
+import { formatearPrecio } from "@/lib/moneda";
 
 interface Complejo { id: string; nombre: string; direccion: string; canchas: { id: string; nombre: string; tipo: string }[]; }
 
@@ -27,9 +28,6 @@ interface ReservaDeHoy {
   /** El último intento de pago: es lo que explica por qué no se acreditó. */
   ultimoPago: { estadoPago: string; detalleEstado: string | null; monto: number; createdAt: string } | null;
 }
-
-const formatearPrecio = (monto: number) =>
-  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
 
 const nombreDe = (reserva: ReservaDeHoy) =>
   reserva.invitadoNombre ?? `${reserva.player.primerNombre} ${reserva.player.apellidos}`.trim();
