@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getAuthUser: vi.fn(),
   limit: vi.fn(),
   saldosPendientesDe: vi.fn(),
+  insertado: vi.fn(),
+  usuarioFindFirst: vi.fn(),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -18,6 +20,13 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@sfs/db", () => ({
   db: {
+    query: { usuarios: { findFirst: mocks.usuarioFindFirst } },
+    insert: () => ({
+      values: (valores: Record<string, unknown>) => {
+        mocks.insertado(valores);
+        return { returning: async () => [{ id: "cliente-nuevo", ...valores }] };
+      },
+    }),
     selectDistinct: () => ({
       from: () => ({
         innerJoin: () => ({
@@ -37,7 +46,7 @@ vi.mock("@/lib/auth-api", async () => {
   return { ...real, getAuthUser: mocks.getAuthUser };
 });
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 const DUENO = "11111111-1111-1111-1111-111111111111";
 
@@ -64,6 +73,7 @@ beforeEach(() => {
   mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
   mocks.limit.mockResolvedValue([cliente()]);
   mocks.saldosPendientesDe.mockResolvedValue(new Map());
+  mocks.usuarioFindFirst.mockResolvedValue(undefined);
 });
 
 describe("GET /api/clientes — el saldo viaja con el cliente", () => {
@@ -126,5 +136,102 @@ describe("GET /api/clientes — el saldo viaja con el cliente", () => {
 
     expect(respuesta.status).toBe(403);
     expect(mocks.saldosPendientesDe).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/clientes — registro rápido desde el mostrador", () => {
+  function alta(cuerpo: Record<string, unknown>) {
+    return new NextRequest("http://localhost/api/clientes", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        // `apiHandler` exige CSRF en los métodos que escriben: el header tiene
+        // que coincidir con la cookie.
+        "x-csrf-token": "token-csrf",
+        cookie: "sfs_token=x; csrf_token=token-csrf",
+      },
+      body: JSON.stringify(cuerpo),
+    });
+  }
+
+  const MINIMO = { primerNombre: "Pedro", apellidos: "Sin Cuenta" };
+
+  it("alcanza con nombre y apellido: en el mostrador no se puede pedir más", async () => {
+    const respuesta = await POST(alta(MINIMO));
+
+    expect(respuesta.status).toBe(201);
+    expect(mocks.insertado).toHaveBeenCalledTimes(1);
+  });
+
+  it("la cuenta nace SIN contraseña: el dueño no elige credenciales ajenas", async () => {
+    await POST(alta(MINIMO));
+
+    const fila = mocks.insertado.mock.calls[0][0];
+    expect(fila.passwordHash ?? null).toBeNull();
+  });
+
+  it("y siempre como PLAYER: no es un camino para fabricar dueños", async () => {
+    await POST(alta({ ...MINIMO, role: "OWNER", rol: "OWNER" }));
+
+    expect(mocks.insertado.mock.calls[0][0].rol).toBe("PLAYER");
+  });
+
+  it("sin email guarda null, no un string vacío que ocuparía el índice único", async () => {
+    await POST(alta(MINIMO));
+
+    expect(mocks.insertado.mock.calls[0][0].email).toBeNull();
+  });
+
+  it("con email lo normaliza, que es como lo va a buscar el login de Google", async () => {
+    await POST(alta({ ...MINIMO, email: "  Pedro@GMAIL.com " }));
+
+    expect(mocks.insertado.mock.calls[0][0].email).toBe("pedro@gmail.com");
+  });
+
+  it("un email ya registrado no se pisa: la cuenta de otro no se toca", async () => {
+    mocks.usuarioFindFirst.mockResolvedValue({ id: "ya-existe" });
+
+    const respuesta = await POST(alta({ ...MINIMO, email: "pedro@gmail.com" }));
+
+    expect(respuesta.status).toBe(409);
+    expect(mocks.insertado).not.toHaveBeenCalled();
+  });
+
+  it("sin email no pregunta por duplicados: varios nulos conviven", async () => {
+    await POST(alta(MINIMO));
+
+    expect(mocks.usuarioFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("devuelve al cliente listo para elegirlo, con saldo cero", async () => {
+    const respuesta = await POST(alta(MINIMO));
+    const creado = await respuesta.json();
+
+    expect(creado.id).toBe("cliente-nuevo");
+    expect(creado.primerNombre).toBe("Pedro");
+    expect(creado.apellidos).toBe("Sin Cuenta");
+    expect(creado.saldoPendiente).toBe(0);
+  });
+
+  it("junta los dos nombres en la columna `nombre`, como el registro normal", async () => {
+    await POST(alta({ ...MINIMO, segundoNombre: "José" }));
+
+    expect(mocks.insertado.mock.calls[0][0].nombre).toBe("Pedro José");
+  });
+
+  it("un jugador no puede crear clientes", async () => {
+    mocks.getAuthUser.mockResolvedValue({ sub: "otro", email: "j@sfs.test", role: "PLAYER" });
+
+    const respuesta = await POST(alta(MINIMO));
+
+    expect(respuesta.status).toBe(403);
+    expect(mocks.insertado).not.toHaveBeenCalled();
+  });
+
+  it("sin nombre no se crea nada: la reserva no se podría ni leer", async () => {
+    const respuesta = await POST(alta({ apellidos: "Solo Apellido" }));
+
+    expect(respuesta.status).toBe(400);
+    expect(mocks.insertado).not.toHaveBeenCalled();
   });
 });
