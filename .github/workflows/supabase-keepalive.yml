@@ -4,10 +4,20 @@ name: Supabase keepalive
 # "user database activity". Los docs piden unas pocas queries por día:
 # https://supabase.com/docs/guides/platform/free-project-pausing
 #
-# Este workflow existe porque el cron de Vercel (/api/cron/liberar-expiradas)
-# sólo corre en deployments de producción. Mientras la app no esté deployada,
-# nada toca la base y el proyecto se pausa. Una vez deployado a producción,
-# ese cron ya genera actividad de sobra y este workflow se puede borrar.
+# Hay dos proyectos, y el riesgo no es el mismo en cada uno:
+#
+# - **producción** ya está deployada, así que el cron de Vercel
+#   (`/api/cron/liberar-expiradas`, diario) más el tráfico real generan
+#   actividad de sobra. Su ping quedó redundante; se mantiene como red de
+#   seguridad porque cuesta tres queries al día.
+# - **sfs-dev** no recibe tráfico: sólo lo toca `pnpm dev` cuando alguien está
+#   programando. Una semana sin tocar el proyecto y se pausa. Para esta base el
+#   workflow no es redundante — es lo único que la mantiene viva.
+#
+# Un job por entorno (matrix) y NO dos pasos en el mismo job, a propósito: con
+# `set -euo pipefail` un fallo en el primer paso aborta el job y el segundo
+# nunca corre. Dicho de otra forma, un problema en producción haría que dev se
+# pausara en silencio. Con `fail-fast: false` cada base se pingea por su cuenta.
 
 on:
   schedule:
@@ -18,19 +28,32 @@ on:
 
 jobs:
   ping:
+    name: Ping ${{ matrix.entorno }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - entorno: produccion
+            secreto: DATABASE_URL
+          - entorno: sfs-dev
+            secreto: DATABASE_URL_DEV
+
     steps:
       - name: Ping la base de datos
         env:
           # Usar la connection string del pooler de Supabase (Supavisor), no la
           # conexión directa: los runners de GitHub no tienen IPv6.
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets[matrix.secreto] }}
+          # El nombre del secret viaja aparte para poder nombrarlo en el error.
+          SECRETO: ${{ matrix.secreto }}
         run: |
           set -euo pipefail
 
           if [ -z "${DATABASE_URL}" ]; then
-            echo "::error::Falta el secret DATABASE_URL en el repositorio."
+            echo "::error::Falta el secret ${SECRETO} en el repositorio."
             exit 1
           fi
 
