@@ -87,9 +87,10 @@ export async function notificarCambioReserva(event: {
   zonaHoraria: string;
   playerId: string;
   playerNombre: string;
-  playerEmail: string;
+  /** Null si el jugador es un cliente del mostrador sin email. */
+  playerEmail: string | null;
   tenantId: string;
-  tenantEmail: string;
+  tenantEmail: string | null;
   montoTotal?: string | null;
   saldoPendiente?: string | null;
 }) {

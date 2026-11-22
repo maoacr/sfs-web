@@ -11,9 +11,14 @@ interface ReservaEvent {
   zonaHoraria: string;
   playerId: string;
   playerNombre: string;
-  playerEmail: string;
+  /**
+   * Null cuando el jugador es un cliente que el dueño registró en el mostrador
+   * y todavía no dio su email. La notificación in-app le llega igual; el mail
+   * simplemente no se manda. Ver la guarda en `notificarPorEmail`.
+   */
+  playerEmail: string | null;
   tenantId: string;
-  tenantEmail: string;
+  tenantEmail: string | null;
   /**
    * Montos que muestran las plantillas de pago. Opcionales porque no todos
    * los eventos los traen; cuando faltan, la plantilla cae en "—".

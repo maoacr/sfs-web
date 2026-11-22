@@ -135,7 +135,7 @@ export const POST = apiHandler<GoogleAuthInput>(
 
       if (accion.anularPassword) {
         await enviarEmail(
-          usuario.email,
+          identidad.email,
           "Tu cuenta de SFS ahora inicia sesión con Google",
           `<p>Hola ${usuario.nombre},</p>
            <p>Vinculamos tu cuenta de SFS a tu cuenta de Google. Desde ahora entrás con el botón <strong>Continuar con Google</strong>.</p>
@@ -168,7 +168,9 @@ export const POST = apiHandler<GoogleAuthInput>(
     const rol = usuario.rol as "OWNER" | "PLAYER";
     const accessToken = await signAccessToken({
       sub: usuario.id,
-      email: usuario.email,
+      // Google ya probó que este email es de esta persona; la columna releída
+      // sería `string | null` por los clientes del mostrador.
+      email: identidad.email,
       role: rol,
     });
     const refreshToken = await signRefreshToken(usuario.id);

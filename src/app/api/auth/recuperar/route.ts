@@ -70,7 +70,7 @@ export const POST = apiHandler<RecuperarInput>(
     const link = `${urlBase()}/auth/restablecer?token=${token}`;
 
     await enviarEmail(
-      usuario.email,
+      email,
       "Restablecé tu contraseña de SFS",
       `<p>Hola ${usuario.nombre},</p>
        <p>Pediste volver a entrar a tu cuenta de SFS. Para elegir una contraseña nueva, entrá acá:</p>

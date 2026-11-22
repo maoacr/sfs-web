@@ -85,6 +85,13 @@
       "when": 1795328276774,
       "tag": "0011_sin_doble_booking",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795365799682,
+      "tag": "0012_email_opcional",
+      "breakpoints": true
     }
   ]
 }

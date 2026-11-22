@@ -20,8 +20,13 @@ export const POST = apiHandler<LoginInput>(
 
     const { email, password } = body;
 
+    // El mismo valor normalizado sirve para buscar y para la sesión: leer de
+     // vuelta `user.email` obligaría a tratar como posible un nulo que esta
+     // búsqueda ya descartó (un `eq` nunca matchea NULL).
+    const emailNormalizado = email.toLowerCase().trim();
+
     const user = await db.query.usuarios.findFirst({
-      where: eq(usuarios.email, email.toLowerCase().trim()),
+      where: eq(usuarios.email, emailNormalizado),
     });
 
     if (!user) {
@@ -58,7 +63,7 @@ export const POST = apiHandler<LoginInput>(
 
     const tokenPayload = {
       sub: user.id,
-      email: user.email,
+      email: emailNormalizado,
       role: user.rol,
     };
 

@@ -5,7 +5,21 @@ export const usuarios = pgTable(
   "usuarios",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    email: varchar("email", { length: 255 }).notNull().unique(),
+    /**
+     * Nullable a propósito: el dueño registra clientes desde el mostrador con
+     * los datos que la persona le quiera dar, y muchas veces no hay email.
+     * Esa cuenta existe —la reserva tiene un titular de verdad y la deuda cae
+     * donde corresponde— pero todavía no puede entrar.
+     *
+     * El email es lo que después le permite RECLAMARLA: cuando la persona
+     * entra con Google, `decidirVinculo` la encuentra por email y le entrega
+     * la cuenta con su historial (ver `src/lib/google-auth.ts`).
+     *
+     * El índice sigue siendo único y eso NO impide varios nulos: en Postgres
+     * los NULL no colisionan entre sí. Es el mismo arreglo que ya tenía
+     * `google_sub`, en esta misma tabla.
+     */
+    email: varchar("email", { length: 255 }).unique(),
     /**
      * Nullable a propósito: el hash existe SI esta cuenta puede entrar con
      * contraseña. Las cuentas de Google no tienen ninguna, y una cuenta que
