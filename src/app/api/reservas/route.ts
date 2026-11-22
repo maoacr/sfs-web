@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { db, reservas, pagos, canchas, tarifas, slotConfigs, estadoReservaEnum } from "@sfs/db";
+import {
+  db,
+  reservas,
+  pagos,
+  canchas,
+  tarifas,
+  slotConfigs,
+  estadoReservaEnum,
+  type Reserva,
+} from "@sfs/db";
 import { and, eq, gt, inArray, isNull, lt, asc, desc, notInArray, type SQL } from "drizzle-orm";
 import { aInstante } from "@/lib/zona-horaria";
 import { diaSemanaDeFecha, turnoDentroDeHorario } from "@/lib/disponibilidad";
@@ -7,11 +16,12 @@ import { reservasDelDiaLocal, reservaOcupaElTurno } from "@/lib/consultas";
 import { apiHandler } from "@/lib/api-handler";
 import { createReservaSchema, type CreateReservaInput } from "@/lib/schemas";
 import { notificarReserva } from "@/lib/event-listeners";
-import { liberarReservasExpiradas } from "@/lib/ttl";
+import { liberarReservasExpiradas, liberarTurnoVencido } from "@/lib/ttl";
 import { calcularPrecio, usarPromocion } from "@/lib/pricing";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 import { saldoPendienteDe } from "@/lib/saldo";
 import { toApiCancha, toApiUsuario } from "@/lib/db-mappers";
+import { esDobleBooking } from "@/lib/errores-db";
 
 /**
  * POST /api/reservas
@@ -91,6 +101,16 @@ export const POST = apiHandler<CreateReservaInput>(
 
     // ─── 3. Verificar solapamiento ────────────────────────────────────────
 
+    // Primero se ASIENTA lo vencido de este turno, y se espera.
+    //
+    // El constraint `reservas_sin_doble_booking` cuenta todo PENDIENTE_PAGO
+    // como ocupante —su predicado tiene que ser inmutable, no puede preguntar
+    // la hora—, mientras que la app considera libre al que pasó el TTL. Sin
+    // este paso, una fila vencida que el barrido global todavía no tocó
+    // bloquearía en la base un turno que la app muestra disponible, y la
+    // reserva legítima moriría con un 23P01.
+    await liberarTurnoVencido({ canchaId, inicio, fin });
+
     const conflicto = await db.query.reservas.findFirst({
       where: and(
         eq(reservas.canchaId, canchaId),
@@ -134,43 +154,56 @@ export const POST = apiHandler<CreateReservaInput>(
     const cobrado = esOwner ? Math.min(montoPagado ?? montoTotal, montoTotal) : 0;
     const saldoReserva = montoTotal - cobrado;
 
-    const reserva = await db.transaction(async (tx) => {
-      const [creada] = await tx
-        .insert(reservas)
-        .values({
-          tenantId: cancha.tenantId,
-          canchaId,
-          playerId: finalPlayerId,
-          slotInicio: inicio,
-          slotFin: fin,
-          montoTotal: montoTotal.toFixed(2),
-          // Sólo se anota el invitado si la reserva NO quedó vinculada a un
-          // usuario real: si hay `playerId`, el nombre lo da su cuenta.
-          invitadoNombre: esOwner && !playerId ? (invitadoNombre ?? null) : null,
-          montoPagado: cobrado.toFixed(2),
-          saldoPendiente: saldoReserva.toFixed(2),
-          estado: esOwner ? (saldoReserva > 0 ? "PAGO_PARCIAL" : "CONFIRMADA") : "PENDIENTE_PAGO",
-        })
-        .returning();
+    // El chequeo de arriba no puede ser suficiente, y no por estar mal escrito:
+    // entre el SELECT y el INSERT hay una ventana, y dos requests simultáneos
+    // la atraviesan los dos. La unicidad del turno la garantiza el constraint
+    // `reservas_sin_doble_booking`; acá sólo se traduce su rechazo al mismo 409
+    // que devuelve el chequeo en memoria, porque para quien reserva es el mismo
+    // hecho: alguien se le adelantó.
+    let reserva: Reserva;
 
-      // Toda plata que entra deja fila en `pagos`. Antes este camino marcaba la
-      // reserva como pagada sin registrar nada: la plata que cobraba el dueño
-      // era invisible para cualquier reporte.
-      if (cobrado > 0) {
-        await tx.insert(pagos).values({
-          reservaId: creada.id,
-          userId: finalPlayerId,
-          monto: cobrado.toFixed(2),
-          estadoPago: "APROBADO",
-          canal: "PRESENCIAL",
-          metodo: metodo ?? "EFECTIVO",
-          entidad: entidad ?? null,
-          mpMetadata: { registradoPor: user.sub },
-        });
-      }
+    try {
+      reserva = await db.transaction(async (tx) => {
+        const [creada] = await tx
+          .insert(reservas)
+          .values({
+            tenantId: cancha.tenantId,
+            canchaId,
+            playerId: finalPlayerId,
+            slotInicio: inicio,
+            slotFin: fin,
+            montoTotal: montoTotal.toFixed(2),
+            // Sólo se anota el invitado si la reserva NO quedó vinculada a un
+            // usuario real: si hay `playerId`, el nombre lo da su cuenta.
+            invitadoNombre: esOwner && !playerId ? (invitadoNombre ?? null) : null,
+            montoPagado: cobrado.toFixed(2),
+            saldoPendiente: saldoReserva.toFixed(2),
+            estado: esOwner ? (saldoReserva > 0 ? "PAGO_PARCIAL" : "CONFIRMADA") : "PENDIENTE_PAGO",
+          })
+          .returning();
 
-      return creada;
-    });
+        // Toda plata que entra deja fila en `pagos`. Antes este camino marcaba la
+        // reserva como pagada sin registrar nada: la plata que cobraba el dueño
+        // era invisible para cualquier reporte.
+        if (cobrado > 0) {
+          await tx.insert(pagos).values({
+            reservaId: creada.id,
+            userId: finalPlayerId,
+            monto: cobrado.toFixed(2),
+            estadoPago: "APROBADO",
+            canal: "PRESENCIAL",
+            metodo: metodo ?? "EFECTIVO",
+            entidad: entidad ?? null,
+            mpMetadata: { registradoPor: user.sub },
+          });
+        }
+
+        return creada;
+      });
+    } catch (error) {
+      if (!esDobleBooking(error)) throw error;
+      return NextResponse.json({ error: "El slot ya está reservado" }, { status: 409 });
+    }
 
     await notificarReserva(
       reserva.id,
@@ -190,7 +223,7 @@ export const POST = apiHandler<CreateReservaInput>(
  * GET /api/reservas
  */
 export const GET = apiHandler(
-  async (request, ctx, _validated) => {
+  async (request, ctx) => {
     const user = ctx.user!;
     const { searchParams } = new URL(request.url);
     const fecha = searchParams.get("fecha");

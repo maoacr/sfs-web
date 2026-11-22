@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   reservaFindMany: vi.fn(),
   insertEnPagos: vi.fn(),
   insertEnReservas: vi.fn(),
+  liberarTurnoVencido: vi.fn(async () => []),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -58,7 +59,10 @@ vi.mock("@sfs/db", () => ({
   estadoReservaEnum: { enumValues: ["PENDIENTE_PAGO", "PAGO_PARCIAL", "CONFIRMADA"] },
 }));
 
-vi.mock("@/lib/ttl", () => ({ liberarReservasExpiradas: vi.fn(async () => undefined) }));
+vi.mock("@/lib/ttl", () => ({
+  liberarReservasExpiradas: vi.fn(async () => undefined),
+  liberarTurnoVencido: mocks.liberarTurnoVencido,
+}));
 vi.mock("@/lib/disponibilidad", () => ({
   diaSemanaDeFecha: () => 1,
   turnoDentroDeHorario: () => true,
@@ -74,6 +78,7 @@ vi.mock("@/lib/pricing", () => ({
 vi.mock("@/lib/event-listeners", () => ({ notificarReserva: vi.fn(async () => undefined) }));
 
 import { GET, POST } from "./route";
+import { CONSTRAINT_SIN_DOBLE_BOOKING } from "@/lib/errores-db";
 
 const DUENO = "11111111-1111-4111-8111-111111111111";
 const JUGADOR = "22222222-2222-4222-8222-222222222222";
@@ -97,6 +102,7 @@ function peticion(cuerpo: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.saldoPendienteDe.mockResolvedValue(0);
+  mocks.liberarTurnoVencido.mockResolvedValue([]);
   mocks.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
   // La cancha no existe: alcanza para probar que la request pasó la puerta del saldo.
   mocks.canchaFindFirst.mockResolvedValue(undefined);
@@ -255,5 +261,75 @@ describe("GET /api/reservas?conSaldo=true — cuentas por cobrar", () => {
   it("sin el filtro no se mete con el saldo", async () => {
     await GET(consulta(""));
     expect(condiciones()).not.toContainEqual({ gt: ["saldo_pendiente", "0"] });
+  });
+});
+
+describe("POST /api/reservas — la base como última palabra sobre el turno", () => {
+  // El turno que pide `peticion()`: 20:00 del 2026-12-01 en Bogotá (UTC-5),
+  // una hora de duración.
+  const INICIO = new Date("2026-12-02T01:00:00.000Z");
+  const FIN = new Date("2026-12-02T02:00:00.000Z");
+
+  beforeEach(() => {
+    mocks.getAuthUser.mockResolvedValue({ sub: JUGADOR, email: "j@sfs.test", role: "PLAYER" });
+    mocks.canchaFindFirst.mockResolvedValue({
+      id: CANCHA, tenantId: DUENO, duracionSlotMinutos: 60,
+      complejo: { zonaHoraria: "America/Bogota" }, slots: [{ diaSemana: 1 }],
+    });
+    mocks.reservaFindFirst.mockResolvedValue(undefined);
+  });
+
+  it("asienta lo vencido de ESE turno antes de insertar", async () => {
+    await POST(peticion({}));
+
+    expect(mocks.liberarTurnoVencido).toHaveBeenCalledWith({
+      canchaId: CANCHA,
+      inicio: INICIO,
+      fin: FIN,
+    });
+  });
+
+  it("lo espera: si insertara primero, la fila vencida haría fallar el constraint", async () => {
+    await POST(peticion({}));
+
+    const liberacion = mocks.liberarTurnoVencido.mock.invocationCallOrder[0];
+    const insercion = mocks.insertEnReservas.mock.invocationCallOrder[0];
+    expect(liberacion).toBeLessThan(insercion);
+  });
+
+  it("traduce el rechazo de la base en un 409, no en un 500", async () => {
+    mocks.insertEnReservas.mockImplementationOnce(() => {
+      throw Object.assign(new Error("conflicting key value violates exclusion constraint"), {
+        code: "23P01",
+        constraint_name: CONSTRAINT_SIN_DOBLE_BOOKING,
+      });
+    });
+
+    const res = await POST(peticion({}));
+
+    expect(res.status).toBe(409);
+  });
+
+  it("le dice lo mismo que el chequeo de la app: para el usuario es el mismo hecho", async () => {
+    mocks.insertEnReservas.mockImplementationOnce(() => {
+      throw Object.assign(new Error("boom"), {
+        code: "23P01",
+        constraint_name: CONSTRAINT_SIN_DOBLE_BOOKING,
+      });
+    });
+
+    const res = await POST(peticion({}));
+
+    expect((await res.json()).error).toBe("El slot ya está reservado");
+  });
+
+  it("no se come cualquier error: lo que no es un choque de turno sigue siendo 500", async () => {
+    mocks.insertEnReservas.mockImplementationOnce(() => {
+      throw new Error("se cayó la base");
+    });
+
+    const res = await POST(peticion({}));
+
+    expect(res.status).toBe(500);
   });
 });
