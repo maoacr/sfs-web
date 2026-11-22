@@ -1,0 +1,81 @@
+name: Migraciones
+
+# Aplica las migraciones de Drizzle a la base de PRODUCCIÓN.
+#
+# Existe porque desde que hay dos proyectos de Supabase (producción y
+# `sfs-dev`), aplicar a mano dejó de ser inofensivo: el paso que importa ya no
+# es "correr el migrate", es "correr el migrate contra la base correcta". Un
+# `.env.local` apuntado a dev y el merge a `main` queda sin aplicar; apuntado a
+# producción desde la laptop, se aplica una migración que todavía no pasó por
+# el PR. Esta automatización le saca la decisión al humano: dev se migra desde
+# la laptop, producción se migra desde acá y de ninguna otra forma.
+#
+# El ledger `drizzle.__drizzle_migrations` vive DENTRO de cada base y guarda
+# hasta dónde llegó, así que este workflow es idempotente: si no hay nada
+# pendiente, no hace nada. Re-correrlo nunca duplica una migración.
+
+on:
+  push:
+    branches: [main]
+    # Sólo cuando cambian los archivos de migración. Un merge que toca
+    # únicamente componentes no tiene nada que aplicar, y un workflow que
+    # corre de más contra la base de producción es un workflow que se empieza
+    # a ignorar.
+    paths:
+      - "packages/db/drizzle/**"
+  workflow_dispatch:
+
+# A diferencia del CI, acá `cancel-in-progress` va en **false** a propósito.
+# Cancelar un typecheck no cuesta nada; cancelar un migrate a mitad de camino
+# deja la base en un estado que el ledger no describe. Si entran dos merges
+# seguidos, el segundo espera — no pisa al primero.
+concurrency:
+  group: migraciones-produccion
+  cancel-in-progress: false
+
+jobs:
+  aplicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm antes de setup-node: el `cache: pnpm` necesita que el binario ya
+      # exista para resolver el store. Mismo orden que en ci.yml.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Aplicar migraciones a producción
+        env:
+          # OJO: este secret NO es el mismo string que el `DIRECT_URL` de
+          # `.env.local`. Ese apunta a `db.<ref>.supabase.co:5432`, que en el
+          # plan Free sólo resuelve por IPv6 — y los runners de GitHub no
+          # tienen IPv6. Acá va el **session pooler** (puerto 5432 en
+          # `aws-0-<region>.pooler.supabase.com`), que es IPv4.
+          #
+          # Y tiene que ser el pooler de SESIÓN, no el de transacción (6543):
+          # `migrate.ts` crea el cliente con `postgres(url, { max: 1 })` sin
+          # `prepare: false`, y el pooler de transacción rompe los prepared
+          # statements. Por eso tampoco se reusa el secret `DATABASE_URL` del
+          # keepalive: a `psql` le da igual el modo, al migrator no.
+          #
+          # `migrate.ts` lee `DIRECT_URL || DATABASE_URL`, así que el nombre
+          # de la variable es el que el script espera; el del secret dice de
+          # dónde sale.
+          DIRECT_URL: ${{ secrets.MIGRACIONES_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DIRECT_URL}" ]; then
+            echo "::error::Falta el secret MIGRACIONES_DATABASE_URL (session pooler de producción, puerto 5432)."
+            exit 1
+          fi
+
+          pnpm --filter @sfs/db run migrate

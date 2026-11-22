@@ -17,11 +17,31 @@ if (!url) {
   process.exit(1);
 }
 
+/**
+ * Devuelve `host:puerto` de una connection string, sin credenciales.
+ *
+ * Con dos proyectos de Supabase (producción y `sfs-dev`), apuntar el `.env` al
+ * equivocado NO falla: las migraciones se aplican igual, sólo que en la base
+ * que no era. Y como el ledger queda escrito ahí, el error recién se nota
+ * mucho después, cuando ya hay datos encima. Imprimir el destino es la
+ * diferencia entre enterarse ahora y enterarse cuando no se puede deshacer.
+ *
+ * Se imprime sólo el host: la connection string lleva la contraseña.
+ */
+function extraerHostDeConexion(cadenaConexion: string): string {
+  try {
+    return new URL(cadenaConexion).host;
+  } catch {
+    return "(no se pudo interpretar la URL)";
+  }
+}
+
 // Para migraciones usamos conexión directa con max 1
 const migrationClient = postgres(url, { max: 1 });
 const db = drizzle(migrationClient);
 
 async function runMigrations() {
+  console.log(`🎯 Base destino: ${extraerHostDeConexion(url)}`);
   console.log("🚀 Aplicando migraciones Drizzle en la base de datos Supabase...");
   const migrationsFolder = path.resolve(__dirname, "../drizzle");
   
