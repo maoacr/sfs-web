@@ -268,15 +268,23 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
   }, [clienteTexto, elegido]);
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true); setError("");
+    e.preventDefault();
+
+    // Sin titular no hay reserva. El botón ya está deshabilitado; esto cubre
+    // el submit por Enter, que el `disabled` no siempre ataja.
+    if (!elegido) {
+      return setError("Elegí un cliente del sistema o registralo antes de agendar.");
+    }
+
+    setLoading(true); setError("");
     try {
       // fecha y hora son locales de la cancha; el servidor calcula el instante y la duración
       const res = await apiFetch("/api/reservas", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           canchaId, fecha, hora,
-          // Con cliente elegido la reserva queda vinculada a su cuenta y la ve
-          // en su app. Sin elegir, se anota el nombre y no se bloquea nada.
-          ...(elegido ? { playerId: elegido.id } : { invitadoNombre: clienteTexto.trim() }),
+          // Siempre vinculada a una cuenta real. `handleSubmit` no llega acá
+          // sin cliente elegido, y el botón está deshabilitado además.
+          playerId: elegido!.id,
           // «Cobré todo» NO manda monto: el precio lo calcula el servidor con
           // el motor de tarifas y el navegador no lo conoce. Mandar un número
           // adivinado acá sería inventar el total.
@@ -366,7 +374,8 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
                   Registrar a esta persona
                 </button>
                 <p className="mt-1 text-xs text-text-dim">
-                  Con cuenta propia la reserva es suya, y lo que deba no te cae a vos.
+                  Hace falta para agendar: la reserva necesita un titular. Con cuenta propia
+                  es suya, y lo que deba no te cae a vos.
                 </p>
               </div>
             ) : null}
@@ -427,7 +436,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
           {error && <p className="text-sm text-error">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm text-text-muted hover:bg-surface-hover">Cancelar</button>
-            <button type="submit" disabled={loading || clienteDebe} className="flex-1 rounded-lg bg-grass px-4 py-2.5 text-sm font-semibold text-white hover:bg-grass-light disabled:opacity-50">{loading ? "Creando..." : "Crear"}</button>
+            <button type="submit" disabled={loading || clienteDebe || !elegido} className="flex-1 rounded-lg bg-grass px-4 py-2.5 text-sm font-semibold text-white hover:bg-grass-light disabled:opacity-50">{loading ? "Creando..." : "Crear"}</button>
           </div>
         </form>
       </div>

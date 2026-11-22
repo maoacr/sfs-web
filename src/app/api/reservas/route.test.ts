@@ -437,3 +437,32 @@ describe("POST /api/reservas — el dueño agenda sin cobrar", () => {
     expect(mocks.notificarReserva).toHaveBeenCalledWith("reserva-nueva", "PAGO_PARCIAL_RECIBIDO");
   });
 });
+
+describe("POST /api/reservas — el invitado dejó de ser un camino", () => {
+  beforeEach(() => {
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+    mocks.saldoPendienteDe.mockResolvedValue(0);
+    mocks.canchaFindFirst.mockResolvedValue({
+      id: CANCHA,
+      tenantId: DUENO,
+      duracionSlotMinutos: 60,
+      complejo: { zonaHoraria: "America/Bogota" },
+      slots: [{ horaInicio: "08:00", horaFin: "23:00" }],
+    });
+    mocks.reservaFindMany.mockResolvedValue([]);
+  });
+
+  it("un body con invitadoNombre se rechaza: el campo ya no existe", async () => {
+    const respuesta = await POST(peticion({ invitadoNombre: "Pedro Sin Cuenta" }));
+
+    expect(respuesta.status).toBe(400);
+    expect(mocks.insertEnReservas).not.toHaveBeenCalled();
+  });
+
+  it("la reserva nunca escribe invitado_nombre", async () => {
+    await POST(peticion({ playerId: JUGADOR }));
+
+    const fila = mocks.insertEnReservas.mock.calls[0]?.[0];
+    expect(fila?.invitadoNombre).toBeUndefined();
+  });
+});
