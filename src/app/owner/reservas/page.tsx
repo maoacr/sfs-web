@@ -29,6 +29,9 @@ const nombreDe = (p: Reserva["player"]) => `${p.primerNombre} ${p.apellidos}`.tr
 interface Filter { complejoId: string; canchaId: string }
 interface ComplejoOpt { id: string; nombre: string; canchas: { id: string; nombre: string }[] }
 
+const formatearPrecio = (monto: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(monto);
+
 export default function OwnerReservas() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [fecha, setFecha] = useState(() => fechaHoy());
@@ -67,7 +70,6 @@ export default function OwnerReservas() {
     return true;
   });
 
-  const formatearPrecio = (n: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(n);
   const claseControl = "rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
 
   return (
@@ -235,7 +237,14 @@ const COBROS = [
 ] as const satisfies readonly { valor: TipoDeCobro; label: string }[];
 
 interface CanchaOpt { id: string; nombre: string; tipo: string }
-interface ClienteOpt { id: string; primerNombre: string; apellidos: string; telefono: string | null }
+/**
+ * El saldo llega del API junto con el cliente: deber bloquea reservar, y el
+ * mostrador tiene que enterarse al elegir a la persona, no al mandar el
+ * formulario.
+ */
+interface ClienteOpt {
+  id: string; primerNombre: string; apellidos: string; telefono: string | null; saldoPendiente: number;
+}
 
 function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [canchas, setCanchas] = useState<CanchaOpt[]>([]);
@@ -254,6 +263,13 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   const huboPlata = cobro !== "NADA";
   const pideEntidad = huboPlata && requiereEntidad(metodo);
+
+  // Derivado, no estado: deseleccionar al deudor levanta el bloqueo solo. Un
+  // `useState` paralelo acá sería una segunda fuente de verdad para el mismo
+  // hecho. El invitado sin cuenta no se bloquea: su deuda no existe en el
+  // sistema, y bloquearlo sería inventarle fricción al mostrador.
+  const saldoDelCliente = elegido?.saldoPendiente ?? 0;
+  const clienteDebe = saldoDelCliente > 0;
 
   useEffect(() => { fetch("/api/canchas?activas=true")
       .then(r => r.json())
@@ -300,7 +316,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
     finally { setLoading(false); }
   }
 
-  const i = "mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
+  const claseCampo = "mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -309,18 +325,18 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label htmlFor="cancha" className="block text-sm font-medium text-text">Cancha</label>
-            <select id="cancha" value={canchaId} onChange={e => setCanchaId(e.target.value)} required className={i}>
+            <select id="cancha" value={canchaId} onChange={e => setCanchaId(e.target.value)} required className={claseCampo}>
               <option value="">Seleccionar...</option>
               {canchas.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.tipo})</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label htmlFor="fecha-reserva" className="block text-sm font-medium text-text">Fecha</label><input id="fecha-reserva" type="date" value={fecha} onChange={e => setFecha(e.target.value)} required className={i} /></div>
-            <div><label htmlFor="hora-reserva" className="block text-sm font-medium text-text">Hora</label><input id="hora-reserva" type="time" value={hora} onChange={e => setHora(e.target.value)} required className={i} /></div>
+            <div><label htmlFor="fecha-reserva" className="block text-sm font-medium text-text">Fecha</label><input id="fecha-reserva" type="date" value={fecha} onChange={e => setFecha(e.target.value)} required className={claseCampo} /></div>
+            <div><label htmlFor="hora-reserva" className="block text-sm font-medium text-text">Hora</label><input id="hora-reserva" type="time" value={hora} onChange={e => setHora(e.target.value)} required className={claseCampo} /></div>
           </div>
           <div className="relative">
             <label htmlFor="cliente" className="block text-sm font-medium text-text">Cliente</label>
-            <input id="cliente" type="text" required className={i} autoComplete="off"
+            <input id="cliente" type="text" required className={claseCampo} autoComplete="off"
               placeholder="Buscá por nombre…"
               value={elegido ? `${elegido.primerNombre} ${elegido.apellidos}`.trim() : clienteTexto}
               onChange={e => { setElegido(null); setClienteTexto(e.target.value); }} />
@@ -340,7 +356,12 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
               </ul>
             )}
 
-            {elegido ? (
+            {clienteDebe ? (
+              <p className="mt-1 text-xs text-error" role="alert">
+                Tiene saldo pendiente: {formatearPrecio(saldoDelCliente)}. No podés agendarle
+                hasta que pague o registres el cobro.
+              </p>
+            ) : elegido ? (
               <p className="mt-1 text-xs text-grass">Queda vinculada a su cuenta: la va a ver en su app.</p>
             ) : clienteTexto.trim().length >= 2 ? (
               <p className="mt-1 text-xs text-warning">
@@ -351,7 +372,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <div>
             <label htmlFor="cobro" className="block text-sm font-medium text-text">Cobro</label>
             <select id="cobro" value={cobro}
-              onChange={e => setCobro(e.target.value as TipoDeCobro)} className={i}>
+              onChange={e => setCobro(e.target.value as TipoDeCobro)} className={claseCampo}>
               {COBROS.map(opcion => (
                 <option key={opcion.valor} value={opcion.valor}>{opcion.label}</option>
               ))}
@@ -371,7 +392,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
               </label>
               <input id="monto-abonado" type="number" inputMode="numeric" min={0}
                 value={montoAbonado} onChange={e => setMontoAbonado(Number(e.target.value))}
-                className={i} />
+                className={claseCampo} />
               <p className="mt-1 text-xs text-text-dim">
                 Si te pasás del precio del turno, se registra el total y la reserva queda sin saldo.
               </p>
@@ -381,7 +402,7 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
           {huboPlata && (
             <div>
               <label htmlFor="metodo" className="block text-sm font-medium text-text">Método</label>
-              <select id="metodo" value={metodo} onChange={e => setMetodo(e.target.value)} className={i}>
+              <select id="metodo" value={metodo} onChange={e => setMetodo(e.target.value)} className={claseCampo}>
                 {METODOS_DE_MOSTRADOR.map(metodoDisponible => (
                   <option key={metodoDisponible.valor} value={metodoDisponible.valor}>
                     {metodoDisponible.label}
@@ -397,14 +418,14 @@ function NewReservaModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 Entidad o banco
               </label>
               <input id="entidad" type="text" value={entidad} onChange={e => setEntidad(e.target.value)}
-                placeholder="Nequi, Daviplata, Bancolombia, Davivienda…" className={i} />
+                placeholder="Nequi, Daviplata, Bancolombia, Davivienda…" className={claseCampo} />
             </div>
           )}
 
           {error && <p className="text-sm text-error">{error}</p>}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-border px-4 py-2.5 text-sm text-text-muted hover:bg-surface-hover">Cancelar</button>
-            <button type="submit" disabled={loading} className="flex-1 rounded-lg bg-grass px-4 py-2.5 text-sm font-semibold text-white hover:bg-grass-light disabled:opacity-50">{loading ? "Creando..." : "Crear"}</button>
+            <button type="submit" disabled={loading || clienteDebe} className="flex-1 rounded-lg bg-grass px-4 py-2.5 text-sm font-semibold text-white hover:bg-grass-light disabled:opacity-50">{loading ? "Creando..." : "Crear"}</button>
           </div>
         </form>
       </div>
