@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AgendaView } from "@/components/agenda-view";
 import { ImageUploadZone } from "@/components/image-upload-zone";
 import { formatAddress } from "@/lib/address";
@@ -196,22 +196,29 @@ function Input({ label, type = "text", value, onChange }: { label: string; type?
 function SlotsTab({ canchaId, slots: initialSlots, onUpdate }: { canchaId: string; slots: Slot[]; onUpdate: () => void }) {
   const [slots, setSlots] = useState<Slot[]>(initialSlots);
   const [loading, setLoading] = useState(false);
-  const [times, setTimes] = useState<Record<string, { apertura: string; cierre: string }>>({});
+  // Lo que el usuario tocó en los inputs de hora, aparte de lo que vino del
+  // servidor. Antes `times` era estado copiado de `slots` por un efecto, lo
+  // que disparaba un render en cascada por cada cambio.
+  const [horariosEditados, setHorariosEditados] = useState<Record<string, Partial<{ apertura: string; cierre: string }>>>({});
+  // Los ids temporales salían de Date.now(), impuro durante el render.
+  const proximoIdTemporal = useRef(0);
 
-  // Sync from props (cuando se recarga la página)
-  useEffect(() => { setSlots(initialSlots); }, [initialSlots]);
+  // Patrón oficial de React para ajustar estado cuando cambia una prop: se
+  // hace durante el render y no en un efecto.
+  const [slotsDeLaProp, setSlotsDeLaProp] = useState(initialSlots);
+  if (initialSlots !== slotsDeLaProp) {
+    setSlotsDeLaProp(initialSlots);
+    setSlots(initialSlots);
+    setHorariosEditados({});
+  }
 
-  // Sync times from slots
-  useEffect(() => {
-    const next: Record<string, { apertura: string; cierre: string }> = {};
-    slots.forEach(s => {
-      next[s.id] = {
-        apertura: extraerHora(s.horaApertura) || "08:00",
-        cierre: extraerHora(s.horaCierre) || "23:00",
-      };
-    });
-    setTimes(next);
-  }, [slots]);
+  const times = useMemo(() => {
+    const horarios = horariosDeSlots(slots);
+    for (const [slotId, edicion] of Object.entries(horariosEditados)) {
+      if (horarios[slotId]) horarios[slotId] = { ...horarios[slotId], ...edicion };
+    }
+    return horarios;
+  }, [slots, horariosEditados]);
 
   async function toggleDia(diaSemana: number) {
     setLoading(true);
@@ -223,7 +230,7 @@ function SlotsTab({ canchaId, slots: initialSlots, onUpdate }: { canchaId: strin
       await apiFetch(`/api/canchas/${canchaId}/slots/${existe.id}`, { method: "DELETE" });
     } else {
       // Optimistic: agregar temporalmente
-      const tempId = "temp-" + Date.now();
+      const tempId = `temp-${proximoIdTemporal.current++}`;
       const tempSlot: Slot = { id: tempId, diaSemana, horaApertura: "1970-01-01T08:00:00.000Z", horaCierre: "1970-01-01T23:00:00.000Z" };
       setSlots(prev => [...prev, tempSlot]);
 
@@ -241,7 +248,7 @@ function SlotsTab({ canchaId, slots: initialSlots, onUpdate }: { canchaId: strin
   }
 
   async function actualizarSlot(slotId: string, field: string, value: string) {
-    setTimes(prev => ({ ...prev, [slotId]: { ...prev[slotId], [field === "horaApertura" ? "apertura" : "cierre"]: value } }));
+    setHorariosEditados(prev => ({ ...prev, [slotId]: { ...prev[slotId], [field === "horaApertura" ? "apertura" : "cierre"]: value } }));
     // Guardar en servidor sin recargar (la UI ya está actualizada)
     apiFetch(`/api/canchas/${canchaId}/slots/${slotId}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
@@ -322,6 +329,23 @@ function TarifasTab({ canchaId, tarifas, onUpdate }: { canchaId: string; tarifas
       </div>
     </div>
   );
+}
+
+/**
+ * Horarios de apertura y cierre por slot, con los valores por defecto de la UI.
+ *
+ * Pura y exportada para poder testearla sin renderizar nada: antes esto vivía
+ * dentro de un efecto que copiaba `slots` a estado en cada cambio.
+ */
+export function horariosDeSlots(slots: Slot[]): Record<string, { apertura: string; cierre: string }> {
+  const horarios: Record<string, { apertura: string; cierre: string }> = {};
+  slots.forEach(slot => {
+    horarios[slot.id] = {
+      apertura: extraerHora(slot.horaApertura) || "08:00",
+      cierre: extraerHora(slot.horaCierre) || "23:00",
+    };
+  });
+  return horarios;
 }
 
 function extraerHora(iso: string | undefined): string | null {

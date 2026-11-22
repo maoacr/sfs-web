@@ -5,6 +5,9 @@ import { fechaDeCalendario } from "@/lib/zona-horaria";
 import { apiFetch } from "@/lib/api-client";
 
 interface ReservaInfo { id: string; estado: string; player: string; apodo: string | null; telefono: string | null }
+/** Lo que devuelve /api/disponibilidad: una cancha con sus slots del día. */
+interface CanchaConSlots { id: string; slots: Slot[] }
+
 interface Slot { inicio: string; fin: string; horaInicio: string; horaFin: string; disponible: boolean; reserva?: ReservaInfo }
 interface CanchaAgenda { id: string; nombre: string; tipo: string; duracionSlotMinutos: number; complejo: { nombre: string; direccion: string } }
 
@@ -34,9 +37,16 @@ function mismaFecha(a: Date, b: Date): boolean {
 export function AgendaView({ canchaId }: { canchaId: string }) {
   const [cancha, setCancha] = useState<CanchaAgenda | null>(null);
   const [semanaLunes, setSemanaLunes] = useState(() => inicioSemana(new Date()));
-  const [diaSeleccionado, setDiaSeleccionado] = useState<Date | null>(null);
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Arranca en hoy. La semana inicial es la de hoy, así que esto antes se
+  // seteaba desde un efecto al montar: un render extra en cascada para
+  // llegar al mismo valor que ya se conoce acá.
+  const [diaSeleccionado, setDiaSeleccionado] = useState<Date>(() => new Date());
+  // Los slots se guardan junto al día al que pertenecen. De ahí se derivan
+  // `slots` y `loading` en vez de sincronizarlos con setState dentro del
+  // efecto, que disparaba renders en cascada. De paso arregla una condición
+  // de carrera: si el usuario cambiaba de día rápido, la respuesta lenta del
+  // día anterior sobreescribía la del día nuevo.
+  const [slotsCargados, setSlotsCargados] = useState<{ dia: string; slots: Slot[] } | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -51,35 +61,29 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
     });
   }, [canchaId]);
 
-  // Auto-seleccionar hoy si está en la semana visible y no hay selección
-  useEffect(() => {
-    if (!diaSeleccionado) return;
-    cargarSlots(diaSeleccionado);
-  }, [diaSeleccionado, canchaId]);
+  const diaPedido = fechaDeCalendario(diaSeleccionado);
+  const slots = slotsCargados?.slots ?? [];
+  // Está cargando mientras lo que tenemos en mano no sea del día pedido.
+  const loading = slotsCargados?.dia !== diaPedido;
 
-  // Seleccionar hoy por defecto al montar si está en la semana actual
   useEffect(() => {
-    const hoyEstaEnSemana = semana.some(dia => mismaFecha(dia, hoy));
-    if (hoyEstaEnSemana) {
-      setDiaSeleccionado(new Date(hoy));
-    } else {
-      setDiaSeleccionado(new Date(semana[0]));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let vigente = true;
+    const guardar = (slotsDelDia: Slot[]) => {
+      if (vigente) setSlotsCargados({ dia: diaPedido, slots: slotsDelDia });
+    };
 
-  function cargarSlots(fecha: Date) {
-    setLoading(true);
-    const day = fechaDeCalendario(fecha);
-    fetch(`/api/disponibilidad?fecha=${day}`)
+    fetch(`/api/disponibilidad?fecha=${diaPedido}`)
       .then(r => r.json())
       .then(data => {
-        const encontrado = Array.isArray(data) ? data.find((c: any) => c.id === canchaId) : null;
-        setSlots(encontrado?.slots || []);
+        const encontrado = Array.isArray(data)
+          ? (data as CanchaConSlots[]).find(cancha => cancha.id === canchaId)
+          : null;
+        guardar(encontrado?.slots ?? []);
       })
-      .catch(() => setSlots([]))
-      .finally(() => setLoading(false));
-  }
+      .catch(() => guardar([]));
+
+    return () => { vigente = false; };
+  }, [diaPedido, canchaId]);
 
   function irSemanaAnterior() {
     const nueva = new Date(semanaLunes);
@@ -104,9 +108,9 @@ export function AgendaView({ canchaId }: { canchaId: string }) {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ estado: "CANCELADA" }),
       });
-      setSlots(prev => prev.map(s =>
+      setSlotsCargados(prev => prev && { ...prev, slots: prev.slots.map(s =>
         s.reserva?.id === reservaId ? { ...s, disponible: true, reserva: undefined } : s
-      ));
+      ) });
       setSelectedSlot(null);
     } catch {} 
     finally { setCancelling(false); }

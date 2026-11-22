@@ -1,15 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
-
-function getQueryParam(key: string): string | null {
-  if (typeof window === "undefined") return null;
-  const url = new URL(window.location.href);
-  return url.searchParams.get(key);
-}
 
 interface PrecioData {
   canchaId: string;
@@ -32,25 +26,33 @@ interface CanchaInfo {
 
 type MontoOption = "50" | "100" | "otro";
 
-export default function ReservarPage() {
+function ReservarForm() {
+  const searchParams = useSearchParams();
   const params = useParams();
   const router = useRouter();
   const canchaId = params.id as string;
 
   const [cancha, setCancha] = useState<CanchaInfo | null>(null);
   const [precio, setPrecio] = useState<PrecioData | null>(null);
-  const [fecha, setFecha] = useState("");
-  const [hora, setHora] = useState("");
+  const [fecha, setFecha] = useState(() => searchParams.get("fecha") ?? "");
+  const [hora, setHora] = useState(() => searchParams.get("hora") ?? "");
   const [codigo, setCodigo] = useState("");
   const [montoOption, setMontoOption] = useState<MontoOption>("50");
   const [montoOtro, setMontoOtro] = useState("");
-  const [loading, setLoading] = useState(true);
+  // Sólo hay algo que cargar si la URL trae fecha y hora.
+  const [loading, setLoading] = useState(() => Boolean(searchParams.get("fecha") && searchParams.get("hora")));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [saldoPendiente, setSaldoPendiente] = useState(0);
   const [step, setStep] = useState<"select" | "precio" | "pagar">("select");
-  const [prefilledFecha, setPrefilledFecha] = useState<string | null>(null);
-  const [prefilledHora, setPrefilledHora] = useState<string | null>(null);
+  // El botón "Intentar con otra fecha" descarta lo que vino en la URL para
+  // caer al selector manual.
+  const [ignorarPrefill, setIgnorarPrefill] = useState(false);
+  // Derivados de la URL, no estado: sólo entran por query param. Antes se
+  // copiaban a estado desde un efecto, que es el setState sincrónico que
+  // disparaba renders en cascada.
+  const prefilledFecha = ignorarPrefill ? null : searchParams.get("fecha");
+  const prefilledHora = ignorarPrefill ? null : searchParams.get("hora");
 
   // Monto seleccionado calculado dinámicamente
   const montoSeleccionado = useMemo(() => {
@@ -74,18 +76,6 @@ export default function ReservarPage() {
 
   // Inicializar
   useEffect(() => {
-    const fechaDeQuery = getQueryParam("fecha");
-    const horaDeQuery = getQueryParam("hora");
-
-    if (fechaDeQuery && horaDeQuery) {
-      setPrefilledFecha(fechaDeQuery);
-      setPrefilledHora(horaDeQuery);
-      setFecha(fechaDeQuery);
-      setHora(horaDeQuery);
-    } else {
-      setLoading(false);
-    }
-
     fetch("/api/me/saldo")
       .then((r) => r.json())
       .then((d) => setSaldoPendiente(d.saldoPendiente || 0))
@@ -95,7 +85,7 @@ export default function ReservarPage() {
       fetch(`/api/canchas?tipo=&complejoId=&page=1&limit=100`)
         .then((r) => r.json())
         .then((data) => {
-          const canchaEncontrada = Array.isArray(data) ? data.find((canchaEncontrada: any) => canchaEncontrada.id === canchaId) : null;
+          const canchaEncontrada = Array.isArray(data) ? (data as CanchaInfo[]).find(cancha => cancha.id === canchaId) : null;
           if (canchaEncontrada) setCancha(canchaEncontrada);
         })
         .catch(() => {});
@@ -210,7 +200,7 @@ export default function ReservarPage() {
         {step === "select" && prefilledFecha && !loading && error && (
           <div className="rounded-xl border border-border bg-surface p-6 space-y-4">
             <p className="text-sm text-red-400">{error}</p>
-            <button onClick={() => { setPrefilledFecha(null); setError(""); }}
+            <button onClick={() => { setIgnorarPrefill(true); setError(""); }}
               className="w-full rounded-xl border border-border px-5 py-3 text-sm text-text-muted">
               Intentar con otra fecha
             </button>
@@ -342,5 +332,13 @@ export default function ReservarPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ReservarPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-text-muted animate-pulse">Cargando...</div>}>
+      <ReservarForm />
+    </Suspense>
   );
 }

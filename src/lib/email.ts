@@ -14,6 +14,14 @@ interface ReservaEvent {
   playerEmail: string;
   tenantId: string;
   tenantEmail: string;
+  /**
+   * Montos que muestran las plantillas de pago. Son opcionales porque hoy
+   * `notificarCambioReserva` NO los envía, así que esas plantillas caen en
+   * "—" siempre. Estaban escondidos detrás de un `as any`, que es justamente
+   * lo que impedía ver el hueco.
+   */
+  saldoPendiente?: string | number;
+  montoTotal?: string | number;
 }
 
 const resend = process.env.RESEND_API_KEY
@@ -99,7 +107,7 @@ const templates: Record<
         <tr><td style="padding:4px 12px 4px 0;color:#71717a">Fecha</td><td>${formatearFechaDeReserva(e.slotInicio, e.zonaHoraria)}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#71717a">Horario</td><td>${formatearHora(e.slotInicio, e.zonaHoraria)} – ${formatearHora(e.slotFin, e.zonaHoraria)}</td></tr>
       </table>
-      <p style="font-size:18px;font-weight:bold;color:#eab308">⚠️ Saldo pendiente: COP ${(e as any).saldoPendiente || "—"}</p>
+      <p style="font-size:18px;font-weight:bold;color:#eab308">⚠️ Saldo pendiente: COP ${e.saldoPendiente || "—"}</p>
       <p style="color:#71717a;font-size:14px">Completá el pago antes de que expire la reserva. Podés pagar desde la app o compartir el link con otros jugadores del partido.</p>
     `,
   }),
@@ -114,7 +122,7 @@ const templates: Record<
         <tr><td style="padding:4px 12px 4px 0;color:#71717a">Fecha</td><td>${formatearFechaDeReserva(e.slotInicio, e.zonaHoraria)}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#71717a">Horario</td><td>${formatearHora(e.slotInicio, e.zonaHoraria)} – ${formatearHora(e.slotFin, e.zonaHoraria)}</td></tr>
       </table>
-      <p style="font-size:16px;font-weight:bold;color:#16a34a">✅ Total pagado: COP ${(e as any).montoTotal || "—"}</p>
+      <p style="font-size:16px;font-weight:bold;color:#16a34a">✅ Total pagado: COP ${e.montoTotal || "—"}</p>
       <p style="color:#71717a;font-size:14px">Presentate 10 minutos antes. ¡Buen partido!</p>
     `,
   }),
@@ -156,7 +164,7 @@ const ownerTemplates: Record<
         <tr><td style="padding:4px 12px 4px 0;color:#71717a">Fecha</td><td>${formatearFechaDeReserva(e.slotInicio, e.zonaHoraria)}</td></tr>
         <tr><td style="padding:4px 12px 4px 0;color:#71717a">Horario</td><td>${formatearHora(e.slotInicio, e.zonaHoraria)} – ${formatearHora(e.slotFin, e.zonaHoraria)}</td></tr>
       </table>
-      <p style="font-size:16px;color:#eab308">⚠️ Saldo pendiente: COP ${(e as any).saldoPendiente || "—"}</p>
+      <p style="font-size:16px;color:#eab308">⚠️ Saldo pendiente: COP ${e.saldoPendiente || "—"}</p>
       <p style="color:#71717a;font-size:14px">El jugador debe completar el pago antes de que expire la reserva.</p>
     `,
   }),
