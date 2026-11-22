@@ -8,7 +8,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}"],
+    // `packages/*` entra porque la lógica pura de @sfs/db también se
+    // testea; los scripts del paquete (migrate, seed) no son importables,
+    // así que lo que vale la pena cubrir se extrae a módulos sin efectos.
+    include: ["src/**/*.test.{ts,tsx}", "packages/*/src/**/*.test.ts"],
   },
   resolve: {
     alias: {
