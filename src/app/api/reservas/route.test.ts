@@ -69,8 +69,9 @@ vi.mock("@/lib/disponibilidad", () => ({
   turnoDentroDeHorario: () => true,
 }));
 vi.mock("@/lib/consultas", () => ({
-  reservasDelDiaLocal: () => [],
+  reservasDelDiaLocal: (fecha: string) => [`ids-del-dia-${fecha}`],
   reservaOcupaElTurno: () => ({}),
+  ESTADOS_EFECTIVOS: ["PAGO_PARCIAL", "CONFIRMADA", "COMPLETADA"],
 }));
 vi.mock("@/lib/pricing", () => ({
   calcularPrecio: async () => ({ success: true, data: { precioFinal: 160000, promocionAplicada: null } }),
@@ -262,6 +263,66 @@ describe("GET /api/reservas?conSaldo=true — cuentas por cobrar", () => {
   it("sin el filtro no se mete con el saldo", async () => {
     await GET(consulta(""));
     expect(condiciones()).not.toContainEqual({ gt: ["saldo_pendiente", "0"] });
+  });
+});
+
+describe("GET /api/reservas?efectivas=true — las reservas que valen", () => {
+  function condiciones() {
+    const args = mocks.reservaFindMany.mock.calls[0]?.[0] as { where: { and: unknown[] } };
+    return args.where.and;
+  }
+
+  beforeEach(() => {
+    mocks.reservaFindMany.mockResolvedValue([]);
+    mocks.getAuthUser.mockResolvedValue({ sub: DUENO, email: "d@sfs.test", role: "OWNER" });
+  });
+
+  function consulta(query: string) {
+    return new NextRequest(`http://localhost/api/reservas${query}`, {
+      method: "GET",
+      headers: { "x-forwarded-for": `10.9.0.${(ip += 1)}` },
+    });
+  }
+
+  it("trae las tres que se concretaron, no un solo estado", async () => {
+    await GET(consulta("?efectivas=true"));
+
+    expect(condiciones()).toContainEqual({
+      inArray: ["estado", ["PAGO_PARCIAL", "CONFIRMADA", "COMPLETADA"]],
+    });
+  });
+
+  it("el cliente no enumera estados: la regla de qué vale vive en el servidor", async () => {
+    await GET(consulta("?efectivas=true"));
+
+    const porEstadoSuelto = condiciones().filter(
+      (c): c is { eq: unknown[] } =>
+        typeof c === "object" && c !== null && "eq" in c && (c as { eq: unknown[] }).eq[0] === "estado"
+    );
+    expect(porEstadoSuelto).toHaveLength(0);
+  });
+
+  it("se combina con el día: 'efectivas de hoy' es una sola pregunta", async () => {
+    await GET(consulta("?efectivas=true&fecha=2026-11-22"));
+
+    expect(condiciones()).toContainEqual({ inArray: ["id", ["ids-del-dia-2026-11-22"]] });
+    expect(condiciones()).toContainEqual({
+      inArray: ["estado", ["PAGO_PARCIAL", "CONFIRMADA", "COMPLETADA"]],
+    });
+  });
+
+  it("sin el filtro no se mete con el estado", async () => {
+    await GET(consulta(""));
+
+    expect(condiciones()).not.toContainEqual({
+      inArray: ["estado", ["PAGO_PARCIAL", "CONFIRMADA", "COMPLETADA"]],
+    });
+  });
+
+  it("un estado explícito sigue funcionando: efectivas no lo reemplaza", async () => {
+    await GET(consulta("?estado=CONFIRMADA"));
+
+    expect(condiciones()).toContainEqual({ eq: ["estado", "CONFIRMADA"] });
   });
 });
 
