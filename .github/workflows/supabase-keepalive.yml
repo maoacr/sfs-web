@@ -36,10 +36,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `ref` es el project ref de Supabase, que viaja dentro del usuario
+          # de la connection string del pooler (`postgres.<ref>`). No es un
+          # secreto: aparece en la URL pública de la API del proyecto. Está acá
+          # para que el paso pueda verificar que el secret apunta a la base que
+          # dice apuntar.
           - entorno: produccion
             secreto: DATABASE_URL
+            ref: nbjnrpktkbrjapamdyvc
           - entorno: sfs-dev
             secreto: DATABASE_URL_DEV
+            ref: ivqlbqvhrhosfovkihkv
 
     steps:
       - name: Ping la base de datos
@@ -49,6 +56,8 @@ jobs:
           DATABASE_URL: ${{ secrets[matrix.secreto] }}
           # El nombre del secret viaja aparte para poder nombrarlo en el error.
           SECRETO: ${{ matrix.secreto }}
+          ENTORNO: ${{ matrix.entorno }}
+          REF: ${{ matrix.ref }}
         run: |
           set -euo pipefail
 
@@ -56,6 +65,34 @@ jobs:
             echo "::error::Falta el secret ${SECRETO} en el repositorio."
             exit 1
           fi
+
+          # Decir a qué host se está conectando, porque la guarda de arriba
+          # sólo detecta un secret VACÍO — no uno cargado con la cadena
+          # equivocada. Pasó: `DATABASE_URL_DEV` apuntaba a producción, los dos
+          # jobs daban verde y sfs-dev se iba a pausar igual, en silencio.
+          #
+          # Las regiones distinguen los entornos: producción es us-east-1,
+          # sfs-dev es us-east-2.
+          #
+          # `##*@` corta en el ÚLTIMO arroba, así que una contraseña que
+          # contenga uno no mueve el host; `%%/*` saca la base. Nunca imprime
+          # la cadena completa: lleva la contraseña.
+          destino="${DATABASE_URL##*@}"
+          destino="${destino%%/*}"
+          echo "Entorno declarado: ${ENTORNO} — host: ${destino}"
+
+          # Y además FALLAR si el secret no apunta al proyecto que debería.
+          # Imprimir el host no alcanza: esto corre solo tres veces al día y
+          # nadie lee los logs de un job verde. Sin esta guarda, un secret
+          # cargado con la cadena del otro entorno deja la base sin pingear
+          # durante los 7 días que tarda Supabase en pausarla.
+          case "${DATABASE_URL}" in
+            *"${REF}"*) ;;
+            *)
+              echo "::error::${SECRETO} no apunta al proyecto ${REF} (${ENTORNO}). Revisá el valor del secret."
+              exit 1
+              ;;
+          esac
 
           # Lectura trivial sobre una tabla real: cuenta como query de usuario
           # y no modifica nada.
