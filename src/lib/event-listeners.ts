@@ -70,6 +70,10 @@ export async function notificarReserva(reservaId: string, tipo: EventoReserva) {
     playerEmail: reserva.player.email,
     tenantId: reserva.tenantId,
     tenantEmail: reserva.tenant.email,
+    // Las plantillas de pago los muestran. Sin esto caían en "—" siempre, y
+    // un `as any` en email.ts tapaba que nunca llegaban.
+    montoTotal: reserva.montoTotal,
+    saldoPendiente: reserva.saldoPendiente,
   });
 }
 
@@ -86,6 +90,8 @@ export async function notificarCambioReserva(event: {
   playerEmail: string;
   tenantId: string;
   tenantEmail: string;
+  montoTotal?: string | null;
+  saldoPendiente?: string | null;
 }) {
   const msgs = mensajes[event.tipo];
 
